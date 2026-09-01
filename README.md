@@ -350,3 +350,12 @@ Full Stack Developer in Training
 <p align="center">
   <strong>EduHub — Bringing School Operations Together.</strong>
 </p>
+
+## Development Guidelines
+
+- Keep TypeScript types explicit and maintainable.
+- Validate incoming requests before processing them.
+- Handle API errors consistently.
+- Add tests when changing business logic.
+- Keep frontend and backend responsibilities separate.
+
