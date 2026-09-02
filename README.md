@@ -443,3 +443,11 @@ Full Stack Developer in Training
 - Keep secrets in environment variables.
 - Never expose sensitive information in API responses.
 
+
+## API Development
+
+- Use consistent endpoint naming.
+- Return appropriate HTTP status codes.
+- Validate request data.
+- Handle API errors consistently.
+
