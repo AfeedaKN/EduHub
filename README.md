@@ -451,3 +451,11 @@ Full Stack Developer in Training
 - Validate request data.
 - Handle API errors consistently.
 
+
+## Code Quality
+
+- Follow a consistent coding style.
+- Use meaningful variable and function names.
+- Keep functions small and focused.
+- Handle errors properly.
+
