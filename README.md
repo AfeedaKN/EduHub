@@ -459,3 +459,11 @@ Full Stack Developer in Training
 - Keep functions small and focused.
 - Handle errors properly.
 
+
+## Error Handling
+
+- Handle errors with appropriate status codes.
+- Return clear and useful error messages.
+- Avoid exposing sensitive information in error responses.
+- Log errors to help with debugging.
+
