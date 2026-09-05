@@ -467,3 +467,11 @@ Full Stack Developer in Training
 - Avoid exposing sensitive information in error responses.
 - Log errors to help with debugging.
 
+
+## Database Management
+
+- Design clear and consistent database schemas.
+- Validate data before saving it.
+- Use indexes to improve query performance.
+- Handle database errors safely.
+
