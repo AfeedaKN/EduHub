@@ -475,3 +475,11 @@ Full Stack Developer in Training
 - Use indexes to improve query performance.
 - Handle database errors safely.
 
+
+## Database Management
+
+- Design clear and consistent database schemas.
+- Validate data before saving it.
+- Use indexes to improve query performance.
+- Handle database errors safely.
+
