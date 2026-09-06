@@ -483,3 +483,12 @@ Full Stack Developer in Training
 - Use indexes to improve query performance.
 - Handle database errors safely.
 
+
+## Security Best Practices
+
+- Hash passwords before storing them.
+- Validate user input on the server.
+- Protect private routes with authentication middleware.
+- Keep secrets in environment variables.
+- Never expose sensitive information in API responses.
+
