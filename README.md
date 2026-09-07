@@ -492,3 +492,12 @@ Full Stack Developer in Training
 - Keep secrets in environment variables.
 - Never expose sensitive information in API responses.
 
+
+## API Security
+
+- Validate incoming request data.
+- Authenticate users before accessing protected routes.
+- Check user roles before allowing restricted actions.
+- Use secure error responses.
+- Keep API secrets in environment variables.
+
