@@ -501,3 +501,11 @@ Full Stack Developer in Training
 - Use secure error responses.
 - Keep API secrets in environment variables.
 
+
+## Authentication
+
+- Verify user credentials securely.
+- Use JWT to protect private routes.
+- Check token validity before granting access.
+- Handle authentication failures properly.
+
