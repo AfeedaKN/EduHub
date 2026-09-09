@@ -509,3 +509,11 @@ Full Stack Developer in Training
 - Check token validity before granting access.
 - Handle authentication failures properly.
 
+
+## Testing Practices
+
+- Test important business logic.
+- Check invalid inputs and edge cases.
+- Test API responses.
+- Run relevant tests before committing changes.
+
