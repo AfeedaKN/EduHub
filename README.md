@@ -525,3 +525,11 @@ Full Stack Developer in Training
 - Review changes before merging.
 - Maintain a clear and consistent project structure.
 
+
+## Project Maintenance
+
+- Keep project documentation updated.
+- Remove unused code and dependencies.
+- Review changes before merging.
+- Maintain a clear and consistent project structure.
+
