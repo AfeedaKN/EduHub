@@ -517,3 +517,11 @@ Full Stack Developer in Training
 - Test API responses.
 - Run relevant tests before committing changes.
 
+
+## Project Maintenance
+
+- Keep project documentation updated.
+- Remove unused code and dependencies.
+- Review changes before merging.
+- Maintain a clear and consistent project structure.
+
