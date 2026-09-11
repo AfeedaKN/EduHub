@@ -533,3 +533,10 @@ Full Stack Developer in Training
 - Review changes before merging.
 - Maintain a clear and consistent project structure.
 
+
+## Code Reviews
+
+- Review code before merging changes.
+- Keep functions readable and focused.
+- Fix bugs found during reviews.
+
