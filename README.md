@@ -540,3 +540,10 @@ Full Stack Developer in Training
 - Keep functions readable and focused.
 - Fix bugs found during reviews.
 
+
+## Environment Configuration
+
+- Store configuration in environment variables.
+- Keep secrets out of source code.
+- Use an example environment file for required variables.
+
