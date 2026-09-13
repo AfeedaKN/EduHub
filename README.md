@@ -547,3 +547,10 @@ Full Stack Developer in Training
 - Keep secrets out of source code.
 - Use an example environment file for required variables.
 
+
+## API Validation
+
+- Validate required fields.
+- Reject invalid data.
+- Return clear validation errors.
+
