@@ -554,3 +554,10 @@ Full Stack Developer in Training
 - Reject invalid data.
 - Return clear validation errors.
 
+
+## Logging and Monitoring
+
+- Log important application errors.
+- Avoid logging passwords and secrets.
+- Use logs to investigate unexpected behavior.
+
