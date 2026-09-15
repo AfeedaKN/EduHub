@@ -561,3 +561,10 @@ Full Stack Developer in Training
 - Avoid logging passwords and secrets.
 - Use logs to investigate unexpected behavior.
 
+
+## Database Performance
+
+- Use indexes for frequently queried fields.
+- Avoid unnecessary database queries.
+- Review slow queries and improve them.
+
