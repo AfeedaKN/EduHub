@@ -568,3 +568,10 @@ Full Stack Developer in Training
 - Avoid unnecessary database queries.
 - Review slow queries and improve them.
 
+
+## User Authorization
+
+- Verify permissions before restricted actions.
+- Allow users to access only permitted resources.
+- Protect administrative operations.
+
