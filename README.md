@@ -582,3 +582,10 @@ Full Stack Developer in Training
 - Explain setup and installation steps.
 - Keep project instructions up to date.
 
+
+## Documentation
+
+- Document important API endpoints.
+- Explain setup and installation steps.
+- Keep project instructions up to date.
+
