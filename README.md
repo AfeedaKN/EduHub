@@ -575,3 +575,10 @@ Full Stack Developer in Training
 - Allow users to access only permitted resources.
 - Protect administrative operations.
 
+
+## Documentation
+
+- Document important API endpoints.
+- Explain setup and installation steps.
+- Keep project instructions up to date.
+
