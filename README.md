@@ -631,3 +631,10 @@ Full Stack Developer in Training
 - Return suitable HTTP status codes.
 - Provide clear error messages.
 
+
+## API Documentation
+
+- Document endpoint URLs and HTTP methods.
+- Explain required request fields.
+- Include expected response formats.
+
