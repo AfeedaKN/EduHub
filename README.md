@@ -638,3 +638,10 @@ Full Stack Developer in Training
 - Explain required request fields.
 - Include expected response formats.
 
+
+## Performance Optimization
+
+- Avoid unnecessary database queries.
+- Use pagination for large result sets.
+- Optimize frequently used API endpoints.
+
