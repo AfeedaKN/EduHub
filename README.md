@@ -645,3 +645,11 @@ Full Stack Developer in Training
 - Use pagination for large result sets.
 - Optimize frequently used API endpoints.
 
+
+## Project Structure
+
+- Organize code into feature-based modules.
+- Separate controllers, services, and routes.
+- Keep shared utilities reusable.
+- Maintain clear naming conventions.
+
