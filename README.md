@@ -661,3 +661,10 @@ Full Stack Developer in Training
 - Keep shared utilities reusable.
 - Maintain clear naming conventions.
 
+
+## Project Architecture
+
+- Organize backend code by feature modules.
+- Separate routes, controllers, and services.
+- Keep shared utilities reusable.
+
