@@ -668,3 +668,10 @@ Full Stack Developer in Training
 - Separate routes, controllers, and services.
 - Keep shared utilities reusable.
 
+
+## Authentication
+
+- Verify user credentials securely.
+- Use JWT for authenticated requests.
+- Protect private API routes.
+
