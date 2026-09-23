@@ -675,3 +675,10 @@ Full Stack Developer in Training
 - Use JWT for authenticated requests.
 - Protect private API routes.
 
+
+## Authorization
+
+- Check user roles before restricted actions.
+- Protect administrative operations.
+- Prevent unauthorized access to student records.
+
