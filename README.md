@@ -682,3 +682,10 @@ Full Stack Developer in Training
 - Protect administrative operations.
 - Prevent unauthorized access to student records.
 
+
+## Parent Management
+
+- Maintain parent account information.
+- Associate parents with their students.
+- Validate parent registration requests.
+
