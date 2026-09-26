@@ -696,3 +696,10 @@ Full Stack Developer in Training
 - Validate student registration data.
 - Support management approval workflows.
 
+
+## Teacher Management
+
+- Maintain teacher profiles.
+- Organize teacher information by role.
+- Restrict teacher operations by permissions.
+
