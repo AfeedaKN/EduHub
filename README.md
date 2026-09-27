@@ -703,3 +703,10 @@ Full Stack Developer in Training
 - Organize teacher information by role.
 - Restrict teacher operations by permissions.
 
+
+## Assignment Management
+
+- Organize assignments by class.
+- Track assignment deadlines.
+- Make relevant assignments available to parents and students.
+
