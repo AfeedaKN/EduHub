@@ -710,3 +710,10 @@ Full Stack Developer in Training
 - Track assignment deadlines.
 - Make relevant assignments available to parents and students.
 
+
+## Examination Management
+
+- Organize examination schedules.
+- Associate marks with students and examinations.
+- Validate marks before saving them.
+
