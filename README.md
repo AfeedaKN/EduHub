@@ -717,3 +717,10 @@ Full Stack Developer in Training
 - Associate marks with students and examinations.
 - Validate marks before saving them.
 
+
+## Attendance Management
+
+- Record attendance by class and date.
+- Validate attendance entries.
+- Make attendance information available to authorized users.
+
