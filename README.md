@@ -724,3 +724,10 @@ Full Stack Developer in Training
 - Validate attendance entries.
 - Make attendance information available to authorized users.
 
+
+## Communication
+
+- Provide clear communication between school and parents.
+- Organize announcements by audience.
+- Protect private communication from unauthorized access.
+
