@@ -731,3 +731,10 @@ Full Stack Developer in Training
 - Organize announcements by audience.
 - Protect private communication from unauthorized access.
 
+
+## API Validation
+
+- Validate required request fields.
+- Reject invalid input.
+- Return clear validation errors.
+
