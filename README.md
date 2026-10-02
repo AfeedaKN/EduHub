@@ -738,3 +738,10 @@ Full Stack Developer in Training
 - Reject invalid input.
 - Return clear validation errors.
 
+
+## Error Handling
+
+- Handle expected errors consistently.
+- Return appropriate HTTP status codes.
+- Avoid exposing internal details in error responses.
+
