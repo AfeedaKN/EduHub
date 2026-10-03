@@ -745,3 +745,10 @@ Full Stack Developer in Training
 - Return appropriate HTTP status codes.
 - Avoid exposing internal details in error responses.
 
+
+## Database Design
+
+- Use schemas that represent school data clearly.
+- Define relationships between related records.
+- Validate data before database operations.
+
