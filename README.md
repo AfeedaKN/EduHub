@@ -752,3 +752,10 @@ Full Stack Developer in Training
 - Define relationships between related records.
 - Validate data before database operations.
 
+
+## Database Performance
+
+- Index fields used frequently in queries.
+- Avoid unnecessary database requests.
+- Review slow queries before optimizing them.
+
