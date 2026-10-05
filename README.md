@@ -759,3 +759,10 @@ Full Stack Developer in Training
 - Avoid unnecessary database requests.
 - Review slow queries before optimizing them.
 
+
+## Testing Practices
+
+- Test important business logic.
+- Cover invalid inputs and edge cases.
+- Run relevant tests before committing changes.
+
