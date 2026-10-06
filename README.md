@@ -766,3 +766,10 @@ Full Stack Developer in Training
 - Cover invalid inputs and edge cases.
 - Run relevant tests before committing changes.
 
+
+## Security Practices
+
+- Hash passwords before storing them.
+- Keep secrets in environment variables.
+- Validate permissions for protected operations.
+
