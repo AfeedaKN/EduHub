@@ -773,3 +773,10 @@ Full Stack Developer in Training
 - Keep secrets in environment variables.
 - Validate permissions for protected operations.
 
+
+## Environment Configuration
+
+- Keep environment-specific settings outside source code.
+- Provide an example environment file.
+- Never commit real secrets.
+
