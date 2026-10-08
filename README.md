@@ -780,3 +780,10 @@ Full Stack Developer in Training
 - Provide an example environment file.
 - Never commit real secrets.
 
+
+## Logging
+
+- Record useful application errors.
+- Avoid logging passwords and sensitive student information.
+- Use logs to investigate failures.
+
