@@ -4,13 +4,14 @@ const baseURL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api/
 
 export const axiosClient: AxiosInstance = axios.create({
   baseURL,
+  withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
   },
   timeout: 10000,
 });
 
-// Request interceptor (e.g. for attaching JWT bearer tokens in the next step)
+// Request interceptor: attach JWT token if present
 axiosClient.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
     const token = localStorage.getItem('eduhub_auth_token');
@@ -19,22 +20,23 @@ axiosClient.interceptors.request.use(
     }
     return config;
   },
-  (error) => {
-    return Promise.reject(error);
-  }
+  (error) => Promise.reject(error)
 );
 
-// Response interceptor (centralized handling of errors & responses)
+// Response interceptor: extract error message cleanly
 axiosClient.interceptors.response.use(
-  (response: AxiosResponse) => {
-    return response;
-  },
+  (response: AxiosResponse) => response,
   (error) => {
-    // Standard error formatting
+    const errorData = error.response?.data?.error;
+    const message = errorData?.message || error.response?.data?.message || error.message || 'Something went wrong';
+    const code = errorData?.code || 'UNKNOWN_ERROR';
+    const details = errorData?.details;
+
     const customError = {
-      message: error.response?.data?.message || error.message || 'Something went wrong',
+      message,
+      code,
+      details,
       status: error.response?.status || 500,
-      errors: error.response?.data?.errors,
     };
     return Promise.reject(customError);
   }
