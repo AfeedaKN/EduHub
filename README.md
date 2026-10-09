@@ -787,3 +787,10 @@ Full Stack Developer in Training
 - Avoid logging passwords and sensitive student information.
 - Use logs to investigate failures.
 
+
+## API Documentation
+
+- Describe endpoint URLs and HTTP methods.
+- Document required request fields.
+- Explain response formats and error cases.
+
