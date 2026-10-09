@@ -21,7 +21,7 @@ import { Button } from '../components/common/Button';
 import { Spinner } from '../components/common/Spinner';
 import { useAppDispatch } from '../store/hooks';
 import { setLastPing } from '../store/slices/appSlice';
-
+//hi
 export const HomePage: React.FC = () => {
   const [health, setHealth] = useState<SystemHealthData | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
