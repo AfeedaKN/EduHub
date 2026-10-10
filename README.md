@@ -794,3 +794,10 @@ Full Stack Developer in Training
 - Document required request fields.
 - Explain response formats and error cases.
 
+
+## Project Setup
+
+- Document required software and dependencies.
+- Explain installation commands.
+- Describe how to configure the local environment.
+
