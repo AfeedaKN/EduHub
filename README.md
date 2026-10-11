@@ -801,3 +801,10 @@ Full Stack Developer in Training
 - Explain installation commands.
 - Describe how to configure the local environment.
 
+
+## Code Quality
+
+- Use meaningful variable and function names.
+- Keep functions focused on one responsibility.
+- Maintain consistent formatting.
+
