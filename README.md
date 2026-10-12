@@ -808,3 +808,10 @@ Full Stack Developer in Training
 - Keep functions focused on one responsibility.
 - Maintain consistent formatting.
 
+
+## Role-Based Access
+
+- Apply permissions based on user roles.
+- Restrict administrative actions.
+- Verify access to protected records.
+
