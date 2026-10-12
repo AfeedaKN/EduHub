@@ -2,11 +2,15 @@ import { Application } from 'express';
 import { env } from '../config/env.config';
 import { initAuthModule, AuthModuleComponents } from '../modules/auth/auth.module';
 import { initParentModule, ParentModuleComponents } from '../modules/parent/parent.module';
+import { initAdminModule, AdminModuleComponents } from '../modules/admin/admin.module';
+import { initTeacherModule, TeacherModuleComponents } from '../modules/teacher/teacher.module';
 import { createRateLimiter } from '../shared/presentation/middleware/rateLimiter';
 
 export interface AppDependencies {
   authModule: AuthModuleComponents;
   parentModule: ParentModuleComponents;
+  adminModule: AdminModuleComponents;
+  teacherModule: TeacherModuleComponents;
 }
 
 export function configureDependencies(): AppDependencies {
@@ -23,9 +27,16 @@ export function configureDependencies(): AppDependencies {
   // Initialize Parent Module reusing the authentication middleware from Auth Module
   const parentModule = initParentModule(authModule.authenticateMiddleware);
 
+  // Initialize Admin Module reusing the authentication middleware from Auth Module
+  const adminModule = initAdminModule(authModule.authenticateMiddleware);
+
+  // Initialize Teacher Module reusing the authentication middleware from Auth Module
+  const teacherModule = initTeacherModule(authModule.authenticateMiddleware);
+
   return {
     authModule,
     parentModule,
+    adminModule,
+    teacherModule,
   };
 }
-

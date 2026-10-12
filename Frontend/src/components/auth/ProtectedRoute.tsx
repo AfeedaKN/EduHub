@@ -17,11 +17,14 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowe
   }
 
   if (allowedRoles && allowedRoles.length > 0 && !allowedRoles.includes(user.role)) {
-    if (user.role === 'TEACHER') {
-      return <Navigate to="/system-status" replace />;
-    }
     if (user.role === 'MANAGEMENT') {
-      return <Navigate to="/system-status" replace />;
+      return <Navigate to="/admin/dashboard" replace />;
+    }
+    if (user.role === 'PARENT') {
+      return <Navigate to="/parent/dashboard" replace />;
+    }
+    if (user.role === 'TEACHER') {
+      return <Navigate to="/teacher/dashboard" replace />;
     }
     return <Navigate to="/login" replace />;
   }

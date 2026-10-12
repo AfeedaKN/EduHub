@@ -143,6 +143,10 @@ export const LoginForm: React.FC<LoginFormProps> = ({ selectedRole, onSuccess })
             onSuccess();
           } else if (user.role === 'PARENT') {
             navigate('/parent/dashboard');
+          } else if (user.role === 'MANAGEMENT') {
+            navigate('/admin/dashboard');
+          } else if (user.role === 'TEACHER') {
+            navigate('/teacher/dashboard');
           } else {
             navigate('/system-status');
           }

@@ -10,6 +10,13 @@ import { ProtectedRoute } from '../components/auth/ProtectedRoute';
 import { ParentDashboardPage } from '../pages/parent/ParentDashboardPage';
 import { ParentPlaceholderPage } from '../pages/parent/ParentPlaceholderPage';
 import { AddStudentPage } from '../pages/parent/AddStudentPage';
+import { AdminDashboardPage } from '../pages/admin/AdminDashboardPage';
+import { AdminAdmissionsPage } from '../pages/admin/AdminAdmissionsPage';
+import { AdminClassesPage } from '../pages/admin/AdminClassesPage';
+import { AdminTeachersPage } from '../pages/admin/AdminTeachersPage';
+import { AdminPlaceholderPage } from '../pages/admin/AdminPlaceholderPage';
+import { TeacherDashboardPage } from '../pages/teacher/TeacherDashboardPage';
+import { TeacherPlaceholderPage } from '../pages/teacher/TeacherPlaceholderPage';
 
 export const AppRouter: React.FC = () => {
   return (
@@ -136,6 +143,276 @@ export const AppRouter: React.FC = () => {
           element={
             <ProtectedRoute allowedRoles={['PARENT']}>
               <ParentPlaceholderPage title="Parent Account Profile" />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* ============================================================== */}
+        {/* Admin / School Management Protected Routes                      */}
+        {/* ============================================================== */}
+        <Route
+          path="/admin/dashboard"
+          element={
+            <ProtectedRoute allowedRoles={['MANAGEMENT']}>
+              <AdminDashboardPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
+
+        {/* Admissions Management Page */}
+        <Route
+          path="/admin/admissions"
+          element={
+            <ProtectedRoute allowedRoles={['MANAGEMENT']}>
+              <AdminAdmissionsPage />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Secondary Admin Module Routes (Ensuring no broken links) */}
+        <Route
+          path="/admin/people/students"
+          element={
+            <ProtectedRoute allowedRoles={['MANAGEMENT']}>
+              <AdminPlaceholderPage
+                title="Enrolled Students Management"
+                description="Manage student records, enrollment status, section allocations, and student profiles."
+              />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/people/teachers"
+          element={
+            <ProtectedRoute allowedRoles={['MANAGEMENT']}>
+              <AdminTeachersPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/teachers"
+          element={<Navigate to="/admin/people/teachers" replace />}
+        />
+        <Route
+          path="/admin/people/parents"
+          element={
+            <ProtectedRoute allowedRoles={['MANAGEMENT']}>
+              <AdminPlaceholderPage
+                title="Parent Accounts Directory"
+                description="Directory of registered parent guardians, their linked children, and contact verifications."
+              />
+            </ProtectedRoute>
+          }
+        />
+        {/* Classes & Sections Management Page */}
+        <Route
+          path="/admin/academics/classes"
+          element={
+            <ProtectedRoute allowedRoles={['MANAGEMENT']}>
+              <AdminClassesPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/classes"
+          element={<Navigate to="/admin/academics/classes" replace />}
+        />
+        <Route
+          path="/admin/academics/subjects"
+          element={
+            <ProtectedRoute allowedRoles={['MANAGEMENT']}>
+              <AdminPlaceholderPage
+                title="Curriculum & Subjects"
+                description="Define academic subjects, syllabus modules, elective options, and grading criteria."
+              />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/academics/timetable"
+          element={
+            <ProtectedRoute allowedRoles={['MANAGEMENT']}>
+              <AdminPlaceholderPage
+                title="Master Academic Timetable"
+                description="Configure class schedules, period timings, room allocations, and teacher substitute schedules."
+              />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/attendance"
+          element={
+            <ProtectedRoute allowedRoles={['MANAGEMENT']}>
+              <AdminPlaceholderPage
+                title="School Attendance Management"
+                description="Review daily school-wide attendance, generate monthly reports, and manage leave records."
+              />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/exams"
+          element={
+            <ProtectedRoute allowedRoles={['MANAGEMENT']}>
+              <AdminPlaceholderPage
+                title="Examinations & Results"
+                description="Manage examination schedules, oversee grading submissions, and publish student report cards."
+              />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/fees"
+          element={
+            <ProtectedRoute allowedRoles={['MANAGEMENT']}>
+              <AdminPlaceholderPage
+                title="Fee Collection & Accounting"
+                description="Configure school fee structures, review pending collections, and generate payment receipts."
+              />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/communication/notices"
+          element={
+            <ProtectedRoute allowedRoles={['MANAGEMENT']}>
+              <AdminPlaceholderPage
+                title="School Circulars & Notices"
+                description="Draft and broadcast official circulars, event alerts, and announcements to parents and faculty."
+              />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/communication/meetings"
+          element={
+            <ProtectedRoute allowedRoles={['MANAGEMENT']}>
+              <AdminPlaceholderPage
+                title="Parent-Teacher Meetings"
+                description="Schedule school-wide PTM sessions, configure appointment slots, and track parent attendance."
+              />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/careers"
+          element={
+            <ProtectedRoute allowedRoles={['MANAGEMENT']}>
+              <AdminPlaceholderPage
+                title="Career Openings & Applications"
+                description="Post school job openings, review teacher candidate resumes, and schedule hiring interviews."
+              />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/settings"
+          element={
+            <ProtectedRoute allowedRoles={['MANAGEMENT']}>
+              <AdminPlaceholderPage
+                title="School Profile & Settings"
+                description="Manage school information, academic year calendars, user access rules, and system configurations."
+              />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Teacher Portal Protected Routes */}
+        <Route
+          path="/teacher/dashboard"
+          element={
+            <ProtectedRoute allowedRoles={['TEACHER']}>
+              <TeacherDashboardPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route path="/teacher" element={<Navigate to="/teacher/dashboard" replace />} />
+        <Route
+          path="/teacher/classes"
+          element={
+            <ProtectedRoute allowedRoles={['TEACHER']}>
+              <TeacherPlaceholderPage
+                title="My Assigned Classes"
+                description="View and manage all classrooms, grade levels, and sections assigned to you for the current academic session."
+              />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/teacher/students"
+          element={
+            <ProtectedRoute allowedRoles={['TEACHER']}>
+              <TeacherPlaceholderPage
+                title="My Students"
+                description="Directory of officially enrolled students across your assigned classes and sections."
+              />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/teacher/attendance"
+          element={
+            <ProtectedRoute allowedRoles={['TEACHER']}>
+              <TeacherPlaceholderPage
+                title="Daily Attendance"
+                description="Record, verify, and submit morning attendance registers for your classroom sessions."
+              />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/teacher/timetable"
+          element={
+            <ProtectedRoute allowedRoles={['TEACHER']}>
+              <TeacherPlaceholderPage
+                title="Weekly Timetable"
+                description="View your complete weekly lecture timetable, room allotments, and break periods."
+              />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/teacher/assignments"
+          element={
+            <ProtectedRoute allowedRoles={['TEACHER']}>
+              <TeacherPlaceholderPage
+                title="Homework & Assignments"
+                description="Create coursework tasks, attach learning resources, and review student homework submissions."
+              />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/teacher/exams"
+          element={
+            <ProtectedRoute allowedRoles={['TEACHER']}>
+              <TeacherPlaceholderPage
+                title="Examinations & Marks Entry"
+                description="Manage term test assessments, enter student marks, and submit subject grading reports."
+              />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/teacher/notices"
+          element={
+            <ProtectedRoute allowedRoles={['TEACHER']}>
+              <TeacherPlaceholderPage
+                title="School Circulars & Announcements"
+                description="Stay up to date with official circulars, faculty meetings, and institutional announcements."
+              />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/teacher/profile"
+          element={
+            <ProtectedRoute allowedRoles={['TEACHER']}>
+              <TeacherPlaceholderPage
+                title="Faculty Profile"
+                description="View your professional teaching credentials, employee identification, and contact information."
+              />
             </ProtectedRoute>
           }
         />

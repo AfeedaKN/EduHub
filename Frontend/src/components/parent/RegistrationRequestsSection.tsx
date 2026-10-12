@@ -1,5 +1,5 @@
 import React from 'react';
-import { Clock, AlertCircle, FileText, ArrowRight } from 'lucide-react';
+import { Clock, AlertCircle, FileText, ArrowRight, CheckCircle2 } from 'lucide-react';
 import { StudentRegistrationRequest } from '../../types/parent.types';
 
 interface RegistrationRequestsSectionProps {
@@ -27,16 +27,21 @@ export const RegistrationRequestsSection: React.FC<RegistrationRequestsSectionPr
       <div className="parent-requests-stack">
         {requests.map((req) => {
           const isRejected = req.status === 'REJECTED';
+          const isApproved = req.status === 'APPROVED';
 
           return (
             <div
               key={req.id}
-              className={`parent-request-card-compact ${isRejected ? 'is-rejected' : 'is-pending'}`}
+              className={`parent-request-card-compact ${
+                isRejected ? 'is-rejected' : isApproved ? 'is-approved' : 'is-pending'
+              }`}
             >
               <div className="parent-request-c-left">
                 <div className="parent-request-c-icon">
                   {isRejected ? (
                     <AlertCircle size={18} className="text-danger" />
+                  ) : isApproved ? (
+                    <CheckCircle2 size={18} style={{ color: '#2E7D32' }} />
                   ) : (
                     <Clock size={18} className="text-muted-blue" />
                   )}
@@ -50,16 +55,26 @@ export const RegistrationRequestsSection: React.FC<RegistrationRequestsSectionPr
                     </span>
                     <span
                       className={`parent-request-c-badge ${
-                        isRejected ? 'badge-rejected' : 'badge-pending'
+                        isRejected
+                          ? 'badge-rejected'
+                          : isApproved
+                          ? 'badge-approved'
+                          : 'badge-pending'
                       }`}
                     >
-                      {isRejected ? 'Not Approved' : 'Pending Review'}
+                      {isRejected
+                        ? 'Not Approved'
+                        : isApproved
+                        ? 'Approved & Enrolled'
+                        : 'Pending Review'}
                     </span>
                   </div>
 
                   <p className="parent-request-c-desc">
                     {isRejected
                       ? req.rejectionReason || 'The school management was unable to approve this admission request.'
+                      : isApproved
+                      ? 'Admission request approved. Your child is officially enrolled.'
                       : 'The school management is reviewing your registration request.'}
                   </p>
 

@@ -1,5 +1,6 @@
 import mongoose, { Schema, Document } from 'mongoose';
 import { StudentGender, ParentRelationship, RegistrationStatus } from '../dtos/parent.dto';
+export { StudentGender, ParentRelationship, RegistrationStatus };
 
 export interface IStudentRegistrationRequestDoc extends Document {
   parentId: mongoose.Types.ObjectId;
@@ -19,6 +20,9 @@ export interface IStudentRegistrationRequestDoc extends Document {
     url: string;
     fileType?: string;
   }>;
+  reviewedBy?: mongoose.Types.ObjectId;
+  reviewedAt?: Date;
+  createdStudentId?: mongoose.Types.ObjectId;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -93,6 +97,20 @@ const StudentRegistrationRequestSchema = new Schema<IStudentRegistrationRequestD
         fileType: { type: String },
       },
     ],
+    reviewedBy: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
+      default: null,
+    },
+    reviewedAt: {
+      type: Date,
+      default: null,
+    },
+    createdStudentId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Student',
+      default: null,
+    },
   },
   {
     timestamps: true,
