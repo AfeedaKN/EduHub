@@ -17,10 +17,12 @@ export interface TeacherSummaryStats {
 }
 
 export interface TeacherClassItem {
+  id?: string;
   classId?: string;
   className: string;
   section: string;
   subject?: string;
+  academicYear?: string;
   studentCount: number;
 }
 
@@ -56,3 +58,28 @@ export interface TeacherDashboardData {
   upcomingActivities: UpcomingActivity[];
   recentNotices: TeacherNotice[];
 }
+
+export interface TeacherStudentItem {
+  id: string;
+  fullName: string;
+  studentId: string;
+  grade: string;
+  section: string;
+  rollNumber?: string;
+  avatarUrl?: string;
+  status: 'ACTIVE' | 'INACTIVE' | 'GRADUATED' | string;
+  academicYear?: string;
+  parentName?: string;
+  parentPhone?: string;
+  parentEmail?: string;
+}
+
+export interface TeacherStudentFilterParams {
+  search?: string;
+  className?: string;
+  grade?: string;
+  section?: string;
+  status?: string;
+  academicYear?: string;
+}
+

@@ -298,5 +298,119 @@ export const adminApi = {
     const res = await axiosClient.delete<ApiResponse<null>>(`/admin/teachers/${id}`);
     return res.data;
   },
+
+  // ==========================================
+  // Teacher Class Assignment APIs
+  // ==========================================
+
+  // Get all assignments across all teachers
+  getAllTeacherAssignments: async (params?: {
+    academicYear?: string;
+    className?: string;
+    section?: string;
+    subject?: string;
+    teacherId?: string;
+    search?: string;
+  }): Promise<ApiResponse<import('../types/admin.types').TeacherAssignmentRecord[]>> => {
+    const res = await axiosClient.get<
+      ApiResponse<import('../types/admin.types').TeacherAssignmentRecord[]>
+    >('/admin/teachers/assignments/all', { params });
+    return res.data;
+  },
+
+  // Get assignments for a specific teacher
+  getTeacherAssignments: async (
+    teacherId: string
+  ): Promise<ApiResponse<import('../types/admin.types').TeacherAssignmentRecord[]>> => {
+    const res = await axiosClient.get<
+      ApiResponse<import('../types/admin.types').TeacherAssignmentRecord[]>
+    >(`/admin/teachers/${teacherId}/assignments`);
+    return res.data;
+  },
+
+  // Assign teacher to class, section, subject, academic year
+  assignTeacherToClass: async (
+    teacherId: string,
+    payload: import('../types/admin.types').AssignTeacherPayload
+  ): Promise<ApiResponse<import('../types/admin.types').TeacherAssignmentRecord>> => {
+    const res = await axiosClient.post<
+      ApiResponse<import('../types/admin.types').TeacherAssignmentRecord>
+    >(`/admin/teachers/${teacherId}/assignments`, payload);
+    return res.data;
+  },
+
+  // Update teacher assignment
+  updateTeacherAssignment: async (
+    teacherId: string,
+    assignmentId: string,
+    payload: import('../types/admin.types').AssignTeacherPayload
+  ): Promise<ApiResponse<import('../types/admin.types').TeacherAssignmentRecord>> => {
+    const res = await axiosClient.put<
+      ApiResponse<import('../types/admin.types').TeacherAssignmentRecord>
+    >(`/admin/teachers/${teacherId}/assignments/${assignmentId}`, payload);
+    return res.data;
+  },
+
+  // Remove teacher assignment
+  removeTeacherAssignment: async (
+    teacherId: string,
+    assignmentId: string
+  ): Promise<ApiResponse<{ success: boolean; message: string }>> => {
+    const res = await axiosClient.delete<ApiResponse<{ success: boolean; message: string }>>(
+      `/admin/teachers/${teacherId}/assignments/${assignmentId}`
+    );
+    return res.data;
+  },
+
+  // ==========================================
+  // Timetable Management APIs
+  // ==========================================
+
+  // Get filtered timetable periods
+  getTimetable: async (
+    params?: import('../types/timetable.types').TimetableFilterParams
+  ): Promise<ApiResponse<import('../types/timetable.types').TimetablePeriod[]>> => {
+    const res = await axiosClient.get<
+      ApiResponse<import('../types/timetable.types').TimetablePeriod[]>
+    >('/admin/timetable', { params });
+    return res.data;
+  },
+
+  // Get single timetable period by ID
+  getTimetablePeriod: async (
+    id: string
+  ): Promise<ApiResponse<import('../types/timetable.types').TimetablePeriod>> => {
+    const res = await axiosClient.get<
+      ApiResponse<import('../types/timetable.types').TimetablePeriod>
+    >(`/admin/timetable/${id}`);
+    return res.data;
+  },
+
+  // Create new timetable period
+  createTimetablePeriod: async (
+    payload: import('../types/timetable.types').CreatePeriodPayload
+  ): Promise<ApiResponse<import('../types/timetable.types').TimetablePeriod>> => {
+    const res = await axiosClient.post<
+      ApiResponse<import('../types/timetable.types').TimetablePeriod>
+    >('/admin/timetable', payload);
+    return res.data;
+  },
+
+  // Update existing timetable period
+  updateTimetablePeriod: async (
+    id: string,
+    payload: import('../types/timetable.types').UpdatePeriodPayload
+  ): Promise<ApiResponse<import('../types/timetable.types').TimetablePeriod>> => {
+    const res = await axiosClient.put<
+      ApiResponse<import('../types/timetable.types').TimetablePeriod>
+    >(`/admin/timetable/${id}`, payload);
+    return res.data;
+  },
+
+  // Delete timetable period
+  deleteTimetablePeriod: async (id: string): Promise<ApiResponse<null>> => {
+    const res = await axiosClient.delete<ApiResponse<null>>(`/admin/timetable/${id}`);
+    return res.data;
+  },
 };
 

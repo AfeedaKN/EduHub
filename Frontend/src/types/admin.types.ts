@@ -170,10 +170,36 @@ export interface UpdateSectionPayload {
 export type TeacherStatus = 'ACTIVE' | 'INACTIVE';
 
 export interface AssignedClass {
+  id?: string;
   classId?: string;
   className: string;
   section: string;
   subject?: string;
+  academicYear?: string;
+  studentCount?: number;
+}
+
+export interface AssignTeacherPayload {
+  classId?: string;
+  className: string;
+  section: string;
+  subject: string;
+  academicYear?: string;
+}
+
+export interface TeacherAssignmentRecord {
+  id: string;
+  teacherId: string;
+  teacherName: string;
+  teacherEmployeeId: string;
+  teacherDepartment: string;
+  teacherStatus: TeacherStatus;
+  classId?: string;
+  className: string;
+  section: string;
+  subject: string;
+  academicYear: string;
+  studentCount: number;
 }
 
 export interface TeacherDetail {

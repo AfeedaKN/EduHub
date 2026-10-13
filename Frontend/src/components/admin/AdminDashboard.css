@@ -1244,49 +1244,74 @@
 }
 
 /* ===================================================================
-   MODAL DIALOG
+   MODAL DIALOG & BACKDROP SYSTEM
    =================================================================== */
-.admin-modal-backdrop {
+.admin-modal-backdrop,
+.admin-modal-overlay {
   position: fixed;
   inset: 0;
-  background-color: rgba(18, 30, 43, 0.45);
-  backdrop-filter: blur(2px);
+  background-color: rgba(18, 30, 43, 0.55);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 200;
-  padding: 16px;
+  z-index: 1000;
+  padding: 20px;
+  box-sizing: border-box;
+  overflow-y: auto;
 }
 
-.admin-modal-dialog {
+.admin-modal-dialog,
+.admin-modal-card {
   background-color: #FFFFFF;
   border: 1px solid var(--admin-border);
   border-radius: 12px;
-  padding: 24px;
-  max-width: 480px;
   width: 100%;
-  box-shadow: 0 16px 40px rgba(32, 53, 74, 0.16);
-  animation: adminModalPop 0.18s ease;
+  max-height: calc(100vh - 48px);
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 48px rgba(32, 53, 74, 0.18);
+  animation: adminModalPop 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  overflow: hidden;
+  box-sizing: border-box;
+  position: relative;
 }
 
 @keyframes adminModalPop {
-  from { opacity: 0; transform: scale(0.97); }
-  to { opacity: 1; transform: scale(1); }
+  from {
+    opacity: 0;
+    transform: scale(0.97) translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
 }
 
 .admin-modal-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 16px;
-  padding-bottom: 12px;
+  padding: 18px 24px;
   border-bottom: 1px solid var(--admin-border-subtle);
+  background-color: #FFFFFF;
+  flex-shrink: 0;
 }
 
 .admin-modal-title {
-  font-size: 1.05rem;
+  font-size: 1.1rem;
   font-weight: 700;
   color: var(--admin-primary);
+  margin: 0;
+  line-height: 1.3;
+}
+
+.admin-modal-subtitle {
+  font-size: 0.78rem;
+  color: var(--admin-text-muted);
+  margin: 3px 0 0;
+  line-height: 1.4;
 }
 
 .admin-modal-close-btn {
@@ -1294,15 +1319,34 @@
   border: none;
   color: var(--admin-text-muted);
   cursor: pointer;
-  padding: 4px;
+  padding: 6px;
   border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.admin-modal-close-btn:hover {
+  background-color: var(--admin-bg-subtle);
+  color: var(--admin-primary);
+}
+
+.admin-modal-close-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .admin-modal-body {
+  padding: 22px 24px;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+  font-size: 0.84rem;
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  font-size: 0.84rem;
 }
 
 .admin-modal-row {
@@ -1323,9 +1367,45 @@
 }
 
 .admin-modal-footer {
-  margin-top: 20px;
+  padding: 16px 24px;
+  border-top: 1px solid var(--admin-border-subtle);
+  background-color: var(--admin-bg-subtle);
   display: flex;
+  align-items: center;
   justify-content: flex-end;
+  gap: 10px;
+  flex-shrink: 0;
+  border-radius: 0 0 12px 12px;
+}
+
+.admin-modal-error-banner,
+.admin-form-error-banner {
+  background-color: #FEF2F2;
+  border: 1px solid #FCA5A5;
+  color: #B91C1C;
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+  line-height: 1.4;
+}
+
+.admin-btn-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  border-top-color: #FFFFFF;
+  border-radius: 50%;
+  animation: adminBtnSpin 0.6s linear infinite;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+@keyframes adminBtnSpin {
+  to { transform: rotate(360deg); }
 }
 
 /* ===================================================================
@@ -2780,5 +2860,970 @@
   }
 }
 
+/* ============================================================== */
+/* TEACHER CLASS ASSIGNMENTS STYLES                               */
+/* ============================================================== */
+.admin-teacher-action-btn.assign:hover {
+  background-color: #F0FDF4;
+  color: #16A34A;
+  border-color: #BBF7D0;
+}
 
+.admin-teacher-tabs {
+  display: flex;
+  gap: 12px;
+  border-bottom: 2px solid var(--admin-border);
+  margin-bottom: 24px;
+}
 
+.admin-teacher-tab-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 18px;
+  background: transparent;
+  border: none;
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--admin-text-muted);
+  cursor: pointer;
+  position: relative;
+  transition: all 0.15s ease;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+}
+
+.admin-teacher-tab-btn:hover {
+  color: var(--admin-primary);
+}
+
+.admin-teacher-tab-btn.active {
+  color: var(--admin-primary);
+  border-bottom-color: var(--admin-primary);
+}
+
+.admin-teacher-tab-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 7px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  background-color: #EEF3F8;
+  color: var(--admin-primary);
+}
+
+.admin-teacher-tab-btn.active .admin-teacher-tab-count {
+  background-color: var(--admin-primary);
+  color: #FFFFFF;
+}
+
+.admin-assignment-subject-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: 5px;
+  font-size: 0.76rem;
+  font-weight: 600;
+  background-color: #F0FDF4;
+  color: #166534;
+  border: 1px solid #DCFCE7;
+}
+
+.admin-assignment-class-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 700;
+  color: #20354A;
+  font-size: 0.92rem;
+}
+
+.admin-assignment-section-pill {
+  padding: 1px 6px;
+  border-radius: 4px;
+  background-color: #EEF3F8;
+  color: #20354A;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.admin-assignment-year-pill {
+  font-size: 0.76rem;
+  color: var(--admin-text-subtle);
+  font-weight: 500;
+}
+
+/* ===================================================================
+   ADMIN TIMETABLE MANAGEMENT STYLES
+   =================================================================== */
+
+/* Page container */
+.admin-timetable-page-container {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+/* Page Header */
+.admin-timetable-header-wrap {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+}
+
+.admin-timetable-title-group h1 {
+  font-family: var(--font-serif, 'Manrope', sans-serif);
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--admin-primary);
+  margin: 0 0 6px 0;
+  line-height: 1.25;
+}
+
+.admin-timetable-title-group p {
+  color: var(--admin-text-muted);
+  font-size: 0.88rem;
+  margin: 0;
+  line-height: 1.45;
+}
+
+.admin-timetable-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Statistics Summary Grid (4 equal-width responsive cards) */
+.admin-timetable-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+@media (max-width: 1024px) {
+  .admin-timetable-summary-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 580px) {
+  .admin-timetable-summary-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.admin-timetable-card-stat {
+  background-color: #FFFFFF;
+  border: 1px solid var(--admin-border);
+  border-radius: 10px;
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+  min-height: 86px;
+  box-sizing: border-box;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.admin-timetable-card-stat:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(32, 53, 74, 0.06);
+}
+
+.admin-timetable-card-stat-info {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+/* Toolbar & Filters (Single row on desktop, wrapping on smaller screens) */
+.admin-timetable-toolbar {
+  background-color: #FFFFFF;
+  border: 1px solid var(--admin-border);
+  border-radius: 10px;
+  padding: 16px 20px;
+  margin-bottom: 24px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.admin-timetable-controls-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.admin-filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.admin-filter-group-year {
+  flex: 0 0 140px;
+}
+
+.admin-filter-group-class {
+  flex: 0 0 200px;
+}
+
+.admin-filter-group-section {
+  flex: 0 0 140px;
+}
+
+.admin-filter-group-search {
+  flex: 1 1 220px;
+  min-width: 200px;
+}
+
+.admin-filter-group-toggle {
+  flex: 0 0 auto;
+}
+
+@media (max-width: 900px) {
+  .admin-filter-group-year,
+  .admin-filter-group-class,
+  .admin-filter-group-section,
+  .admin-filter-group-search,
+  .admin-filter-group-toggle {
+    flex: 1 1 45%;
+    min-width: 160px;
+  }
+}
+
+@media (max-width: 600px) {
+  .admin-filter-group-year,
+  .admin-filter-group-class,
+  .admin-filter-group-section,
+  .admin-filter-group-search,
+  .admin-filter-group-toggle {
+    flex: 1 1 100%;
+    min-width: 100%;
+  }
+}
+
+.admin-filter-label {
+  font-size: 0.73rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--admin-text-muted);
+  display: block;
+  user-select: none;
+}
+
+.admin-filter-select-control {
+  height: 38px;
+  padding: 0 12px;
+  border-radius: 6px;
+  border: 1px solid var(--admin-border);
+  background-color: #FFFFFF;
+  font-size: 0.83rem;
+  color: var(--admin-text-main);
+  outline: none;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.admin-filter-select-control:focus {
+  border-color: var(--admin-primary);
+  box-shadow: 0 0 0 2px var(--admin-primary-light);
+}
+
+.admin-filter-select-control:disabled {
+  background-color: var(--admin-bg-subtle);
+  color: var(--admin-text-subtle);
+  cursor: not-allowed;
+}
+
+/* Aligned Search Input */
+.admin-search-input-box {
+  position: relative;
+  display: flex;
+  align-items: center;
+  height: 38px;
+  width: 100%;
+}
+
+.admin-search-box-icon {
+  position: absolute;
+  left: 11px;
+  color: var(--admin-text-subtle);
+  pointer-events: none;
+}
+
+.admin-search-box-input {
+  width: 100%;
+  height: 100%;
+  padding: 0 32px 0 34px;
+  border-radius: 6px;
+  border: 1px solid var(--admin-border);
+  background-color: var(--admin-bg-subtle);
+  font-size: 0.83rem;
+  color: var(--admin-text-main);
+  outline: none;
+  box-sizing: border-box;
+  transition: all 0.15s ease;
+}
+
+.admin-search-box-input:focus {
+  border-color: var(--admin-primary);
+  background-color: #FFFFFF;
+  box-shadow: 0 0 0 2px var(--admin-primary-light);
+}
+
+.admin-search-box-clear {
+  position: absolute;
+  right: 8px;
+  background: transparent;
+  border: none;
+  color: var(--admin-text-subtle);
+  cursor: pointer;
+  padding: 3px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.admin-search-box-clear:hover {
+  color: var(--admin-text-main);
+  background-color: rgba(0, 0, 0, 0.05);
+}
+
+/* Aligned Segmented Toggle (Weekly vs Day View) */
+.admin-view-toggle {
+  display: inline-flex;
+  align-items: center;
+  height: 38px;
+  background: var(--admin-bg-subtle);
+  padding: 3px;
+  border-radius: 7px;
+  border: 1px solid var(--admin-border);
+  box-sizing: border-box;
+}
+
+.admin-view-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 12px;
+  border-radius: 5px;
+  font-size: 0.80rem;
+  font-weight: 600;
+  border: none;
+  background: transparent;
+  color: var(--admin-text-muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.admin-view-toggle-btn:hover {
+  color: var(--admin-primary);
+}
+
+.admin-view-toggle-btn.active {
+  background: #FFFFFF;
+  color: var(--admin-primary);
+  box-shadow: 0 1px 3px rgba(32, 53, 74, 0.08);
+}
+
+/* Day Filter Ribbon (All Days + Monday-Saturday) */
+.admin-timetable-day-filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-top: 12px;
+  border-top: 1px solid var(--admin-border-subtle);
+  flex-wrap: wrap;
+}
+
+.admin-day-filter-hint {
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: var(--admin-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.admin-day-filter-pills {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.admin-day-pill-btn {
+  padding: 5px 12px;
+  border-radius: 16px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  border: 1px solid var(--admin-border);
+  background: var(--admin-bg-subtle);
+  color: var(--admin-text-muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.admin-day-pill-btn:hover {
+  background: #FFFFFF;
+  border-color: var(--admin-muted-blue);
+  color: var(--admin-primary);
+}
+
+.admin-day-pill-btn.active {
+  background: var(--admin-primary);
+  color: #FFFFFF;
+  border-color: var(--admin-primary);
+}
+
+.admin-day-pill-badge {
+  font-size: 0.70rem;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.07);
+}
+
+.admin-day-pill-btn.active .admin-day-pill-badge {
+  background: rgba(255, 255, 255, 0.22);
+  color: #FFFFFF;
+}
+
+/* Weekly Timetable Grid View */
+.admin-weekly-scroll-container {
+  width: 100%;
+  overflow-x: auto;
+  padding-bottom: 8px;
+  -webkit-overflow-scrolling: touch;
+}
+
+.admin-weekly-timetable-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(185px, 1fr));
+  gap: 14px;
+  align-items: start;
+  min-width: 1080px;
+}
+
+@media (max-width: 1200px) {
+  .admin-weekly-timetable-grid {
+    min-width: 980px;
+  }
+}
+
+/* Day Column Card */
+.admin-timetable-day-col {
+  background-color: #FFFFFF;
+  border: 1px solid var(--admin-border);
+  border-radius: 10px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 380px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+  box-sizing: border-box;
+}
+
+.admin-day-col-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--admin-border-subtle);
+}
+
+.admin-day-name {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--admin-primary);
+}
+
+.admin-day-slots-badge {
+  font-size: 0.70rem;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 10px;
+  background-color: var(--admin-primary-light);
+  color: var(--admin-primary);
+  display: inline-block;
+  margin-top: 2px;
+}
+
+.admin-col-add-btn {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  border: 1px dashed var(--admin-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  color: var(--admin-text-muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.admin-col-add-btn:hover {
+  color: var(--admin-primary);
+  border-color: var(--admin-primary);
+  background-color: var(--admin-primary-light);
+}
+
+/* Day Period Cards Stack */
+.admin-day-periods-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.admin-col-empty-slot {
+  padding: 32px 10px;
+  text-align: center;
+  color: var(--admin-text-subtle);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.78rem;
+  border: 1px dashed var(--admin-border);
+  border-radius: 8px;
+  background-color: var(--admin-bg-subtle);
+}
+
+.admin-btn-link {
+  background: none;
+  border: none;
+  color: var(--admin-primary);
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+  transition: background-color 0.15s ease;
+}
+
+.admin-btn-link:hover {
+  background-color: var(--admin-primary-light);
+  text-decoration: underline;
+}
+
+/* Clean Period Card with restrained accents */
+.admin-period-card {
+  position: relative;
+  background-color: #FFFFFF;
+  border: 1px solid var(--admin-border);
+  border-left: 3.5px solid var(--admin-muted-blue);
+  border-radius: 8px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  box-shadow: 0 1px 2px rgba(32, 53, 74, 0.03);
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+  box-sizing: border-box;
+}
+
+.admin-period-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(32, 53, 74, 0.08);
+}
+
+.admin-period-card.period-card-teaching {
+  border-left-color: #2563EB;
+}
+
+.admin-period-card.period-card-break {
+  border-left-color: #D97706;
+  background-color: #FFFDF7;
+}
+
+.admin-period-card.period-card-assembly {
+  border-left-color: #7C3AED;
+  background-color: #FAF8FF;
+}
+
+.admin-period-card.period-card-activity {
+  border-left-color: #059669;
+  background-color: #F7FEFA;
+}
+
+.admin-period-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.74rem;
+  gap: 6px;
+}
+
+.admin-period-time {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 600;
+  color: var(--admin-text-main);
+  font-variant-numeric: tabular-nums;
+}
+
+.admin-period-type-pill {
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 1px 6px;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+.admin-period-type-pill.pill-teaching {
+  background-color: #EFF6FF;
+  color: #1D4ED8;
+}
+
+.admin-period-type-pill.pill-break {
+  background-color: #FEF3C7;
+  color: #B45309;
+}
+
+.admin-period-type-pill.pill-assembly {
+  background-color: #EDE9FE;
+  color: #6D28D9;
+}
+
+.admin-period-type-pill.pill-activity {
+  background-color: #D1FAE5;
+  color: #047857;
+}
+
+.admin-period-subject {
+  font-weight: 700;
+  font-size: 0.88rem;
+  color: var(--admin-primary);
+  word-break: break-word;
+  line-height: 1.25;
+}
+
+.admin-period-meta-grid {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.admin-period-class-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background-color: var(--admin-primary-light);
+  color: var(--admin-primary);
+}
+
+.admin-period-room-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background-color: #F1F5F9;
+  color: #475569;
+}
+
+.admin-period-teacher {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.75rem;
+  color: #15803D;
+  font-weight: 500;
+}
+
+.admin-period-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  background: rgba(255, 255, 255, 0.9);
+  padding: 2px;
+  border-radius: 5px;
+}
+
+.admin-period-card:hover .admin-period-actions,
+.admin-period-card:focus-within .admin-period-actions {
+  opacity: 1;
+}
+
+.admin-period-action-btn {
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  border: 1px solid var(--admin-border);
+  background: #FFFFFF;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--admin-text-muted);
+  transition: all 0.15s ease;
+}
+
+.admin-period-action-btn.edit:hover {
+  color: #2563EB;
+  border-color: #2563EB;
+  background-color: #EFF6FF;
+}
+
+.admin-period-action-btn.delete:hover {
+  color: #DC2626;
+  border-color: #DC2626;
+  background-color: #FEF2F2;
+}
+
+/* Empty State Card */
+.admin-timetable-empty-card {
+  background-color: #FFFFFF;
+  border: 1px solid var(--admin-border);
+  border-radius: 12px;
+  padding: 48px 24px;
+  text-align: center;
+  box-shadow: 0 1px 3px rgba(32, 53, 74, 0.03);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.admin-timetable-empty-icon {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background-color: #EFF6FF;
+  color: #2563EB;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 4px;
+}
+
+.admin-timetable-empty-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--admin-primary);
+  margin: 0;
+}
+
+.admin-timetable-empty-desc {
+  font-size: 0.84rem;
+  color: var(--admin-text-muted);
+  max-width: 440px;
+  line-height: 1.5;
+  margin: 0;
+}
+
+/* Day View Table Layout */
+.admin-timetable-table-card {
+  background-color: #FFFFFF;
+  border: 1px solid var(--admin-border);
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+}
+
+.admin-timetable-loading-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+/* Day View Table Helpers */
+.admin-day-label {
+  font-weight: 700;
+  color: var(--admin-primary);
+  font-size: 0.82rem;
+}
+
+.admin-class-section-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border-radius: 5px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  background-color: var(--admin-primary-light);
+  color: var(--admin-primary);
+}
+
+.admin-room-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 7px;
+  border-radius: 4px;
+  font-size: 0.76rem;
+  font-weight: 600;
+  background-color: #F1F5F9;
+  color: #475569;
+}
+
+.admin-table-action-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: 1px solid var(--admin-border);
+  background-color: #FFFFFF;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--admin-text-muted);
+  transition: all 0.15s ease;
+}
+
+.admin-table-action-btn:hover {
+  color: var(--admin-primary);
+  border-color: var(--admin-primary);
+  background-color: var(--admin-primary-light);
+}
+
+.admin-table-action-btn.delete:hover {
+  color: #DC2626;
+  border-color: #DC2626;
+  background-color: #FEF2F2;
+}
+
+/* Quick Timing Preset Chip in Modal */
+.admin-preset-time-chip {
+  font-size: 0.72rem;
+  font-weight: 500;
+  padding: 4px 9px;
+  border-radius: 6px;
+  border: 1px solid var(--admin-border);
+  background: var(--admin-bg-subtle);
+  color: var(--admin-text-main);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.admin-preset-time-chip:hover {
+  border-color: var(--admin-primary);
+  color: var(--admin-primary);
+  background: var(--admin-primary-light);
+}
+
+/* ===================================================================
+   ADMIN TIMETABLE MODAL (Fixed Header & Footer, Scrollable Body)
+   =================================================================== */
+
+.admin-timetable-modal-card {
+  width: min(620px, calc(100vw - 32px)) !important;
+  max-width: min(620px, calc(100vw - 32px)) !important;
+  max-height: 90vh !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+  margin: auto;
+  border-radius: 12px;
+  background-color: #FFFFFF;
+  border: 1px solid var(--admin-border);
+  box-shadow: 0 20px 48px rgba(32, 53, 74, 0.22);
+  box-sizing: border-box;
+}
+
+.admin-timetable-modal-header {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 24px;
+  border-bottom: 1px solid var(--admin-border-subtle);
+  background-color: #FFFFFF;
+}
+
+.admin-timetable-modal-form {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  margin: 0;
+}
+
+.admin-timetable-modal-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 20px 24px 28px;
+  box-sizing: border-box;
+  -webkit-overflow-scrolling: touch;
+}
+
+.admin-timetable-modal-body::-webkit-scrollbar {
+  width: 6px;
+}
+
+.admin-timetable-modal-body::-webkit-scrollbar-track {
+  background: var(--admin-bg-subtle);
+}
+
+.admin-timetable-modal-body::-webkit-scrollbar-thumb {
+  background: #CBD5E1;
+  border-radius: 3px;
+}
+
+.admin-timetable-modal-body::-webkit-scrollbar-thumb:hover {
+  background: #94A3B8;
+}
+
+.admin-timetable-modal-footer {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 24px;
+  background-color: #FFFFFF;
+  border-top: 1px solid var(--admin-border);
+  border-radius: 0 0 12px 12px;
+  box-sizing: border-box;
+}
+
+.admin-timetable-modal-btn {
+  height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 18px;
+  border-radius: 6px;
+  font-size: 0.84rem;
+  font-weight: 600;
+  box-sizing: border-box;
+  white-space: nowrap;
+}

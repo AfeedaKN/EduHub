@@ -37,10 +37,25 @@ export class TeacherDashboardController {
   getStudents = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const userId = (req as any).user?.sub || (req as any).user?.id;
-      const data = await this.service.getTeacherStudents(userId);
+      const data = await this.service.getTeacherStudents(userId, req.query as any);
       res.status(200).json(ApiResponse.success(data, 'Students retrieved successfully.'));
     } catch (error) {
       next(error);
     }
   };
+
+  /**
+   * GET /api/v1/teacher/timetable
+   */
+  getTimetable = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const userId = (req as any).user?.sub || (req as any).user?.id;
+      const academicYear = req.query.academicYear as string | undefined;
+      const data = await this.service.getTeacherWeeklyTimetable(userId, academicYear);
+      res.status(200).json(ApiResponse.success(data, 'Weekly timetable retrieved successfully.'));
+    } catch (error) {
+      next(error);
+    }
+  };
 }
+

@@ -1,10 +1,45 @@
 export type TeacherStatus = 'ACTIVE' | 'INACTIVE';
 
 export interface AssignedClassDTO {
+  id?: string;
   classId?: string;
   className: string;
   section: string;
   subject?: string;
+  academicYear?: string;
+  studentCount?: number;
+}
+
+export interface AssignTeacherDTO {
+  classId?: string;
+  className: string;
+  section: string;
+  subject: string;
+  academicYear?: string;
+}
+
+export interface TeacherAssignmentDetailDTO {
+  id: string;
+  teacherId: string;
+  teacherName: string;
+  teacherEmployeeId: string;
+  teacherDepartment: string;
+  teacherStatus: TeacherStatus;
+  classId?: string;
+  className: string;
+  section: string;
+  subject: string;
+  academicYear: string;
+  studentCount: number;
+}
+
+export interface AssignmentFilterDTO {
+  academicYear?: string;
+  className?: string;
+  section?: string;
+  subject?: string;
+  teacherId?: string;
+  search?: string;
 }
 
 export interface CreateTeacherDTO {

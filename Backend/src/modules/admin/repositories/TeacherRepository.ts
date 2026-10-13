@@ -1,5 +1,5 @@
 import mongoose, { ClientSession } from 'mongoose';
-import { TeacherModel, ITeacherDoc } from '../models/Teacher.model';
+import { TeacherModel, ITeacherDoc, ITeacherAssignedClass } from '../models/Teacher.model';
 import { UserModel, IUserDocument } from '../../auth/models/User.model';
 import { TeacherFilterDTO } from '../dtos/teacher.dto';
 
@@ -18,6 +18,22 @@ export interface ITeacherRepository {
   updateUserForTeacher(userId: string, userData: Partial<IUserDocument>, session?: ClientSession): Promise<IUserDocument | null>;
   findUserByEmail(email: string): Promise<IUserDocument | null>;
   deleteUser(userId: string, session?: ClientSession): Promise<void>;
+
+  findAssignmentConflict(params: {
+    className: string;
+    section: string;
+    subject: string;
+    academicYear?: string;
+    excludeTeacherId?: string;
+    excludeAssignmentId?: string;
+  }): Promise<{ teacherId: string; teacherName: string; employeeId: string } | null>;
+  addAssignment(teacherId: string, assignment: ITeacherAssignedClass): Promise<ITeacherDoc | null>;
+  updateAssignment(
+    teacherId: string,
+    assignmentId: string,
+    assignment: Partial<ITeacherAssignedClass>
+  ): Promise<ITeacherDoc | null>;
+  removeAssignment(teacherId: string, assignmentId: string): Promise<ITeacherDoc | null>;
 }
 
 export class TeacherRepository implements ITeacherRepository {
@@ -133,5 +149,94 @@ export class TeacherRepository implements ITeacherRepository {
     if (!mongoose.Types.ObjectId.isValid(userId)) return;
     const opts = session ? { session } : {};
     await UserModel.findByIdAndDelete(userId, opts).exec();
+  }
+
+  async findAssignmentConflict(params: {
+    className: string;
+    section: string;
+    subject: string;
+    academicYear?: string;
+    excludeTeacherId?: string;
+    excludeAssignmentId?: string;
+  }): Promise<{ teacherId: string; teacherName: string; employeeId: string } | null> {
+    const targetYear = (params.academicYear || '2026-2027').trim().toLowerCase();
+    const teachers = await TeacherModel.find({ status: 'ACTIVE' }).exec();
+
+    for (const teacher of teachers) {
+      const isCurrentTeacher =
+        params.excludeTeacherId && teacher._id.toString() === params.excludeTeacherId;
+
+      for (const ac of teacher.assignedClasses || []) {
+        if (
+          isCurrentTeacher &&
+          params.excludeAssignmentId &&
+          ac._id &&
+          ac._id.toString() === params.excludeAssignmentId
+        ) {
+          continue;
+        }
+
+        const matchesClass =
+          ac.className.trim().toLowerCase() === params.className.trim().toLowerCase();
+        const matchesSection =
+          ac.section.trim().toLowerCase() === params.section.trim().toLowerCase();
+        const matchesSubject =
+          (ac.subject || '').trim().toLowerCase() === params.subject.trim().toLowerCase();
+        const acYear = (ac.academicYear || '2026-2027').trim().toLowerCase();
+        const matchesYear = acYear === targetYear;
+
+        if (matchesClass && matchesSection && matchesSubject && matchesYear) {
+          return {
+            teacherId: teacher._id.toString(),
+            teacherName: teacher.fullName,
+            employeeId: teacher.employeeId,
+          };
+        }
+      }
+    }
+
+    return null;
+  }
+
+  async addAssignment(
+    teacherId: string,
+    assignment: ITeacherAssignedClass
+  ): Promise<ITeacherDoc | null> {
+    if (!mongoose.Types.ObjectId.isValid(teacherId)) return null;
+    return await TeacherModel.findByIdAndUpdate(
+      teacherId,
+      { $push: { assignedClasses: assignment } },
+      { new: true, runValidators: true }
+    ).exec();
+  }
+
+  async updateAssignment(
+    teacherId: string,
+    assignmentId: string,
+    assignment: Partial<ITeacherAssignedClass>
+  ): Promise<ITeacherDoc | null> {
+    if (!mongoose.Types.ObjectId.isValid(teacherId)) return null;
+    const teacher = await TeacherModel.findById(teacherId).exec();
+    if (!teacher) return null;
+
+    const subdoc = (teacher.assignedClasses as any).id(assignmentId);
+    if (!subdoc) return null;
+
+    if (assignment.classId !== undefined) subdoc.classId = assignment.classId;
+    if (assignment.className !== undefined) subdoc.className = assignment.className;
+    if (assignment.section !== undefined) subdoc.section = assignment.section;
+    if (assignment.subject !== undefined) subdoc.subject = assignment.subject;
+    if (assignment.academicYear !== undefined) subdoc.academicYear = assignment.academicYear;
+
+    return await teacher.save();
+  }
+
+  async removeAssignment(teacherId: string, assignmentId: string): Promise<ITeacherDoc | null> {
+    if (!mongoose.Types.ObjectId.isValid(teacherId)) return null;
+    return await TeacherModel.findByIdAndUpdate(
+      teacherId,
+      { $pull: { assignedClasses: { _id: new mongoose.Types.ObjectId(assignmentId) } } },
+      { new: true }
+    ).exec();
   }
 }

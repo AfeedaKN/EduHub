@@ -1,10 +1,12 @@
 import mongoose, { Schema, Document } from 'mongoose';
 
 export interface ITeacherAssignedClass {
+  _id?: mongoose.Types.ObjectId;
   classId?: mongoose.Types.ObjectId;
   className: string;
   section: string;
   subject?: string;
+  academicYear?: string;
 }
 
 export interface ITeacherDoc extends Document {
@@ -99,6 +101,11 @@ const TeacherSchema = new Schema<ITeacherDoc>(
           type: String,
           trim: true,
           default: '',
+        },
+        academicYear: {
+          type: String,
+          trim: true,
+          default: '2026-2027',
         },
       },
     ],

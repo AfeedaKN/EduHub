@@ -14,6 +14,7 @@ describe('TeacherService Unit Tests', () => {
   let teacherService: TeacherService;
   let mockRepo: ITeacherRepository;
   let mockPasswordService: IPasswordService;
+  let mockClassRepo: any;
 
   beforeEach(() => {
     mockRepo = {
@@ -31,6 +32,10 @@ describe('TeacherService Unit Tests', () => {
       updateUserForTeacher: vi.fn(),
       findUserByEmail: vi.fn().mockResolvedValue(null),
       deleteUser: vi.fn(),
+      findAssignmentConflict: vi.fn().mockResolvedValue(null),
+      addAssignment: vi.fn(),
+      updateAssignment: vi.fn(),
+      removeAssignment: vi.fn(),
     };
 
     mockPasswordService = {
@@ -38,7 +43,14 @@ describe('TeacherService Unit Tests', () => {
       compare: vi.fn().mockResolvedValue(true),
     };
 
-    teacherService = new TeacherService(mockRepo, mockPasswordService);
+    mockClassRepo = {
+      findClassById: vi.fn(),
+      findClassByName: vi.fn(),
+      findSectionByClassAndName: vi.fn(),
+      countEnrolledStudents: vi.fn().mockResolvedValue(25),
+    };
+
+    teacherService = new TeacherService(mockRepo, mockPasswordService, mockClassRepo);
   });
 
   describe('createTeacher', () => {
@@ -297,6 +309,224 @@ describe('TeacherService Unit Tests', () => {
       expect(summary.totalTeachers).toBe(15);
       expect(summary.activeTeachers).toBe(12);
       expect(summary.inactiveTeachers).toBe(3);
+    });
+  });
+
+  describe('Teacher Assignment Management', () => {
+    const fakeTeacherId = new mongoose.Types.ObjectId().toString();
+    const fakeClassId = new mongoose.Types.ObjectId();
+    const fakeAssignmentId = new mongoose.Types.ObjectId();
+
+    const sampleActiveTeacher = {
+      _id: new mongoose.Types.ObjectId(fakeTeacherId),
+      employeeId: 'TCH-0001',
+      fullName: 'Dr. Arthur Pendelton',
+      email: 'arthur.p@eduhub.school',
+      department: 'Mathematics',
+      designation: 'Senior Teacher',
+      status: 'ACTIVE',
+      assignedClasses: [],
+    };
+
+    beforeEach(() => {
+      vi.mocked(mockRepo.findTeacherById).mockResolvedValue(sampleActiveTeacher as any);
+      vi.mocked(mockClassRepo.findClassByName).mockResolvedValue({
+        _id: fakeClassId,
+        name: 'Grade 8',
+        academicYear: '2026-2027',
+        status: 'ACTIVE',
+      });
+      vi.mocked(mockClassRepo.findSectionByClassAndName).mockResolvedValue({
+        _id: new mongoose.Types.ObjectId(),
+        classId: fakeClassId,
+        name: 'A',
+        academicYear: '2026-2027',
+        status: 'ACTIVE',
+      });
+    });
+
+    it('should assign teacher to class, section, subject, and academic year', async () => {
+      vi.mocked(mockRepo.addAssignment).mockResolvedValue({
+        ...sampleActiveTeacher,
+        assignedClasses: [
+          {
+            _id: fakeAssignmentId,
+            classId: fakeClassId,
+            className: 'Grade 8',
+            section: 'A',
+            subject: 'Mathematics',
+            academicYear: '2026-2027',
+          },
+        ],
+      } as any);
+
+      const result = await teacherService.assignTeacherToClass(fakeTeacherId, {
+        className: 'Grade 8',
+        section: 'A',
+        subject: 'Mathematics',
+        academicYear: '2026-2027',
+      });
+
+      expect(result.id).toBe(fakeAssignmentId.toString());
+      expect(result.teacherName).toBe('Dr. Arthur Pendelton');
+      expect(result.className).toBe('Grade 8');
+      expect(result.section).toBe('A');
+      expect(result.subject).toBe('Mathematics');
+      expect(result.academicYear).toBe('2026-2027');
+      expect(result.studentCount).toBe(25);
+      expect(mockRepo.addAssignment).toHaveBeenCalled();
+    });
+
+    it('should throw ValidationError if teacher is INACTIVE', async () => {
+      vi.mocked(mockRepo.findTeacherById).mockResolvedValue({
+        ...sampleActiveTeacher,
+        status: 'INACTIVE',
+      } as any);
+
+      await expect(
+        teacherService.assignTeacherToClass(fakeTeacherId, {
+          className: 'Grade 8',
+          section: 'A',
+          subject: 'Mathematics',
+        })
+      ).rejects.toThrow(ValidationError);
+    });
+
+    it('should throw ValidationError if subject is incompatible with department', async () => {
+      // Teacher is in Mathematics department, assigning Physical Education
+      await expect(
+        teacherService.assignTeacherToClass(fakeTeacherId, {
+          className: 'Grade 8',
+          section: 'A',
+          subject: 'Physical Education',
+        })
+      ).rejects.toThrow(ValidationError);
+    });
+
+    it('should throw ConflictError if duplicate assignment already exists', async () => {
+      vi.mocked(mockRepo.findAssignmentConflict).mockResolvedValue({
+        teacherId: 'other-id',
+        teacherName: 'Prof. Marcus Vance',
+        employeeId: 'TCH-0002',
+      });
+
+      await expect(
+        teacherService.assignTeacherToClass(fakeTeacherId, {
+          className: 'Grade 8',
+          section: 'A',
+          subject: 'Mathematics',
+          academicYear: '2026-2027',
+        })
+      ).rejects.toThrow(ConflictError);
+    });
+
+    it('should throw NotFoundError if class does not exist in academic directory', async () => {
+      vi.mocked(mockClassRepo.findClassByName).mockResolvedValue(null);
+
+      await expect(
+        teacherService.assignTeacherToClass(fakeTeacherId, {
+          className: 'Nonexistent Grade',
+          section: 'A',
+          subject: 'Mathematics',
+        })
+      ).rejects.toThrow(NotFoundError);
+    });
+
+    it('should throw ValidationError if academic year mismatches class academic year', async () => {
+      vi.mocked(mockClassRepo.findClassByName).mockResolvedValue({
+        _id: fakeClassId,
+        name: 'Grade 8',
+        academicYear: '2026-2027',
+        status: 'ACTIVE',
+      });
+
+      await expect(
+        teacherService.assignTeacherToClass(fakeTeacherId, {
+          className: 'Grade 8',
+          section: 'A',
+          subject: 'Mathematics',
+          academicYear: '2024-2025',
+        })
+      ).rejects.toThrow(ValidationError);
+    });
+
+    it('should update an existing assignment successfully', async () => {
+      const teacherWithAssignment = {
+        ...sampleActiveTeacher,
+        assignedClasses: [
+          {
+            _id: fakeAssignmentId,
+            classId: fakeClassId,
+            className: 'Grade 8',
+            section: 'A',
+            subject: 'Mathematics',
+            academicYear: '2026-2027',
+          },
+        ],
+      };
+      vi.mocked(mockRepo.findTeacherById).mockResolvedValue(teacherWithAssignment as any);
+      vi.mocked(mockRepo.updateAssignment).mockResolvedValue(teacherWithAssignment as any);
+
+      const result = await teacherService.updateTeacherAssignment(
+        fakeTeacherId,
+        fakeAssignmentId.toString(),
+        {
+          className: 'Grade 8',
+          section: 'A',
+          subject: 'Statistics',
+          academicYear: '2026-2027',
+        }
+      );
+
+      expect(result.id).toBe(fakeAssignmentId.toString());
+      expect(result.studentCount).toBe(25);
+      expect(mockRepo.updateAssignment).toHaveBeenCalled();
+    });
+
+    it('should remove an assignment successfully', async () => {
+      const teacherWithAssignment = {
+        ...sampleActiveTeacher,
+        assignedClasses: [
+          {
+            _id: fakeAssignmentId,
+            classId: fakeClassId,
+            className: 'Grade 8',
+            section: 'A',
+            subject: 'Mathematics',
+            academicYear: '2026-2027',
+          },
+        ],
+      };
+      vi.mocked(mockRepo.findTeacherById).mockResolvedValue(teacherWithAssignment as any);
+      vi.mocked(mockRepo.removeAssignment).mockResolvedValue(sampleActiveTeacher as any);
+
+      await teacherService.removeTeacherAssignment(fakeTeacherId, fakeAssignmentId.toString());
+      expect(mockRepo.removeAssignment).toHaveBeenCalledWith(
+        fakeTeacherId,
+        fakeAssignmentId.toString()
+      );
+    });
+
+    it('should retrieve assignments for a teacher with real enrolled student counts', async () => {
+      const teacherWithAssignment = {
+        ...sampleActiveTeacher,
+        assignedClasses: [
+          {
+            _id: fakeAssignmentId,
+            classId: fakeClassId,
+            className: 'Grade 8',
+            section: 'A',
+            subject: 'Mathematics',
+            academicYear: '2026-2027',
+          },
+        ],
+      };
+      vi.mocked(mockRepo.findTeacherById).mockResolvedValue(teacherWithAssignment as any);
+
+      const assignments = await teacherService.getTeacherAssignments(fakeTeacherId);
+      expect(assignments.length).toBe(1);
+      expect(assignments[0].className).toBe('Grade 8');
+      expect(assignments[0].studentCount).toBe(25);
     });
   });
 });

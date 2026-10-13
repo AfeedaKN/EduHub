@@ -11,6 +11,7 @@ import { UserModel } from '../../src/modules/auth/models/User.model';
 import { ClassModel } from '../../src/modules/admin/models/Class.model';
 import { SectionModel } from '../../src/modules/admin/models/Section.model';
 import { TeacherModel } from '../../src/modules/admin/models/Teacher.model';
+import { TimetablePeriodModel } from '../../src/modules/admin/models/TimetablePeriod.model';
 
 describe('Admin Routes Integration Tests', () => {
   const app = createApp();
@@ -518,5 +519,337 @@ describe('Admin Routes Integration Tests', () => {
       const userDoc = await UserModel.findOne({ email: testEmail });
       expect(userDoc?.status).toBe('DISABLED');
     });
+
+    describe('Teacher Class Assignment Endpoints', () => {
+      let assignClassId: string;
+      let assignSectionId: string;
+      let assignmentId: string;
+
+      beforeAll(async () => {
+        // Ensure teacher is ACTIVE for assignment tests
+        await TeacherModel.findByIdAndUpdate(createdTeacherId, {
+          status: 'ACTIVE',
+          department: 'Science',
+        });
+
+        // Create test class and section
+        const c = await ClassModel.create({
+          name: 'Grade 10',
+          academicYear: '2026-2027',
+          status: 'ACTIVE',
+        });
+        assignClassId = c._id.toString();
+
+        const s = await SectionModel.create({
+          classId: c._id,
+          name: 'A',
+          academicYear: '2026-2027',
+          capacity: 35,
+          status: 'ACTIVE',
+        });
+        assignSectionId = s._id.toString();
+      });
+
+      afterAll(async () => {
+        await SectionModel.deleteMany({ classId: assignClassId });
+        await ClassModel.findByIdAndDelete(assignClassId);
+      });
+
+      it('POST /api/v1/admin/teachers/:id/assignments without token returns 401', async () => {
+        const res = await request(app)
+          .post(`/api/v1/admin/teachers/${createdTeacherId}/assignments`)
+          .send({
+            className: 'Grade 10',
+            section: 'A',
+            subject: 'Physics',
+            academicYear: '2026-2027',
+          });
+
+        expect(res.status).toBe(401);
+      });
+
+      it('POST /api/v1/admin/teachers/:id/assignments with Parent token returns 403', async () => {
+        const res = await request(app)
+          .post(`/api/v1/admin/teachers/${createdTeacherId}/assignments`)
+          .set('Authorization', `Bearer ${parentToken}`)
+          .send({
+            className: 'Grade 10',
+            section: 'A',
+            subject: 'Physics',
+            academicYear: '2026-2027',
+          });
+
+        expect(res.status).toBe(403);
+      });
+
+      it('POST /api/v1/admin/teachers/:id/assignments rejects incompatible subject for teacher department', async () => {
+        // Teacher department is Science; assign Physical Education
+        const res = await request(app)
+          .post(`/api/v1/admin/teachers/${createdTeacherId}/assignments`)
+          .set('Authorization', `Bearer ${managementToken}`)
+          .send({
+            className: 'Grade 10',
+            section: 'A',
+            subject: 'Physical Education',
+            academicYear: '2026-2027',
+          });
+
+        expect(res.status).toBe(400);
+        expect(res.body.success).toBe(false);
+        expect(res.body.error.code).toBe('VALIDATION_ERROR');
+        expect(res.body.error.message).toContain('not compatible');
+      });
+
+      it('POST /api/v1/admin/teachers/:id/assignments successfully assigns class and section', async () => {
+        const res = await request(app)
+          .post(`/api/v1/admin/teachers/${createdTeacherId}/assignments`)
+          .set('Authorization', `Bearer ${managementToken}`)
+          .send({
+            classId: assignClassId,
+            className: 'Grade 10',
+            section: 'A',
+            subject: 'Physics',
+            academicYear: '2026-2027',
+          });
+
+        expect(res.status).toBe(201);
+        expect(res.body.success).toBe(true);
+        expect(res.body.data.className).toBe('Grade 10');
+        expect(res.body.data.section).toBe('A');
+        expect(res.body.data.subject).toBe('Physics');
+        expect(res.body.data.academicYear).toBe('2026-2027');
+        expect(res.body.data.id).toBeDefined();
+        assignmentId = res.body.data.id;
+      });
+
+      it('POST /api/v1/admin/teachers/:id/assignments rejects duplicate assignment', async () => {
+        const res = await request(app)
+          .post(`/api/v1/admin/teachers/${createdTeacherId}/assignments`)
+          .set('Authorization', `Bearer ${managementToken}`)
+          .send({
+            classId: assignClassId,
+            className: 'Grade 10',
+            section: 'A',
+            subject: 'Physics',
+            academicYear: '2026-2027',
+          });
+
+        expect(res.status).toBe(409);
+        expect(res.body.success).toBe(false);
+      });
+
+      it('GET /api/v1/admin/teachers/:id/assignments returns teacher assignments', async () => {
+        const res = await request(app)
+          .get(`/api/v1/admin/teachers/${createdTeacherId}/assignments`)
+          .set('Authorization', `Bearer ${managementToken}`);
+
+        expect(res.status).toBe(200);
+        expect(res.body.success).toBe(true);
+        expect(Array.isArray(res.body.data)).toBe(true);
+        expect(res.body.data.length).toBeGreaterThanOrEqual(1);
+        expect(res.body.data[0].subject).toBe('Physics');
+      });
+
+      it('GET /api/v1/admin/teachers/assignments/all returns all assignments across school', async () => {
+        const res = await request(app)
+          .get('/api/v1/admin/teachers/assignments/all')
+          .set('Authorization', `Bearer ${managementToken}`);
+
+        expect(res.status).toBe(200);
+        expect(res.body.success).toBe(true);
+        expect(Array.isArray(res.body.data)).toBe(true);
+        const match = res.body.data.find((a: any) => a.id === assignmentId);
+        expect(match).toBeDefined();
+      });
+
+      it('PUT /api/v1/admin/teachers/:id/assignments/:assignmentId updates assignment subject', async () => {
+        const res = await request(app)
+          .put(`/api/v1/admin/teachers/${createdTeacherId}/assignments/${assignmentId}`)
+          .set('Authorization', `Bearer ${managementToken}`)
+          .send({
+            classId: assignClassId,
+            className: 'Grade 10',
+            section: 'A',
+            subject: 'Chemistry',
+            academicYear: '2026-2027',
+          });
+
+        expect(res.status).toBe(200);
+        expect(res.body.success).toBe(true);
+        expect(res.body.data.subject).toBe('Chemistry');
+      });
+
+      it('DELETE /api/v1/admin/teachers/:id/assignments/:assignmentId removes assignment', async () => {
+        const res = await request(app)
+          .delete(`/api/v1/admin/teachers/${createdTeacherId}/assignments/${assignmentId}`)
+          .set('Authorization', `Bearer ${managementToken}`);
+
+        expect(res.status).toBe(200);
+        expect(res.body.success).toBe(true);
+
+        // Verify assignment is gone
+        const verify = await request(app)
+          .get(`/api/v1/admin/teachers/${createdTeacherId}/assignments`)
+          .set('Authorization', `Bearer ${managementToken}`);
+
+        const found = verify.body.data.find((a: any) => a.id === assignmentId);
+        expect(found).toBeUndefined();
+      });
+    });
+
+    describe('Timetable Management Endpoints', () => {
+      let createdPeriodId: string;
+      let ttClassId: string;
+
+      const teacherToken = tokenService.generateAccessToken({
+        sub: '65f1234567890abcdef12347',
+        email: 'teacher.temp@eduhub.school',
+        role: UserRole.TEACHER,
+      });
+
+      beforeAll(async () => {
+        const cls = await ClassModel.create({
+          name: 'Grade 11',
+          academicYear: '2026-2027',
+          status: 'ACTIVE',
+        });
+        ttClassId = cls._id.toString();
+
+        await SectionModel.create({
+          classId: cls._id,
+          name: 'A',
+          academicYear: '2026-2027',
+          capacity: 30,
+          roomNumber: 'Lab 101',
+          status: 'ACTIVE',
+        });
+      });
+
+      afterAll(async () => {
+        await TimetablePeriodModel.deleteMany({});
+        await SectionModel.deleteMany({ classId: ttClassId });
+        await ClassModel.findByIdAndDelete(ttClassId);
+      });
+
+      it('POST /api/v1/admin/timetable rejects unauthenticated requests', async () => {
+        const res = await request(app).post('/api/v1/admin/timetable').send({});
+        expect(res.status).toBe(401);
+      });
+
+      it('POST /api/v1/admin/timetable rejects requests without MANAGEMENT role', async () => {
+        const res = await request(app)
+          .post('/api/v1/admin/timetable')
+          .set('Authorization', `Bearer ${teacherToken}`)
+          .send({});
+        expect(res.status).toBe(403);
+      });
+
+      it('POST /api/v1/admin/timetable creates period successfully', async () => {
+        const res = await request(app)
+          .post('/api/v1/admin/timetable')
+          .set('Authorization', `Bearer ${managementToken}`)
+          .send({
+            academicYear: '2026-2027',
+            classId: ttClassId,
+            section: 'A',
+            dayOfWeek: 'MONDAY',
+            startTime: '09:00',
+            endTime: '09:45',
+            subject: 'Physics',
+            teacherId: createdTeacherId,
+            roomNumber: 'Lab 101',
+            periodType: 'TEACHING',
+          });
+
+        expect(res.status).toBe(201);
+        expect(res.body.success).toBe(true);
+        expect(res.body.data.id).toBeDefined();
+        expect(res.body.data.className).toBe('Grade 11');
+        expect(res.body.data.section).toBe('A');
+        expect(res.body.data.subject).toBe('Physics');
+        expect(res.body.data.formattedTime).toBe('9:00 AM - 9:45 AM');
+        createdPeriodId = res.body.data.id;
+      });
+
+      it('POST /api/v1/admin/timetable prevents overlapping period for same section', async () => {
+        const res = await request(app)
+          .post('/api/v1/admin/timetable')
+          .set('Authorization', `Bearer ${managementToken}`)
+          .send({
+            academicYear: '2026-2027',
+            classId: ttClassId,
+            section: 'A',
+            dayOfWeek: 'MONDAY',
+            startTime: '09:15',
+            endTime: '10:00',
+            subject: 'Chemistry',
+          });
+
+        expect(res.status).toBe(409);
+        expect(res.body.success).toBe(false);
+        expect(res.body.error.message).toContain('Section conflict');
+      });
+
+      it('POST /api/v1/admin/timetable allows adjacent period starting exactly when previous ends', async () => {
+        const res = await request(app)
+          .post('/api/v1/admin/timetable')
+          .set('Authorization', `Bearer ${managementToken}`)
+          .send({
+            academicYear: '2026-2027',
+            classId: ttClassId,
+            section: 'A',
+            dayOfWeek: 'MONDAY',
+            startTime: '09:45',
+            endTime: '10:30',
+            subject: 'Mathematics',
+          });
+
+        expect(res.status).toBe(201);
+        expect(res.body.success).toBe(true);
+        expect(res.body.data.startTime).toBe('09:45');
+      });
+
+      it('GET /api/v1/admin/timetable returns scheduled periods', async () => {
+        const res = await request(app)
+          .get('/api/v1/admin/timetable')
+          .query({ academicYear: '2026-2027', className: 'Grade 11' })
+          .set('Authorization', `Bearer ${managementToken}`);
+
+        expect(res.status).toBe(200);
+        expect(res.body.success).toBe(true);
+        expect(Array.isArray(res.body.data)).toBe(true);
+        expect(res.body.data.length).toBeGreaterThanOrEqual(2);
+      });
+
+      it('PUT /api/v1/admin/timetable/:id updates period subject and room', async () => {
+        const res = await request(app)
+          .put(`/api/v1/admin/timetable/${createdPeriodId}`)
+          .set('Authorization', `Bearer ${managementToken}`)
+          .send({
+            subject: 'Advanced Physics',
+            roomNumber: 'Main Lab A',
+          });
+
+        expect(res.status).toBe(200);
+        expect(res.body.success).toBe(true);
+        expect(res.body.data.subject).toBe('Advanced Physics');
+        expect(res.body.data.roomNumber).toBe('Main Lab A');
+      });
+
+      it('DELETE /api/v1/admin/timetable/:id removes period', async () => {
+        const res = await request(app)
+          .delete(`/api/v1/admin/timetable/${createdPeriodId}`)
+          .set('Authorization', `Bearer ${managementToken}`);
+
+        expect(res.status).toBe(200);
+        expect(res.body.success).toBe(true);
+
+        const checkRes = await request(app)
+          .get(`/api/v1/admin/timetable/${createdPeriodId}`)
+          .set('Authorization', `Bearer ${managementToken}`);
+        expect(checkRes.status).toBe(404);
+      });
+    });
   });
 });
+

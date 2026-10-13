@@ -14,8 +14,13 @@ import { AdminDashboardPage } from '../pages/admin/AdminDashboardPage';
 import { AdminAdmissionsPage } from '../pages/admin/AdminAdmissionsPage';
 import { AdminClassesPage } from '../pages/admin/AdminClassesPage';
 import { AdminTeachersPage } from '../pages/admin/AdminTeachersPage';
+import { AdminTimetablePage } from '../pages/admin/AdminTimetablePage';
 import { AdminPlaceholderPage } from '../pages/admin/AdminPlaceholderPage';
 import { TeacherDashboardPage } from '../pages/teacher/TeacherDashboardPage';
+import { TeacherClassesPage } from '../pages/teacher/TeacherClassesPage';
+import { TeacherStudentsPage } from '../pages/teacher/TeacherStudentsPage';
+import { TeacherAttendancePage } from '../pages/teacher/TeacherAttendancePage';
+import { TeacherTimetablePage } from '../pages/teacher/TeacherTimetablePage';
 import { TeacherPlaceholderPage } from '../pages/teacher/TeacherPlaceholderPage';
 
 export const AppRouter: React.FC = () => {
@@ -233,10 +238,7 @@ export const AppRouter: React.FC = () => {
           path="/admin/academics/timetable"
           element={
             <ProtectedRoute allowedRoles={['MANAGEMENT']}>
-              <AdminPlaceholderPage
-                title="Master Academic Timetable"
-                description="Configure class schedules, period timings, room allocations, and teacher substitute schedules."
-              />
+              <AdminTimetablePage />
             </ProtectedRoute>
           }
         />
@@ -332,10 +334,7 @@ export const AppRouter: React.FC = () => {
           path="/teacher/classes"
           element={
             <ProtectedRoute allowedRoles={['TEACHER']}>
-              <TeacherPlaceholderPage
-                title="My Assigned Classes"
-                description="View and manage all classrooms, grade levels, and sections assigned to you for the current academic session."
-              />
+              <TeacherClassesPage />
             </ProtectedRoute>
           }
         />
@@ -343,10 +342,7 @@ export const AppRouter: React.FC = () => {
           path="/teacher/students"
           element={
             <ProtectedRoute allowedRoles={['TEACHER']}>
-              <TeacherPlaceholderPage
-                title="My Students"
-                description="Directory of officially enrolled students across your assigned classes and sections."
-              />
+              <TeacherStudentsPage />
             </ProtectedRoute>
           }
         />
@@ -354,10 +350,7 @@ export const AppRouter: React.FC = () => {
           path="/teacher/attendance"
           element={
             <ProtectedRoute allowedRoles={['TEACHER']}>
-              <TeacherPlaceholderPage
-                title="Daily Attendance"
-                description="Record, verify, and submit morning attendance registers for your classroom sessions."
-              />
+              <TeacherAttendancePage />
             </ProtectedRoute>
           }
         />
@@ -365,10 +358,7 @@ export const AppRouter: React.FC = () => {
           path="/teacher/timetable"
           element={
             <ProtectedRoute allowedRoles={['TEACHER']}>
-              <TeacherPlaceholderPage
-                title="Weekly Timetable"
-                description="View your complete weekly lecture timetable, room allotments, and break periods."
-              />
+              <TeacherTimetablePage />
             </ProtectedRoute>
           }
         />

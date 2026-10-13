@@ -145,7 +145,12 @@ export const TeacherDashboardPage: React.FC = () => {
           {/* 4 Summary Cards Grid (Responsive Row) */}
           <section className="teacher-summary-cards-row" aria-label="Key Teaching Statistics">
             {/* Card 1: Assigned Classes */}
-            <div className="teacher-summary-card">
+            <Link
+              to="/teacher/classes"
+              className="teacher-summary-card"
+              style={{ textDecoration: 'none', cursor: 'pointer' }}
+              title="View all assigned classes"
+            >
               <div className="teacher-card-top-row">
                 <span className="teacher-card-label">Assigned Classes</span>
                 <div className="teacher-card-icon-wrap">
@@ -158,10 +163,11 @@ export const TeacherDashboardPage: React.FC = () => {
                 </div>
                 <span className="teacher-card-indicator">Active</span>
               </div>
-              <div className="teacher-card-subtext">
-                Classes &amp; sections assigned to you
+              <div className="teacher-card-subtext" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span>Classes &amp; sections assigned to you</span>
+                <ArrowRight size={13} style={{ color: '#20354A' }} />
               </div>
-            </div>
+            </Link>
 
             {/* Card 2: Total Students */}
             <div className="teacher-summary-card">
@@ -321,7 +327,7 @@ export const TeacherDashboardPage: React.FC = () => {
                               {cls.subject || 'Core Subject'}
                             </div>
                           </div>
-                          <span className="teacher-class-year-pill">2026-2027</span>
+                          <span className="teacher-class-year-pill">{cls.academicYear || '2026-2027'}</span>
                         </div>
 
                         <div className="teacher-class-meta-row">

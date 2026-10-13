@@ -1,8 +1,10 @@
 export interface TeacherClassSummaryDTO {
+  id?: string;
   classId?: string;
   className: string;
   section: string;
   subject?: string;
+  academicYear?: string;
   studentCount: number;
 }
 
@@ -62,4 +64,20 @@ export interface TeacherStudentItemDTO {
   rollNumber?: string;
   avatarUrl?: string;
   status: string;
+  academicYear?: string;
+  parentName?: string;
+  parentPhone?: string;
+  parentEmail?: string;
 }
+
+export interface TeacherStudentsQueryDTO {
+  search?: string;
+  className?: string;
+  grade?: string;
+  section?: string;
+  status?: string;
+  academicYear?: string;
+  page?: string | number;
+  limit?: string | number;
+}
+

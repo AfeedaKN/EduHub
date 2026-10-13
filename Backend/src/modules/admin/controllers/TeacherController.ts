@@ -98,4 +98,76 @@ export class TeacherController {
       next(error);
     }
   };
+
+  /**
+   * GET /api/v1/admin/teachers/assignments/all
+   */
+  getAllAssignments = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { academicYear, className, section, subject, teacherId, search } = req.query;
+      const assignments = await this.teacherService.getAllAssignments({
+        academicYear: academicYear as string | undefined,
+        className: className as string | undefined,
+        section: section as string | undefined,
+        subject: subject as string | undefined,
+        teacherId: teacherId as string | undefined,
+        search: search as string | undefined,
+      });
+      res.status(200).json(ApiResponse.success(assignments, 'Teacher assignments retrieved successfully.'));
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  /**
+   * GET /api/v1/admin/teachers/:id/assignments
+   */
+  getTeacherAssignments = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { id } = req.params;
+      const assignments = await this.teacherService.getTeacherAssignments(id);
+      res.status(200).json(ApiResponse.success(assignments, 'Assignments for teacher retrieved successfully.'));
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  /**
+   * POST /api/v1/admin/teachers/:id/assignments
+   */
+  assignTeacherToClass = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { id } = req.params;
+      const assignment = await this.teacherService.assignTeacherToClass(id, req.body);
+      res.status(201).json(ApiResponse.success(assignment, 'Class assigned to teacher successfully.'));
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  /**
+   * PUT /api/v1/admin/teachers/:id/assignments/:assignmentId
+   */
+  updateTeacherAssignment = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { id, assignmentId } = req.params;
+      const updated = await this.teacherService.updateTeacherAssignment(id, assignmentId, req.body);
+      res.status(200).json(ApiResponse.success(updated, 'Teacher assignment updated successfully.'));
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  /**
+   * DELETE /api/v1/admin/teachers/:id/assignments/:assignmentId
+   */
+  removeTeacherAssignment = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { id, assignmentId } = req.params;
+      await this.teacherService.removeTeacherAssignment(id, assignmentId);
+      res.status(200).json(ApiResponse.success(null, 'Teacher assignment removed successfully.'));
+    } catch (error) {
+      next(error);
+    }
+  };
 }

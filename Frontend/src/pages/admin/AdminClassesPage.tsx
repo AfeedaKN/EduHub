@@ -155,6 +155,52 @@ export const AdminClassesPage: React.FC = () => {
     fetchData();
   }, [selectedYear, selectedStatus]);
 
+  // Prevent background scrolling when any modal is open
+  const isAnyModalOpen =
+    showClassModal ||
+    showSectionModal ||
+    Boolean(activeClassForSections) ||
+    Boolean(confirmationModal);
+
+  useEffect(() => {
+    if (isAnyModalOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [isAnyModalOpen]);
+
+  // Support Escape key to close open modals
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (confirmationModal && !isConfirming) {
+          setConfirmationModal(null);
+        } else if (showSectionModal && !isSubmittingSection) {
+          setShowSectionModal(false);
+        } else if (showClassModal && !isSubmittingClass) {
+          setShowClassModal(false);
+        } else if (activeClassForSections) {
+          setActiveClassForSections(null);
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [
+    confirmationModal,
+    isConfirming,
+    showSectionModal,
+    isSubmittingSection,
+    showClassModal,
+    isSubmittingClass,
+    activeClassForSections,
+  ]);
+
   // Handle Search Input with Enter or blur
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -246,12 +292,18 @@ export const AdminClassesPage: React.FC = () => {
     });
   };
 
-  // Open Add Section Modal
-  const handleOpenAddSection = () => {
-    if (!activeClassForSections) return;
+  // Open Add Section Modal (for specific class or general)
+  const handleOpenAddSection = (targetClass?: ClassDetail) => {
+    const parentClass = targetClass || activeClassForSections || classes[0];
+    if (!parentClass) {
+      showError('Please create a class first before adding sections.');
+      return;
+    }
+    setActiveClassForSections(parentClass);
     setEditingSection(null);
+
     // Suggest next section letter (e.g. B if A exists)
-    const existingLetters = activeClassForSections.sections.map((s) => s.name.toUpperCase());
+    const existingLetters = parentClass.sections?.map((s) => s.name.toUpperCase()) || [];
     const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
     const nextLetter = alphabet.find((l) => !existingLetters.includes(l)) || 'A';
 
@@ -383,14 +435,28 @@ export const AdminClassesPage: React.FC = () => {
             <h1>Classes & Sections</h1>
             <p>Manage academic classes, sections, and student capacity.</p>
           </div>
-          <button
-            type="button"
-            className="admin-btn-primary-action"
-            onClick={handleOpenAddClass}
-          >
-            <Plus size={16} />
-            <span>Add Class</span>
-          </button>
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+            {classes.length > 0 && (
+              <button
+                type="button"
+                className="admin-btn-secondary"
+                onClick={() => handleOpenAddSection()}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '9px 16px', fontWeight: 600 }}
+                title="Add a new section to an existing class"
+              >
+                <Plus size={15} />
+                <span>Add Section</span>
+              </button>
+            )}
+            <button
+              type="button"
+              className="admin-btn-primary-action"
+              onClick={handleOpenAddClass}
+            >
+              <Plus size={16} />
+              <span>Add Class</span>
+            </button>
+          </div>
         </div>
 
         {/* Summary Statistics Cards */}
@@ -623,6 +689,16 @@ export const AdminClassesPage: React.FC = () => {
                               <button
                                 type="button"
                                 className="admin-btn-action"
+                                style={{ padding: '6px 10px', fontSize: '0.78rem' }}
+                                onClick={() => handleOpenAddSection(c)}
+                                title="Add Section to this class"
+                              >
+                                <Plus size={13} />
+                                <span>Section</span>
+                              </button>
+                              <button
+                                type="button"
+                                className="admin-btn-action"
                                 style={{ padding: '6px 12px', fontSize: '0.78rem' }}
                                 onClick={() => setActiveClassForSections(c)}
                                 title="View and manage sections"
@@ -694,6 +770,14 @@ export const AdminClassesPage: React.FC = () => {
                       <button
                         type="button"
                         className="admin-btn-action-icon"
+                        onClick={() => handleOpenAddSection(c)}
+                        title="Add Section to this class"
+                      >
+                        <Plus size={14} />
+                      </button>
+                      <button
+                        type="button"
+                        className="admin-btn-action-icon"
                         onClick={() => handleOpenEditClass(c)}
                       >
                         <Edit2 size={14} />
@@ -717,21 +801,44 @@ export const AdminClassesPage: React.FC = () => {
         {/* ADD / EDIT CLASS MODAL                                         */}
         {/* ============================================================== */}
         {showClassModal && (
-          <div className="admin-modal-overlay" onClick={() => !isSubmittingClass && setShowClassModal(false)}>
-            <div className="admin-modal-card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 500 }}>
+          <div
+            className="admin-modal-backdrop"
+            onClick={() => !isSubmittingClass && setShowClassModal(false)}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="class-modal-title"
+          >
+            <div
+              className="admin-modal-dialog"
+              onClick={(e) => e.stopPropagation()}
+              style={{ maxWidth: 500 }}
+            >
               <div className="admin-modal-header">
-                <h3>{editingClass ? `Edit Class: ${editingClass.name}` : 'Add New Class'}</h3>
+                <div>
+                  <h3 id="class-modal-title" className="admin-modal-title">
+                    {editingClass ? `Edit Class: ${editingClass.name}` : 'Add New Class'}
+                  </h3>
+                  <p className="admin-modal-subtitle">
+                    {editingClass
+                      ? 'Update grade details, academic year, and status.'
+                      : 'Configure academic grade and curriculum year intake.'}
+                  </p>
+                </div>
                 <button
                   type="button"
                   className="admin-modal-close-btn"
                   onClick={() => setShowClassModal(false)}
                   disabled={isSubmittingClass}
+                  aria-label="Close class modal"
                 >
                   <X size={18} />
                 </button>
               </div>
 
-              <form onSubmit={handleSubmitClass}>
+              <form
+                onSubmit={handleSubmitClass}
+                style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, margin: 0 }}
+              >
                 <div className="admin-modal-body">
                   {classFormError && (
                     <div className="admin-modal-error-banner">
@@ -837,27 +944,31 @@ export const AdminClassesPage: React.FC = () => {
         {/* ============================================================== */}
         {activeClassForSections && (
           <div
-            className="admin-modal-overlay"
+            className="admin-modal-backdrop"
             onClick={() => setActiveClassForSections(null)}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="sections-modal-title"
           >
             <div
-              className="admin-modal-card"
+              className="admin-modal-dialog"
               onClick={(e) => e.stopPropagation()}
               style={{ maxWidth: 720, width: '92%' }}
             >
               <div className="admin-modal-header">
                 <div>
-                  <h3 style={{ margin: 0 }}>
+                  <h3 id="sections-modal-title" className="admin-modal-title">
                     {activeClassForSections.name} — Sections
                   </h3>
-                  <div style={{ fontSize: '0.78rem', color: 'var(--admin-text-muted)', marginTop: 2 }}>
-                    Academic Year: {activeClassForSections.academicYear} • Total Enrolled: {activeClassForSections.totalEnrolled} / {activeClassForSections.totalCapacity} ({activeClassForSections.availableSeats} available)
-                  </div>
+                  <p className="admin-modal-subtitle">
+                    Academic Year: {activeClassForSections.academicYear} • Enrolled: {activeClassForSections.totalEnrolled} / {activeClassForSections.totalCapacity} ({activeClassForSections.availableSeats} seats available)
+                  </p>
                 </div>
                 <button
                   type="button"
                   className="admin-modal-close-btn"
                   onClick={() => setActiveClassForSections(null)}
+                  aria-label="Close sections modal"
                 >
                   <X size={18} />
                 </button>
@@ -872,7 +983,7 @@ export const AdminClassesPage: React.FC = () => {
                     type="button"
                     className="admin-btn-primary-action"
                     style={{ padding: '7px 14px', fontSize: '0.8rem' }}
-                    onClick={handleOpenAddSection}
+                    onClick={() => handleOpenAddSection(activeClassForSections)}
                   >
                     <Plus size={14} />
                     <span>Add Section</span>
@@ -890,7 +1001,7 @@ export const AdminClassesPage: React.FC = () => {
                       type="button"
                       className="admin-btn-primary-action"
                       style={{ marginTop: 10, padding: '7px 14px', fontSize: '0.8rem' }}
-                      onClick={handleOpenAddSection}
+                      onClick={() => handleOpenAddSection(activeClassForSections)}
                     >
                       <Plus size={14} />
                       <span>Add First Section</span>
@@ -974,26 +1085,50 @@ export const AdminClassesPage: React.FC = () => {
         {/* ============================================================== */}
         {/* ADD / EDIT SECTION MODAL                                       */}
         {/* ============================================================== */}
-        {showSectionModal && activeClassForSections && (
+        {showSectionModal && (
           <div
-            className="admin-modal-overlay"
+            className="admin-modal-backdrop"
             style={{ zIndex: 1200 }}
             onClick={() => !isSubmittingSection && setShowSectionModal(false)}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="section-modal-title"
           >
-            <div className="admin-modal-card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 460 }}>
+            <div
+              className="admin-modal-dialog"
+              onClick={(e) => e.stopPropagation()}
+              style={{ maxWidth: 480 }}
+            >
               <div className="admin-modal-header">
-                <h3>{editingSection ? `Edit Section: ${editingSection.name}` : `Add Section to ${activeClassForSections.name}`}</h3>
+                <div>
+                  <h3 id="section-modal-title" className="admin-modal-title">
+                    {editingSection
+                      ? `Edit Section: ${editingSection.name}`
+                      : activeClassForSections
+                      ? `Add Section to ${activeClassForSections.name}`
+                      : 'Add New Section'}
+                  </h3>
+                  <p className="admin-modal-subtitle">
+                    {editingSection
+                      ? 'Update capacity, classroom allocation, or active status.'
+                      : 'Define student capacity and classroom allocation.'}
+                  </p>
+                </div>
                 <button
                   type="button"
                   className="admin-modal-close-btn"
                   onClick={() => setShowSectionModal(false)}
                   disabled={isSubmittingSection}
+                  aria-label="Close section modal"
                 >
                   <X size={18} />
                 </button>
               </div>
 
-              <form onSubmit={handleSubmitSection}>
+              <form
+                onSubmit={handleSubmitSection}
+                style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, margin: 0 }}
+              >
                 <div className="admin-modal-body">
                   {sectionFormError && (
                     <div className="admin-modal-error-banner">
@@ -1001,6 +1136,35 @@ export const AdminClassesPage: React.FC = () => {
                       <span>{sectionFormError}</span>
                     </div>
                   )}
+
+                  {/* Parent Class Selector */}
+                  <div style={{ marginBottom: 14 }}>
+                    <label className="admin-form-label">Parent Class / Grade *</label>
+                    <select
+                      className="admin-form-select"
+                      value={activeClassForSections?.id || ''}
+                      onChange={(e) => {
+                        const targetClass = classes.find((c) => c.id === e.target.value);
+                        if (targetClass) {
+                          setActiveClassForSections(targetClass);
+                          if (!editingSection) {
+                            const existingLetters = targetClass.sections?.map((s) => s.name.toUpperCase()) || [];
+                            const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+                            const nextLetter = alphabet.find((l) => !existingLetters.includes(l)) || 'A';
+                            setSectionNameInput(nextLetter);
+                          }
+                        }
+                      }}
+                      disabled={Boolean(editingSection)}
+                      required
+                    >
+                      {classes.map((cls) => (
+                        <option key={cls.id} value={cls.id}>
+                          {cls.name} ({cls.academicYear})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
 
                   <div className="admin-form-row-2" style={{ marginBottom: 14 }}>
                     <div>
@@ -1041,9 +1205,21 @@ export const AdminClassesPage: React.FC = () => {
                     />
                   </div>
 
-                  <div style={{ fontSize: '0.74rem', color: 'var(--admin-text-muted)', marginBottom: 14 }}>
-                    Academic Year: <strong>{activeClassForSections.academicYear}</strong> (Inherited from parent class)
-                  </div>
+                  {activeClassForSections && (
+                    <div
+                      style={{
+                        fontSize: '0.74rem',
+                        color: 'var(--admin-text-muted)',
+                        marginBottom: 14,
+                        backgroundColor: 'var(--admin-bg-subtle)',
+                        padding: '8px 12px',
+                        borderRadius: 6,
+                        border: '1px solid var(--admin-border-subtle)',
+                      }}
+                    >
+                      Academic Year: <strong>{activeClassForSections.academicYear}</strong> (Inherited from {activeClassForSections.name})
+                    </div>
+                  )}
 
                   {editingSection && (
                     <div style={{ marginBottom: 14 }}>
@@ -1080,7 +1256,7 @@ export const AdminClassesPage: React.FC = () => {
                         <span>Saving...</span>
                       </>
                     ) : (
-                      <span>{editingSection ? 'Update Section' : 'Add Section'}</span>
+                      <span>{editingSection ? 'Update Section' : 'Save Section'}</span>
                     )}
                   </button>
                 </div>
@@ -1093,15 +1269,24 @@ export const AdminClassesPage: React.FC = () => {
         {/* CONFIRMATION MODAL (DEACTIVATION / CONSEQUENTIAL ACTIONS)     */}
         {/* ============================================================== */}
         {confirmationModal && (
-          <div className="admin-modal-overlay" style={{ zIndex: 1300 }}>
-            <div className="admin-modal-card" style={{ maxWidth: 460 }}>
+          <div
+            className="admin-modal-backdrop"
+            style={{ zIndex: 1300 }}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="confirm-modal-title"
+          >
+            <div className="admin-modal-dialog" style={{ maxWidth: 460 }}>
               <div className="admin-modal-header">
-                <h3>{confirmationModal.title}</h3>
+                <h3 id="confirm-modal-title" className="admin-modal-title">
+                  {confirmationModal.title}
+                </h3>
                 <button
                   type="button"
                   className="admin-modal-close-btn"
                   onClick={() => !isConfirming && setConfirmationModal(null)}
                   disabled={isConfirming}
+                  aria-label="Close confirmation modal"
                 >
                   <X size={18} />
                 </button>

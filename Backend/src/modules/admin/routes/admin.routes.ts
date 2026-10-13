@@ -2,6 +2,7 @@ import { Router, RequestHandler } from 'express';
 import { AdminController } from '../controllers/AdminController';
 import { ClassController } from '../controllers/ClassController';
 import { TeacherController } from '../controllers/TeacherController';
+import { TimetableController } from '../controllers/TimetableController';
 import { authorizeRoles } from '../../auth/middlewares/auth.middleware';
 import { UserRole } from '../../auth/dtos/auth.dto';
 
@@ -9,12 +10,19 @@ export interface AdminRoutesDependencies {
   adminController: AdminController;
   classController: ClassController;
   teacherController: TeacherController;
+  timetableController: TimetableController;
   authenticateMiddleware: RequestHandler;
 }
 
 export function createAdminRouter(deps: AdminRoutesDependencies): Router {
   const router = Router();
-  const { adminController, classController, teacherController, authenticateMiddleware } = deps;
+  const {
+    adminController,
+    classController,
+    teacherController,
+    timetableController,
+    authenticateMiddleware,
+  } = deps;
 
   // Protect all Admin endpoints with JWT authentication and MANAGEMENT role authorization
   router.use(authenticateMiddleware, authorizeRoles(UserRole.MANAGEMENT));
@@ -52,6 +60,7 @@ export function createAdminRouter(deps: AdminRoutesDependencies): Router {
 
   // Teacher Management
   router.get('/teachers/summary', teacherController.getSummaryStats);
+  router.get('/teachers/assignments/all', teacherController.getAllAssignments);
   router.get('/teachers', teacherController.getTeachers);
   router.post('/teachers', teacherController.createTeacher);
   router.get('/teachers/:id', teacherController.getTeacherById);
@@ -59,5 +68,19 @@ export function createAdminRouter(deps: AdminRoutesDependencies): Router {
   router.patch('/teachers/:id/status', teacherController.changeTeacherStatus);
   router.delete('/teachers/:id', teacherController.deleteTeacher);
 
+  // Teacher Class Assignments
+  router.get('/teachers/:id/assignments', teacherController.getTeacherAssignments);
+  router.post('/teachers/:id/assignments', teacherController.assignTeacherToClass);
+  router.put('/teachers/:id/assignments/:assignmentId', teacherController.updateTeacherAssignment);
+  router.delete('/teachers/:id/assignments/:assignmentId', teacherController.removeTeacherAssignment);
+
+  // Master Academic Timetable Management
+  router.get('/timetable', timetableController.getPeriods);
+  router.post('/timetable', timetableController.createPeriod);
+  router.get('/timetable/:id', timetableController.getPeriodById);
+  router.put('/timetable/:id', timetableController.updatePeriod);
+  router.delete('/timetable/:id', timetableController.deletePeriod);
+
   return router;
 }
+

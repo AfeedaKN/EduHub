@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import { ITeacherRepository } from '../repositories/TeacherRepository';
+import { IClassRepository } from '../repositories/ClassRepository';
 import { IPasswordService } from '../../auth/services/PasswordService';
 import {
   CreateTeacherDTO,
@@ -8,8 +9,11 @@ import {
   TeacherSummaryDTO,
   TeacherFilterDTO,
   TeacherStatus,
+  AssignTeacherDTO,
+  TeacherAssignmentDetailDTO,
+  AssignmentFilterDTO,
 } from '../dtos/teacher.dto';
-import { ITeacherDoc } from '../models/Teacher.model';
+import { ITeacherDoc, ITeacherAssignedClass } from '../models/Teacher.model';
 import { UserRole, AccountStatus } from '../../auth/dtos/auth.dto';
 import {
   ValidationError,
@@ -17,10 +21,102 @@ import {
   NotFoundError,
 } from '../../../shared/domain/errors/AppError';
 
+export const DEPARTMENT_SUBJECT_COMPATIBILITY: Record<string, string[]> = {
+  Mathematics: [
+    'math',
+    'mathematics',
+    'algebra',
+    'geometry',
+    'calculus',
+    'statistics',
+    'trigonometry',
+    'arithmetic',
+    'applied math',
+  ],
+  Science: [
+    'science',
+    'physics',
+    'chemistry',
+    'biology',
+    'botany',
+    'zoology',
+    'environmental science',
+    'general science',
+  ],
+  English: [
+    'english',
+    'english literature',
+    'literature',
+    'grammar',
+    'reading',
+    'writing',
+    'creative writing',
+    'english language',
+  ],
+  'Social Studies': [
+    'social studies',
+    'history',
+    'geography',
+    'civics',
+    'economics',
+    'political science',
+    'sociology',
+  ],
+  'Computer Science': [
+    'computer science',
+    'cs',
+    'informatics',
+    'information technology',
+    'coding',
+    'programming',
+    'robotics',
+    'ai',
+  ],
+  Languages: [
+    'language',
+    'languages',
+    'french',
+    'spanish',
+    'german',
+    'hindi',
+    'arabic',
+    'mandarin',
+    'sanskrit',
+    'malayalam',
+    'tamil',
+    'urdu',
+    'latin',
+  ],
+  'Arts & Music': [
+    'art',
+    'arts',
+    'music',
+    'drawing',
+    'painting',
+    'drama',
+    'theatre',
+    'fine arts',
+    'sculpture',
+    'craft',
+  ],
+  'Physical Education': [
+    'physical education',
+    'pe',
+    'sports',
+    'health',
+    'fitness',
+    'athletics',
+    'games',
+    'yoga',
+  ],
+  General: [],
+};
+
 export class TeacherService {
   constructor(
     private readonly teacherRepo: ITeacherRepository,
-    private readonly passwordService: IPasswordService
+    private readonly passwordService: IPasswordService,
+    private readonly classRepo?: IClassRepository
   ) {}
 
   /**
@@ -122,6 +218,7 @@ export class TeacherService {
         className: ac.className,
         section: ac.section,
         subject: ac.subject || '',
+        academicYear: ac.academicYear || '2026-2027',
       })),
       joiningDate: dto.joiningDate ? new Date(dto.joiningDate) : new Date(),
     });
@@ -223,6 +320,7 @@ export class TeacherService {
         className: ac.className,
         section: ac.section,
         subject: ac.subject || '',
+        academicYear: ac.academicYear || '2026-2027',
       }));
     }
 
@@ -326,6 +424,492 @@ export class TeacherService {
   }
 
   /**
+   * Validate subject compatibility with teacher's department
+   */
+  validateSubjectCompatibility(department: string, subject: string): void {
+    if (!subject || !subject.trim()) {
+      throw new ValidationError('Subject name is required for assignment.', 'MISSING_SUBJECT');
+    }
+
+    const cleanDept = (department || 'General').trim();
+    if (cleanDept.toLowerCase() === 'general') {
+      return;
+    }
+
+    const keywords = DEPARTMENT_SUBJECT_COMPATIBILITY[cleanDept];
+    if (!keywords || keywords.length === 0) {
+      return;
+    }
+
+    const cleanSubject = subject.trim().toLowerCase();
+    const isCompatible = keywords.some(
+      (kw) => cleanSubject.includes(kw) || kw.includes(cleanSubject)
+    );
+
+    if (!isCompatible) {
+      throw new ValidationError(
+        `Subject "${subject.trim()}" is not compatible with teacher's department "${cleanDept}".`,
+        'SUBJECT_INCOMPATIBLE'
+      );
+    }
+  }
+
+  /**
+   * Validate class exists and is active, section exists for class and is active, and academic year matches
+   */
+  async validateClassAndSection(
+    classId: string | undefined,
+    className: string,
+    section: string,
+    academicYear?: string
+  ): Promise<{ resolvedClassId: mongoose.Types.ObjectId; resolvedYear: string }> {
+    if (!className || !className.trim()) {
+      throw new ValidationError('Class name is required for assignment.', 'MISSING_CLASS_NAME');
+    }
+    if (!section || !section.trim()) {
+      throw new ValidationError('Section name is required for assignment.', 'MISSING_SECTION');
+    }
+
+    if (!this.classRepo) {
+      return {
+        resolvedClassId:
+          classId && mongoose.Types.ObjectId.isValid(classId)
+            ? new mongoose.Types.ObjectId(classId)
+            : new mongoose.Types.ObjectId(),
+        resolvedYear: academicYear || '2026-2027',
+      };
+    }
+
+    let classDoc = null;
+    if (classId && mongoose.Types.ObjectId.isValid(classId)) {
+      classDoc = await this.classRepo.findClassById(classId);
+    } else {
+      classDoc = await this.classRepo.findClassByName(className.trim(), academicYear);
+    }
+
+    if (!classDoc) {
+      throw new NotFoundError(
+        `Class "${className.trim()}" was not found in the academic directory.`,
+        'CLASS_NOT_FOUND'
+      );
+    }
+
+    if (classDoc.status === 'INACTIVE') {
+      throw new ValidationError(
+        `Cannot assign to inactive class "${classDoc.name}".`,
+        'CLASS_INACTIVE'
+      );
+    }
+
+    const resolvedYear =
+      (academicYear && academicYear.trim()) || classDoc.academicYear || '2026-2027';
+    if (
+      academicYear &&
+      classDoc.academicYear &&
+      academicYear.trim() !== classDoc.academicYear.trim()
+    ) {
+      throw new ValidationError(
+        `Class "${classDoc.name}" belongs to academic year ${classDoc.academicYear}, but ${academicYear} was specified.`,
+        'ACADEMIC_YEAR_MISMATCH'
+      );
+    }
+
+    const cleanSection = section.trim().toUpperCase();
+    const sectionDoc = await this.classRepo.findSectionByClassAndName(
+      classDoc._id.toString(),
+      cleanSection
+    );
+    if (!sectionDoc) {
+      throw new NotFoundError(
+        `Section "${cleanSection}" does not exist for class "${classDoc.name}".`,
+        'SECTION_NOT_FOUND'
+      );
+    }
+
+    if (sectionDoc.status === 'INACTIVE') {
+      throw new ValidationError(
+        `Cannot assign to inactive section "${cleanSection}" in class "${classDoc.name}".`,
+        'SECTION_INACTIVE'
+      );
+    }
+
+    return {
+      resolvedClassId: classDoc._id,
+      resolvedYear,
+    };
+  }
+
+  /**
+   * Validate teacher status is ACTIVE
+   */
+  validateTeacherActive(teacher: ITeacherDoc): void {
+    if (teacher.status !== 'ACTIVE') {
+      throw new ValidationError(
+        `Cannot assign classes to teacher "${teacher.fullName}" because the account is INACTIVE. Please activate the teacher account first.`,
+        'TEACHER_INACTIVE'
+      );
+    }
+  }
+
+  /**
+   * Prevent duplicate active assignments
+   */
+  async checkDuplicateAssignment(
+    teacherId: string,
+    className: string,
+    section: string,
+    subject: string,
+    academicYear: string,
+    excludeAssignmentId?: string
+  ): Promise<void> {
+    const conflict = await this.teacherRepo.findAssignmentConflict({
+      className,
+      section,
+      subject,
+      academicYear,
+      excludeTeacherId: teacherId,
+      excludeAssignmentId,
+    });
+
+    if (conflict) {
+      if (conflict.teacherId === teacherId) {
+        throw new ConflictError(
+          `Teacher is already actively assigned to ${className} - Section ${section} for ${subject} (${academicYear}).`,
+          'DUPLICATE_TEACHER_ASSIGNMENT'
+        );
+      } else {
+        throw new ConflictError(
+          `${className} - Section ${section} for subject "${subject}" (${academicYear}) is already actively assigned to ${conflict.teacherName} (${conflict.employeeId}).`,
+          'DUPLICATE_CLASS_ASSIGNMENT'
+        );
+      }
+    }
+  }
+
+  /**
+   * Calculate student count from officially enrolled students in assigned section
+   */
+  private async getEnrolledStudentCount(
+    grade: string,
+    section: string,
+    academicYear?: string
+  ): Promise<number> {
+    if (this.classRepo && typeof this.classRepo.countEnrolledStudents === 'function') {
+      return await this.classRepo.countEnrolledStudents(grade, section, academicYear);
+    }
+    return 0;
+  }
+
+  /**
+   * Assign a teacher to a class, section, subject, and academic year
+   */
+  async assignTeacherToClass(
+    teacherId: string,
+    dto: AssignTeacherDTO
+  ): Promise<TeacherAssignmentDetailDTO> {
+    if (!teacherId || !mongoose.Types.ObjectId.isValid(teacherId)) {
+      throw new ValidationError('Invalid teacher ID.', 'INVALID_ID');
+    }
+
+    const teacher = await this.teacherRepo.findTeacherById(teacherId);
+    if (!teacher) {
+      throw new NotFoundError('Teacher profile not found.');
+    }
+
+    this.validateTeacherActive(teacher);
+    this.validateSubjectCompatibility(teacher.department, dto.subject);
+
+    const { resolvedClassId, resolvedYear } = await this.validateClassAndSection(
+      dto.classId,
+      dto.className,
+      dto.section,
+      dto.academicYear
+    );
+
+    const cleanClassName = dto.className.trim();
+    const cleanSection = dto.section.trim().toUpperCase();
+    const cleanSubject = dto.subject.trim();
+
+    await this.checkDuplicateAssignment(
+      teacher._id.toString(),
+      cleanClassName,
+      cleanSection,
+      cleanSubject,
+      resolvedYear
+    );
+
+    const newAssignment: ITeacherAssignedClass = {
+      classId: resolvedClassId,
+      className: cleanClassName,
+      section: cleanSection,
+      subject: cleanSubject,
+      academicYear: resolvedYear,
+    };
+
+    const updated = await this.teacherRepo.addAssignment(teacherId, newAssignment);
+    if (!updated) {
+      throw new NotFoundError('Failed to record class assignment.');
+    }
+
+    const addedSubdoc = updated.assignedClasses[updated.assignedClasses.length - 1];
+    const assignmentId = (addedSubdoc as any)?._id ? (addedSubdoc as any)._id.toString() : '';
+
+    const studentCount = await this.getEnrolledStudentCount(
+      cleanClassName,
+      cleanSection,
+      resolvedYear
+    );
+
+    return {
+      id: assignmentId,
+      teacherId: updated._id.toString(),
+      teacherName: updated.fullName,
+      teacherEmployeeId: updated.employeeId,
+      teacherDepartment: updated.department,
+      teacherStatus: updated.status,
+      classId: resolvedClassId.toString(),
+      className: cleanClassName,
+      section: cleanSection,
+      subject: cleanSubject,
+      academicYear: resolvedYear,
+      studentCount,
+    };
+  }
+
+  /**
+   * Update an existing teacher assignment
+   */
+  async updateTeacherAssignment(
+    teacherId: string,
+    assignmentId: string,
+    dto: AssignTeacherDTO
+  ): Promise<TeacherAssignmentDetailDTO> {
+    if (!teacherId || !mongoose.Types.ObjectId.isValid(teacherId)) {
+      throw new ValidationError('Invalid teacher ID.', 'INVALID_ID');
+    }
+    if (!assignmentId || !mongoose.Types.ObjectId.isValid(assignmentId)) {
+      throw new ValidationError('Invalid assignment ID.', 'INVALID_ID');
+    }
+
+    const teacher = await this.teacherRepo.findTeacherById(teacherId);
+    if (!teacher) {
+      throw new NotFoundError('Teacher profile not found.');
+    }
+
+    const existing = (teacher.assignedClasses || []).find(
+      (ac) => (ac as any)._id && (ac as any)._id.toString() === assignmentId
+    );
+    if (!existing) {
+      throw new NotFoundError('Assignment record not found for this teacher.');
+    }
+
+    this.validateTeacherActive(teacher);
+    this.validateSubjectCompatibility(teacher.department, dto.subject);
+
+    const { resolvedClassId, resolvedYear } = await this.validateClassAndSection(
+      dto.classId,
+      dto.className,
+      dto.section,
+      dto.academicYear
+    );
+
+    const cleanClassName = dto.className.trim();
+    const cleanSection = dto.section.trim().toUpperCase();
+    const cleanSubject = dto.subject.trim();
+
+    await this.checkDuplicateAssignment(
+      teacher._id.toString(),
+      cleanClassName,
+      cleanSection,
+      cleanSubject,
+      resolvedYear,
+      assignmentId
+    );
+
+    const updated = await this.teacherRepo.updateAssignment(teacherId, assignmentId, {
+      classId: resolvedClassId,
+      className: cleanClassName,
+      section: cleanSection,
+      subject: cleanSubject,
+      academicYear: resolvedYear,
+    });
+
+    if (!updated) {
+      throw new NotFoundError('Failed to update class assignment.');
+    }
+
+    const studentCount = await this.getEnrolledStudentCount(
+      cleanClassName,
+      cleanSection,
+      resolvedYear
+    );
+
+    return {
+      id: assignmentId,
+      teacherId: updated._id.toString(),
+      teacherName: updated.fullName,
+      teacherEmployeeId: updated.employeeId,
+      teacherDepartment: updated.department,
+      teacherStatus: updated.status,
+      classId: resolvedClassId.toString(),
+      className: cleanClassName,
+      section: cleanSection,
+      subject: cleanSubject,
+      academicYear: resolvedYear,
+      studentCount,
+    };
+  }
+
+  /**
+   * Remove an assignment from a teacher
+   */
+  async removeTeacherAssignment(teacherId: string, assignmentId: string): Promise<void> {
+    if (!teacherId || !mongoose.Types.ObjectId.isValid(teacherId)) {
+      throw new ValidationError('Invalid teacher ID.', 'INVALID_ID');
+    }
+    if (!assignmentId || !mongoose.Types.ObjectId.isValid(assignmentId)) {
+      throw new ValidationError('Invalid assignment ID.', 'INVALID_ID');
+    }
+
+    const teacher = await this.teacherRepo.findTeacherById(teacherId);
+    if (!teacher) {
+      throw new NotFoundError('Teacher profile not found.');
+    }
+
+    const existing = (teacher.assignedClasses || []).find(
+      (ac) => (ac as any)._id && (ac as any)._id.toString() === assignmentId
+    );
+    if (!existing) {
+      throw new NotFoundError('Assignment record not found for this teacher.');
+    }
+
+    await this.teacherRepo.removeAssignment(teacherId, assignmentId);
+  }
+
+  /**
+   * Get all assignments for a specific teacher with real student counts
+   */
+  async getTeacherAssignments(teacherId: string): Promise<TeacherAssignmentDetailDTO[]> {
+    if (!teacherId || !mongoose.Types.ObjectId.isValid(teacherId)) {
+      throw new ValidationError('Invalid teacher ID.', 'INVALID_ID');
+    }
+
+    const teacher = await this.teacherRepo.findTeacherById(teacherId);
+    if (!teacher) {
+      throw new NotFoundError('Teacher profile not found.');
+    }
+
+    return await Promise.all(
+      (teacher.assignedClasses || []).map(async (ac) => {
+        const studentCount = await this.getEnrolledStudentCount(
+          ac.className,
+          ac.section,
+          ac.academicYear
+        );
+
+        return {
+          id: (ac as any)._id ? (ac as any)._id.toString() : '',
+          teacherId: teacher._id.toString(),
+          teacherName: teacher.fullName,
+          teacherEmployeeId: teacher.employeeId,
+          teacherDepartment: teacher.department,
+          teacherStatus: teacher.status,
+          classId: ac.classId ? ac.classId.toString() : undefined,
+          className: ac.className,
+          section: ac.section,
+          subject: ac.subject || '',
+          academicYear: ac.academicYear || '2026-2027',
+          studentCount,
+        };
+      })
+    );
+  }
+
+  /**
+   * Get all assignments across all teachers with optional filtering
+   */
+  async getAllAssignments(filter?: AssignmentFilterDTO): Promise<TeacherAssignmentDetailDTO[]> {
+    const teachers = await this.teacherRepo.findAllTeachers();
+    const results: TeacherAssignmentDetailDTO[] = [];
+
+    for (const teacher of teachers) {
+      if (filter?.teacherId && teacher._id.toString() !== filter.teacherId) {
+        continue;
+      }
+
+      for (const ac of teacher.assignedClasses || []) {
+        const acYear = ac.academicYear || '2026-2027';
+
+        if (
+          filter?.academicYear &&
+          filter.academicYear !== 'ALL' &&
+          acYear !== filter.academicYear
+        ) {
+          continue;
+        }
+
+        if (
+          filter?.className &&
+          filter.className !== 'ALL' &&
+          ac.className.toLowerCase() !== filter.className.toLowerCase()
+        ) {
+          continue;
+        }
+
+        if (
+          filter?.section &&
+          filter.section !== 'ALL' &&
+          ac.section.toLowerCase() !== filter.section.toLowerCase()
+        ) {
+          continue;
+        }
+
+        if (
+          filter?.subject &&
+          filter.subject.trim() &&
+          !ac.subject?.toLowerCase().includes(filter.subject.trim().toLowerCase())
+        ) {
+          continue;
+        }
+
+        if (filter?.search && filter.search.trim()) {
+          const s = filter.search.trim().toLowerCase();
+          const matches =
+            teacher.fullName.toLowerCase().includes(s) ||
+            teacher.employeeId.toLowerCase().includes(s) ||
+            ac.className.toLowerCase().includes(s) ||
+            ac.section.toLowerCase().includes(s) ||
+            (ac.subject && ac.subject.toLowerCase().includes(s));
+          if (!matches) continue;
+        }
+
+        const studentCount = await this.getEnrolledStudentCount(
+          ac.className,
+          ac.section,
+          ac.academicYear
+        );
+
+        results.push({
+          id: (ac as any)._id ? (ac as any)._id.toString() : '',
+          teacherId: teacher._id.toString(),
+          teacherName: teacher.fullName,
+          teacherEmployeeId: teacher.employeeId,
+          teacherDepartment: teacher.department,
+          teacherStatus: teacher.status,
+          classId: ac.classId ? ac.classId.toString() : undefined,
+          className: ac.className,
+          section: ac.section,
+          subject: ac.subject || '',
+          academicYear: acYear,
+          studentCount,
+        });
+      }
+    }
+
+    return results;
+  }
+
+  /**
    * Map database model to safe DTO (NEVER EXPOSES PASSWORD OR PASSWORD HASH)
    */
   private mapToDTO(doc: ITeacherDoc): TeacherResponseDTO {
@@ -341,10 +925,12 @@ export class TeacherService {
       department: doc.department || 'General',
       status: doc.status,
       assignedClasses: (doc.assignedClasses || []).map((ac) => ({
+        id: (ac as any)._id ? (ac as any)._id.toString() : undefined,
         classId: ac.classId ? ac.classId.toString() : undefined,
         className: ac.className,
         section: ac.section,
         subject: ac.subject || '',
+        academicYear: ac.academicYear || '2026-2027',
       })),
       joiningDate: doc.joiningDate ? doc.joiningDate.toISOString() : '',
       createdAt: doc.createdAt ? doc.createdAt.toISOString() : '',
