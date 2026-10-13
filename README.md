@@ -815,3 +815,10 @@ Full Stack Developer in Training
 - Restrict administrative actions.
 - Verify access to protected records.
 
+
+## Performance Optimization
+
+- Use pagination for large result sets.
+- Avoid unnecessary database queries.
+- Measure performance before making optimizations.
+
