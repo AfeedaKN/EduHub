@@ -822,3 +822,10 @@ Full Stack Developer in Training
 - Avoid unnecessary database queries.
 - Measure performance before making optimizations.
 
+
+## Maintenance
+
+- Remove unused code when appropriate.
+- Keep dependencies updated carefully.
+- Review changes before merging.
+
