@@ -829,3 +829,10 @@ Full Stack Developer in Training
 - Keep dependencies updated carefully.
 - Review changes before merging.
 
+
+## Project Documentation
+
+- Keep project features documented.
+- Explain important design decisions.
+- Update instructions when behavior changes.
+
