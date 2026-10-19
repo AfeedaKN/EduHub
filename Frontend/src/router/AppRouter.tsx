@@ -8,6 +8,7 @@ import { NotFoundPage } from '../pages/NotFoundPage';
 import { MainLayout } from '../components/layout/MainLayout';
 import { ProtectedRoute } from '../components/auth/ProtectedRoute';
 import { ParentDashboardPage } from '../pages/parent/ParentDashboardPage';
+import { ParentAssignmentsPage } from '../pages/parent/ParentAssignmentsPage';
 import { ParentPlaceholderPage } from '../pages/parent/ParentPlaceholderPage';
 import { AddStudentPage } from '../pages/parent/AddStudentPage';
 import { AdminDashboardPage } from '../pages/admin/AdminDashboardPage';
@@ -15,12 +16,14 @@ import { AdminAdmissionsPage } from '../pages/admin/AdminAdmissionsPage';
 import { AdminClassesPage } from '../pages/admin/AdminClassesPage';
 import { AdminTeachersPage } from '../pages/admin/AdminTeachersPage';
 import { AdminTimetablePage } from '../pages/admin/AdminTimetablePage';
+import { AdminExamsPage } from '../pages/admin/AdminExamsPage';
 import { AdminPlaceholderPage } from '../pages/admin/AdminPlaceholderPage';
 import { TeacherDashboardPage } from '../pages/teacher/TeacherDashboardPage';
 import { TeacherClassesPage } from '../pages/teacher/TeacherClassesPage';
 import { TeacherStudentsPage } from '../pages/teacher/TeacherStudentsPage';
 import { TeacherAttendancePage } from '../pages/teacher/TeacherAttendancePage';
 import { TeacherTimetablePage } from '../pages/teacher/TeacherTimetablePage';
+import { TeacherAssignmentsPage } from '../pages/teacher/TeacherAssignmentsPage';
 import { TeacherPlaceholderPage } from '../pages/teacher/TeacherPlaceholderPage';
 
 export const AppRouter: React.FC = () => {
@@ -99,7 +102,7 @@ export const AppRouter: React.FC = () => {
           path="/parent/assignments"
           element={
             <ProtectedRoute allowedRoles={['PARENT']}>
-              <ParentPlaceholderPage title="Homework & Assignments" />
+              <ParentAssignmentsPage />
             </ProtectedRoute>
           }
         />
@@ -257,10 +260,15 @@ export const AppRouter: React.FC = () => {
           path="/admin/exams"
           element={
             <ProtectedRoute allowedRoles={['MANAGEMENT']}>
-              <AdminPlaceholderPage
-                title="Examinations & Results"
-                description="Manage examination schedules, oversee grading submissions, and publish student report cards."
-              />
+              <AdminExamsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/exams/:id"
+          element={
+            <ProtectedRoute allowedRoles={['MANAGEMENT']}>
+              <AdminExamsPage />
             </ProtectedRoute>
           }
         />
@@ -366,10 +374,7 @@ export const AppRouter: React.FC = () => {
           path="/teacher/assignments"
           element={
             <ProtectedRoute allowedRoles={['TEACHER']}>
-              <TeacherPlaceholderPage
-                title="Homework & Assignments"
-                description="Create coursework tasks, attach learning resources, and review student homework submissions."
-              />
+              <TeacherAssignmentsPage />
             </ProtectedRoute>
           }
         />

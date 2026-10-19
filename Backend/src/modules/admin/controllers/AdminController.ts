@@ -2,6 +2,8 @@ import { Request, Response, NextFunction } from 'express';
 import { IAdminService } from '../services/AdminService';
 import { ApiResponse } from '../../../shared/presentation/responses/ApiResponse';
 import { UnauthorizedError } from '../../../shared/domain/errors/AppError';
+import { HttpStatusCode } from '../constants/httpStatusCode';
+import { AdminMessages } from '../constants/adminMessages';
 
 export class AdminController {
   constructor(private readonly adminService: IAdminService) {}
@@ -13,8 +15,8 @@ export class AdminController {
       }
 
       const summary = await this.adminService.getDashboardSummary();
-      return res.status(200).json(
-        ApiResponse.success(summary, 'Admin dashboard summary retrieved successfully.')
+      return res.status(HttpStatusCode.OK).json(
+        ApiResponse.success(summary, AdminMessages.DASHBOARD_SUMMARY_FETCHED)
       );
     } catch (error) {
       next(error);
@@ -35,8 +37,8 @@ export class AdminController {
         sort: sort === 'oldest' ? 'oldest' : 'newest',
       });
 
-      return res.status(200).json(
-        ApiResponse.success(admissions, 'Admissions list retrieved successfully.')
+      return res.status(HttpStatusCode.OK).json(
+        ApiResponse.success(admissions, AdminMessages.ADMISSIONS_FETCHED)
       );
     } catch (error) {
       next(error);
@@ -50,8 +52,8 @@ export class AdminController {
       }
 
       const counts = await this.adminService.getAdmissionCounts();
-      return res.status(200).json(
-        ApiResponse.success(counts, 'Admissions summary counts retrieved.')
+      return res.status(HttpStatusCode.OK).json(
+        ApiResponse.success(counts, AdminMessages.ADMISSION_COUNTS_FETCHED)
       );
     } catch (error) {
       next(error);
@@ -65,8 +67,8 @@ export class AdminController {
       }
 
       const admission = await this.adminService.getAdmissionDetail(req.params.id);
-      return res.status(200).json(
-        ApiResponse.success(admission, 'Admission request details retrieved.')
+      return res.status(HttpStatusCode.OK).json(
+        ApiResponse.success(admission, AdminMessages.ADMISSION_DETAIL_FETCHED)
       );
     } catch (error) {
       next(error);
@@ -83,8 +85,8 @@ export class AdminController {
       const section = (req.query.section as string) || 'A';
       const capacity = await this.adminService.getClassCapacity(grade, section);
 
-      return res.status(200).json(
-        ApiResponse.success(capacity, 'Class capacity retrieved successfully.')
+      return res.status(HttpStatusCode.OK).json(
+        ApiResponse.success(capacity, AdminMessages.CLASS_CAPACITY_FETCHED)
       );
     } catch (error) {
       next(error);
@@ -103,7 +105,7 @@ export class AdminController {
         req.body
       );
 
-      return res.status(200).json(
+      return res.status(HttpStatusCode.OK).json(
         ApiResponse.success(result, result.message)
       );
     } catch (error) {
@@ -123,7 +125,7 @@ export class AdminController {
         req.body
       );
 
-      return res.status(200).json(
+      return res.status(HttpStatusCode.OK).json(
         ApiResponse.success(result, result.message)
       );
     } catch (error) {

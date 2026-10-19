@@ -1,10 +1,11 @@
-import { Application } from 'express';
-import { env } from '../config/env.config';
-import { initAuthModule, AuthModuleComponents } from '../modules/auth/auth.module';
-import { initParentModule, ParentModuleComponents } from '../modules/parent/parent.module';
-import { initAdminModule, AdminModuleComponents } from '../modules/admin/admin.module';
-import { initTeacherModule, TeacherModuleComponents } from '../modules/teacher/teacher.module';
-import { createRateLimiter } from '../shared/presentation/middleware/rateLimiter';
+import { authModule } from '../modules/auth';
+import { adminModule } from '../modules/admin';
+import { parentModule } from '../modules/parent';
+import { teacherModule } from '../modules/teacher';
+import { AuthModuleComponents } from '../modules/auth/auth.module';
+import { AdminModuleComponents } from '../modules/admin/admin.module';
+import { ParentModuleComponents } from '../modules/parent/parent.module';
+import { TeacherModuleComponents } from '../modules/teacher/teacher.module';
 
 export interface AppDependencies {
   authModule: AuthModuleComponents;
@@ -14,25 +15,6 @@ export interface AppDependencies {
 }
 
 export function configureDependencies(): AppDependencies {
-  // Create shared rate limiters
-  const authRateLimiter = createRateLimiter({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 10, // max 10 requests per 15 minutes for sensitive endpoints
-    message: 'Too many authentication attempts. Please try again after 15 minutes.',
-  });
-
-  // Initialize Auth Module
-  const authModule = initAuthModule(env, authRateLimiter);
-
-  // Initialize Parent Module reusing the authentication middleware from Auth Module
-  const parentModule = initParentModule(authModule.authenticateMiddleware);
-
-  // Initialize Admin Module reusing the authentication middleware from Auth Module
-  const adminModule = initAdminModule(authModule.authenticateMiddleware);
-
-  // Initialize Teacher Module reusing the authentication middleware from Auth Module
-  const teacherModule = initTeacherModule(authModule.authenticateMiddleware);
-
   return {
     authModule,
     parentModule,
