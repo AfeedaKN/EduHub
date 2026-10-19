@@ -589,3 +589,10 @@ Full Stack Developer in Training
 - Explain setup and installation steps.
 - Keep project instructions up to date.
 
+
+## Performance Optimization
+
+- Avoid unnecessary database queries.
+- Optimize slow API responses.
+- Reduce unnecessary processing.
+
