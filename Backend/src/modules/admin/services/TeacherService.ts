@@ -415,10 +415,12 @@ export class TeacherService {
   /**
    * Helper to extract string ID whether userId is populated or raw ObjectId
    */
-  private extractUserId(userIdField: any): string {
+  private extractUserId(
+    userIdField: { _id?: unknown; toString(): string } | string | null | undefined
+  ): string {
     if (!userIdField) return '';
-    if (typeof userIdField === 'object' && userIdField._id) {
-      return userIdField._id.toString();
+    if (typeof userIdField === 'object' && '_id' in userIdField && userIdField._id) {
+      return String(userIdField._id);
     }
     return userIdField.toString();
   }

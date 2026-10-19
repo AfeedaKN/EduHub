@@ -1,15 +1,24 @@
 import { Request, Response, NextFunction } from 'express';
 import { AssignmentService } from '../services/AssignmentService';
 import { ApiResponse } from '../../../shared/presentation/responses/ApiResponse';
+import { UnauthorizedError } from '../../../shared/domain/errors/AppError';
 import { HttpStatusCode } from '../constants/httpStatusCode';
 import { TeacherMessages } from '../constants/teacherMessages';
 
 export class AssignmentController {
   constructor(private readonly service: AssignmentService) {}
 
+  private getUserId(req: Request): string {
+    const userId = req.user?.sub;
+    if (!userId) {
+      throw new UnauthorizedError('Authentication required.', 'UNAUTHORIZED');
+    }
+    return userId;
+  }
+
   getAssignments = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const userId = (req as any).user?.sub || (req as any).user?.id;
+      const userId = this.getUserId(req);
       const { academicYear, className, section, subject, status, search } = req.query;
 
       const result = await this.service.getAssignments(userId, {
@@ -29,7 +38,7 @@ export class AssignmentController {
 
   getAssignmentById = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const userId = (req as any).user?.sub || (req as any).user?.id;
+      const userId = this.getUserId(req);
       const { id } = req.params;
 
       const assignment = await this.service.getAssignmentById(userId, id);
@@ -41,7 +50,7 @@ export class AssignmentController {
 
   createAssignment = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const userId = (req as any).user?.sub || (req as any).user?.id;
+      const userId = this.getUserId(req);
       const assignment = await this.service.createAssignment(userId, req.body);
 
       res.status(HttpStatusCode.CREATED).json(ApiResponse.success(assignment, TeacherMessages.ASSIGNMENT_CREATED));
@@ -52,7 +61,7 @@ export class AssignmentController {
 
   updateAssignment = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const userId = (req as any).user?.sub || (req as any).user?.id;
+      const userId = this.getUserId(req);
       const { id } = req.params;
 
       const assignment = await this.service.updateAssignment(userId, id, req.body);
@@ -64,7 +73,7 @@ export class AssignmentController {
 
   updateStatus = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const userId = (req as any).user?.sub || (req as any).user?.id;
+      const userId = this.getUserId(req);
       const { id } = req.params;
       const { status } = req.body;
 
@@ -77,7 +86,7 @@ export class AssignmentController {
 
   deleteAssignment = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const userId = (req as any).user?.sub || (req as any).user?.id;
+      const userId = this.getUserId(req);
       const { id } = req.params;
 
       await this.service.deleteAssignment(userId, id);
@@ -89,7 +98,7 @@ export class AssignmentController {
 
   getAssignmentSubmissions = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const userId = (req as any).user?.sub || (req as any).user?.id;
+      const userId = this.getUserId(req);
       const { id } = req.params;
 
       const submissions = await this.service.getSubmissionsForAssignment(userId, id);
@@ -101,7 +110,7 @@ export class AssignmentController {
 
   gradeSubmission = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const userId = (req as any).user?.sub || (req as any).user?.id;
+      const userId = this.getUserId(req);
       const { id, submissionId } = req.params;
 
       const result = await this.service.gradeSubmission(userId, id, submissionId, req.body);

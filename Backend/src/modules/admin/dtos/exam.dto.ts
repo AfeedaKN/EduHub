@@ -1,6 +1,11 @@
-import { ExamType, ExamStatus } from '../models/Exam.model';
+import {
+  ExamType,
+  ExamStatus,
+  VALID_EXAM_TYPES,
+  VALID_EXAM_STATUSES,
+} from '../models/Exam.model';
 
-export { ExamType, ExamStatus };
+export { ExamType, ExamStatus, VALID_EXAM_TYPES, VALID_EXAM_STATUSES };
 
 export interface ApplicableClassDTO {
   classId: string;

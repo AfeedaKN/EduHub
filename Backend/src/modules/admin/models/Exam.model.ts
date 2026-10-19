@@ -1,19 +1,25 @@
 import mongoose, { Schema, Document } from 'mongoose';
 
-export type ExamType =
-  | 'UNIT_TEST'
-  | 'FIRST_TERM'
-  | 'MID_TERM'
-  | 'SECOND_TERM'
-  | 'ANNUAL_EXAM'
-  | 'OTHER';
+export const VALID_EXAM_TYPES = [
+  'UNIT_TEST',
+  'FIRST_TERM',
+  'MID_TERM',
+  'SECOND_TERM',
+  'ANNUAL_EXAM',
+  'OTHER',
+] as const;
 
-export type ExamStatus =
-  | 'DRAFT'
-  | 'SCHEDULED'
-  | 'ONGOING'
-  | 'COMPLETED'
-  | 'CANCELLED';
+export type ExamType = typeof VALID_EXAM_TYPES[number];
+
+export const VALID_EXAM_STATUSES = [
+  'DRAFT',
+  'SCHEDULED',
+  'ONGOING',
+  'COMPLETED',
+  'CANCELLED',
+] as const;
+
+export type ExamStatus = typeof VALID_EXAM_STATUSES[number];
 
 export interface IApplicableClass {
   classId: mongoose.Types.ObjectId;

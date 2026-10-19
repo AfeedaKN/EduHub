@@ -27,7 +27,7 @@ export interface UserResponseDTO {
 }
 
 export const mapUserToResponseDTO = (user: {
-  _id?: any;
+  _id?: { toString(): string } | string;
   id?: string;
   fullName: string;
   email: string;

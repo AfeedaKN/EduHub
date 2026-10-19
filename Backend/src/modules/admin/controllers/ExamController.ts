@@ -6,6 +6,10 @@ import {
   ExamFilterDTO,
   CreateScheduleDTO,
   UpdateScheduleDTO,
+  ExamType,
+  ExamStatus,
+  VALID_EXAM_TYPES,
+  VALID_EXAM_STATUSES,
 } from '../dtos/exam.dto';
 import { ApiResponse } from '../../../shared/presentation/responses/ApiResponse';
 import { HttpStatusCode } from '../constants/httpStatusCode';
@@ -26,10 +30,19 @@ export class ExamController {
 
   getExams = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
+      const rawExamType = req.query.examType as string | undefined;
+      const rawStatus = req.query.status as string | undefined;
+
       const filter: ExamFilterDTO = {
         academicYear: req.query.academicYear as string | undefined,
-        examType: req.query.examType as any,
-        status: req.query.status as any,
+        examType:
+          rawExamType && (VALID_EXAM_TYPES as readonly string[]).includes(rawExamType)
+            ? (rawExamType as ExamType)
+            : undefined,
+        status:
+          rawStatus && (VALID_EXAM_STATUSES as readonly string[]).includes(rawStatus)
+            ? (rawStatus as ExamStatus)
+            : undefined,
         search: req.query.search as string | undefined,
       };
 
