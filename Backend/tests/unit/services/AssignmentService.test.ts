@@ -594,6 +594,48 @@ describe('AssignmentService Unit Tests', () => {
       ).rejects.toThrow(ValidationError);
     });
 
+    it('should throw ValidationError if feedback exceeds 2000 characters', async () => {
+      mockSubmissionRepo.findByAssignmentAndId.mockResolvedValue(mockExistingSub);
+      const longFeedback = 'a'.repeat(2001);
+
+      await expect(
+        service.gradeSubmission(
+          validUserId,
+          sampleAssignmentDoc._id.toString(),
+          submissionId,
+          {
+            marksObtained: 40,
+            feedback: longFeedback,
+          }
+        )
+      ).rejects.toThrow(ValidationError);
+    });
+
+    it('should throw ValidationError if marks are NaN or non-numeric', async () => {
+      mockSubmissionRepo.findByAssignmentAndId.mockResolvedValue(mockExistingSub);
+
+      await expect(
+        service.gradeSubmission(
+          validUserId,
+          sampleAssignmentDoc._id.toString(),
+          submissionId,
+          {
+            marksObtained: NaN,
+          }
+        )
+      ).rejects.toThrow(ValidationError);
+    });
+
+    it('should throw ValidationError if assignmentId or submissionId is invalid ObjectId', async () => {
+      await expect(
+        service.gradeSubmission(validUserId, 'invalid-id', submissionId, { marksObtained: 40 })
+      ).rejects.toThrow(ValidationError);
+
+      await expect(
+        service.gradeSubmission(validUserId, sampleAssignmentDoc._id.toString(), 'invalid-id', { marksObtained: 40 })
+      ).rejects.toThrow(ValidationError);
+    });
+
     it('should throw ForbiddenError if unauthorized teacher attempts to grade', async () => {
       await expect(
         service.gradeSubmission(

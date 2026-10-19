@@ -375,3 +375,10 @@ Full Stack Developer in Training
 - Validate user input before processing requests.
 - Handle API errors consistently.
 
+
+## API Development
+
+- Use consistent endpoint naming.
+- Return appropriate HTTP status codes.
+- Validate request data.
+
