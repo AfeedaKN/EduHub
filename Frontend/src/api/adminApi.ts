@@ -412,5 +412,118 @@ export const adminApi = {
     const res = await axiosClient.delete<ApiResponse<null>>(`/admin/timetable/${id}`);
     return res.data;
   },
+
+  // ==========================================
+  // Examinations & Subject-wise Scheduling APIs
+  // ==========================================
+
+  getExamsSummary: async (params?: {
+    academicYear?: string;
+  }): Promise<ApiResponse<import('../types/exam.types').ExamsSummaryCounts>> => {
+    const res = await axiosClient.get<ApiResponse<import('../types/exam.types').ExamsSummaryCounts>>(
+      '/admin/exams/summary',
+      { params }
+    );
+    return res.data;
+  },
+
+  getExams: async (
+    params?: import('../types/exam.types').ExamFilterParams
+  ): Promise<ApiResponse<import('../types/exam.types').Exam[]>> => {
+    const res = await axiosClient.get<ApiResponse<import('../types/exam.types').Exam[]>>(
+      '/admin/exams',
+      { params }
+    );
+    return res.data;
+  },
+
+  getExamById: async (
+    id: string
+  ): Promise<ApiResponse<import('../types/exam.types').Exam>> => {
+    const res = await axiosClient.get<ApiResponse<import('../types/exam.types').Exam>>(
+      `/admin/exams/${id}`
+    );
+    return res.data;
+  },
+
+  createExam: async (
+    payload: import('../types/exam.types').CreateExamPayload
+  ): Promise<ApiResponse<import('../types/exam.types').Exam>> => {
+    const res = await axiosClient.post<ApiResponse<import('../types/exam.types').Exam>>(
+      '/admin/exams',
+      payload
+    );
+    return res.data;
+  },
+
+  updateExam: async (
+    id: string,
+    payload: import('../types/exam.types').UpdateExamPayload
+  ): Promise<ApiResponse<import('../types/exam.types').Exam>> => {
+    const res = await axiosClient.put<ApiResponse<import('../types/exam.types').Exam>>(
+      `/admin/exams/${id}`,
+      payload
+    );
+    return res.data;
+  },
+
+  deleteExam: async (id: string): Promise<ApiResponse<null>> => {
+    const res = await axiosClient.delete<ApiResponse<null>>(`/admin/exams/${id}`);
+    return res.data;
+  },
+
+  getExamSchedules: async (
+    examId: string
+  ): Promise<ApiResponse<import('../types/exam.types').ExamSchedule[]>> => {
+    const res = await axiosClient.get<ApiResponse<import('../types/exam.types').ExamSchedule[]>>(
+      `/admin/exams/${examId}/schedules`
+    );
+    return res.data;
+  },
+
+  createExamSchedule: async (
+    examId: string,
+    payload: import('../types/exam.types').CreateSchedulePayload
+  ): Promise<ApiResponse<import('../types/exam.types').ExamSchedule>> => {
+    const res = await axiosClient.post<ApiResponse<import('../types/exam.types').ExamSchedule>>(
+      `/admin/exams/${examId}/schedules`,
+      payload
+    );
+    return res.data;
+  },
+
+  updateExamSchedule: async (
+    examId: string,
+    scheduleId: string,
+    payload: import('../types/exam.types').UpdateSchedulePayload
+  ): Promise<ApiResponse<import('../types/exam.types').ExamSchedule>> => {
+    const res = await axiosClient.put<ApiResponse<import('../types/exam.types').ExamSchedule>>(
+      `/admin/exams/${examId}/schedules/${scheduleId}`,
+      payload
+    );
+    return res.data;
+  },
+
+  deleteExamSchedule: async (
+    examId: string,
+    scheduleId: string
+  ): Promise<ApiResponse<null>> => {
+    const res = await axiosClient.delete<ApiResponse<null>>(
+      `/admin/exams/${examId}/schedules/${scheduleId}`
+    );
+    return res.data;
+  },
+
+  getValidSubjectsForClassSection: async (
+    classId: string,
+    section: string,
+    academicYear?: string
+  ): Promise<ApiResponse<string[]>> => {
+    const res = await axiosClient.get<ApiResponse<string[]>>(
+      `/admin/exams/classes/${classId}/sections/${section}/subjects`,
+      { params: { academicYear } }
+    );
+    return res.data;
+  },
 };
 

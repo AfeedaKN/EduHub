@@ -3,6 +3,7 @@ import { AdminController } from '../controllers/AdminController';
 import { ClassController } from '../controllers/ClassController';
 import { TeacherController } from '../controllers/TeacherController';
 import { TimetableController } from '../controllers/TimetableController';
+import { ExamController } from '../controllers/ExamController';
 import { authorizeRoles } from '../../auth/middlewares/auth.middleware';
 import { UserRole } from '../../auth/dtos/auth.dto';
 
@@ -11,6 +12,7 @@ export interface AdminRoutesDependencies {
   classController: ClassController;
   teacherController: TeacherController;
   timetableController: TimetableController;
+  examController: ExamController;
   authenticateMiddleware: RequestHandler;
 }
 
@@ -21,6 +23,7 @@ export function createAdminRouter(deps: AdminRoutesDependencies): Router {
     classController,
     teacherController,
     timetableController,
+    examController,
     authenticateMiddleware,
   } = deps;
 
@@ -80,6 +83,21 @@ export function createAdminRouter(deps: AdminRoutesDependencies): Router {
   router.get('/timetable/:id', timetableController.getPeriodById);
   router.put('/timetable/:id', timetableController.updatePeriod);
   router.delete('/timetable/:id', timetableController.deletePeriod);
+
+  // Examinations & Subject-wise Scheduling Management
+  router.get('/exams/summary', examController.getSummary);
+  router.get('/exams/classes/:classId/sections/:section/subjects', examController.getValidSubjects);
+  router.get('/exams', examController.getExams);
+  router.post('/exams', examController.createExam);
+  router.get('/exams/:id', examController.getExamById);
+  router.put('/exams/:id', examController.updateExam);
+  router.delete('/exams/:id', examController.deleteExam);
+
+  // Subject Schedules for an Exam
+  router.get('/exams/:id/schedules', examController.getSchedules);
+  router.post('/exams/:id/schedules', examController.createSchedule);
+  router.put('/exams/:id/schedules/:scheduleId', examController.updateSchedule);
+  router.delete('/exams/:id/schedules/:scheduleId', examController.deleteSchedule);
 
   return router;
 }

@@ -3,15 +3,18 @@ import { AdminDashboardRepository } from './repositories/AdminDashboardRepositor
 import { ClassRepository } from './repositories/ClassRepository';
 import { TeacherRepository } from './repositories/TeacherRepository';
 import { TimetableRepository } from './repositories/TimetableRepository';
+import { ExamRepository } from './repositories/ExamRepository';
 import { PasswordService } from '../auth/services/PasswordService';
 import { AdminService } from './services/AdminService';
 import { ClassService } from './services/ClassService';
 import { TeacherService } from './services/TeacherService';
 import { TimetableService } from './services/TimetableService';
+import { ExamService } from './services/ExamService';
 import { AdminController } from './controllers/AdminController';
 import { ClassController } from './controllers/ClassController';
 import { TeacherController } from './controllers/TeacherController';
 import { TimetableController } from './controllers/TimetableController';
+import { ExamController } from './controllers/ExamController';
 import { createAdminRouter } from './routes/admin.routes';
 
 export interface AdminModuleComponents {
@@ -20,25 +23,27 @@ export interface AdminModuleComponents {
   classController: ClassController;
   teacherController: TeacherController;
   timetableController: TimetableController;
+  examController: ExamController;
   adminService: AdminService;
   classService: ClassService;
   teacherService: TeacherService;
   timetableService: TimetableService;
+  examService: ExamService;
   adminDashboardRepository: AdminDashboardRepository;
   classRepository: ClassRepository;
   teacherRepository: TeacherRepository;
   timetableRepository: TimetableRepository;
+  examRepository: ExamRepository;
 }
 
 export function initAdminModule(authenticateMiddleware: RequestHandler): AdminModuleComponents {
-  // 1. Repositories
   const adminDashboardRepository = new AdminDashboardRepository();
   const classRepository = new ClassRepository();
   const teacherRepository = new TeacherRepository();
   const timetableRepository = new TimetableRepository();
+  const examRepository = new ExamRepository();
 
-  // 2. Services
-  const passwordService = new PasswordService();
+  const passwordService = new PasswordService(10);
   const classService = new ClassService(classRepository);
   const teacherService = new TeacherService(teacherRepository, passwordService, classRepository);
   const adminService = new AdminService(adminDashboardRepository, classRepository);
@@ -47,19 +52,24 @@ export function initAdminModule(authenticateMiddleware: RequestHandler): AdminMo
     classRepository,
     teacherRepository
   );
+  const examService = new ExamService(
+    examRepository,
+    classRepository,
+    teacherRepository
+  );
 
-  // 3. Controllers
   const adminController = new AdminController(adminService);
   const classController = new ClassController(classService);
   const teacherController = new TeacherController(teacherService);
   const timetableController = new TimetableController(timetableService);
+  const examController = new ExamController(examService);
 
-  // 4. Router
   const router = createAdminRouter({
     adminController,
     classController,
     teacherController,
     timetableController,
+    examController,
     authenticateMiddleware,
   });
 
@@ -69,13 +79,16 @@ export function initAdminModule(authenticateMiddleware: RequestHandler): AdminMo
     classController,
     teacherController,
     timetableController,
+    examController,
     adminService,
     classService,
     teacherService,
     timetableService,
+    examService,
     adminDashboardRepository,
     classRepository,
     teacherRepository,
     timetableRepository,
+    examRepository,
   };
 }
