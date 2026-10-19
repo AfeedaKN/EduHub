@@ -382,3 +382,10 @@ Full Stack Developer in Training
 - Return appropriate HTTP status codes.
 - Validate request data.
 
+
+## Testing Practices
+
+- Test important business logic.
+- Cover invalid inputs and edge cases.
+- Run relevant tests before committing changes.
+
