@@ -152,40 +152,33 @@ Parent registration and staff account creation follow different workflows. Paren
 
 ## 📂 Project Structure
 
-The intended modular structure can follow this organization. Update the names to match the actual folders in your repository.
+EduHub is organized as a clean modular monorepo containing a modern React SPA and an Express TypeScript API:
 
 ```text
 EduHub/
-├── frontend/
-│   ├── public/
+├── Frontend/                      # React 19 + TypeScript + Vite SPA
+│   ├── public/                    # Static assets & brand images
 │   └── src/
-│       ├── assets/
-│       ├── components/
-│       ├── pages/
-│       ├── layouts/
-│       ├── features/
-│       ├── services/
-│       ├── routes/
-│       ├── store/
-│       └── main.tsx
+│       ├── api/                   # Typed API service clients (Axios)
+│       ├── components/            # Reusable UI components & layouts
+│       ├── pages/                 # Role-specific dashboard views
+│       ├── router/                # App router with protected routes
+│       ├── store/                 # Redux Toolkit state slices
+│       └── types/                 # Frontend TypeScript interfaces
 │
-├── backend/
-│   └── src/
-│       ├── config/
-│       ├── middleware/
-│       ├── modules/
-│       │   ├── auth/
-│       │   ├── users/
-│       │   ├── admissions/
-│       │   ├── students/
-│       │   ├── teachers/
-│       │   ├── academics/
-│       │   ├── attendance/
-│       │   ├── examinations/
-│       │   ├── fees/
-│       │   └── communication/
-│       ├── utils/
-│       └── server.ts
+├── Backend/                       # Node.js + Express + TypeScript API
+│   ├── src/
+│   │   ├── composition/           # Dependency injection container
+│   │   ├── config/                # Environment configuration (Zod)
+│   │   ├── modules/               # Domain modules
+│   │   │   ├── admin/             # Admissions, classes, teachers, timetable, exams
+│   │   │   ├── auth/              # JWT auth, verification, refresh sessions
+│   │   │   ├── parent/            # Parent portal, children, assignments
+│   │   │   └── teacher/           # Attendance, dashboard, assignments & grading
+│   │   ├── shared/                # Domain errors, ApiResponse, middlewares
+│   │   └── server.ts              # Express application bootstrap
+│   ├── scripts/                   # Database seed scripts
+│   └── tests/                     # Integration and unit tests (Vitest)
 │
 ├── .gitignore
 └── README.md
@@ -197,62 +190,101 @@ EduHub/
 
 Install the following before running the project:
 
-- Node.js and npm
-- MongoDB or a MongoDB Atlas connection
-- Git
-- A code editor such as Visual Studio Code
+- **Node.js**: v20 or later and npm
+- **MongoDB**: Local MongoDB instance (running on port 27017) or MongoDB Atlas connection
+- **Git**: Installed and configured
 
 ### 1. Clone the Repository
 
 ```bash
-git clone <YOUR-GITHUB-REPOSITORY-URL>
+git clone https://github.com/AfeedaKN/EduHub.git
 cd EduHub
 ```
 
-Replace the repository URL and folder name with the actual values for your project.
-
 ### 2. Install Dependencies
 
-Open a terminal in each application folder and install its dependencies:
+Install dependencies for both the Frontend and Backend:
 
 ```bash
-cd frontend
+# Install frontend dependencies
+cd Frontend
 npm install
-```
 
-Then install the backend dependencies:
-
-```bash
-cd backend
+# Install backend dependencies
+cd ../Backend
 npm install
 ```
 
 ### 3. Configure Environment Variables
 
-Create a `.env` file inside the backend folder and add the variables required by your implementation.
+Create a `.env` file inside the `Backend/` directory (you can copy `Backend/.env.example`):
 
-Example:
+```bash
+cd Backend
+cp .env.example .env
+```
+
+Example configuration (`Backend/.env`):
 
 ```env
 PORT=5000
-MONGO_URI=your_mongodb_connection_string
-JWT_SECRET=your_long_random_secret
+NODE_ENV=development
+MONGO_URI=mongodb://127.0.0.1:27017/eduhub
 CLIENT_URL=http://localhost:5173
+
+# JWT Configuration
+JWT_ACCESS_SECRET=your_super_secret_jwt_access_key_min_32_chars
+JWT_ACCESS_EXPIRY=15m
+JWT_REFRESH_SECRET=your_super_secret_jwt_refresh_key_min_32_chars
+JWT_REFRESH_EXPIRY_DAYS=7
+
+# Cookie Settings
+COOKIE_NAME=eduhub_refresh_token
+COOKIE_SECURE=false
+COOKIE_SAME_SITE=lax
 ```
 
-Use the variable names expected by your backend configuration. Replace the example values with your own local settings, and never commit real secrets to GitHub.
+### 4. Seed Initial Management Account
 
-### 4. Run the Application
-
-Start the frontend and backend in separate terminals, using the development scripts configured in each `package.json`.
-
-For example, if both projects define a `dev` script:
+To create the default Principal / Management administrator account:
 
 ```bash
+cd Backend
+npm run seed:management
+```
+
+### 5. Run the Application
+
+Start the backend API and frontend development servers in separate terminals:
+
+```bash
+# Terminal 1 - Backend Server (http://localhost:5000)
+cd Backend
+npm run dev
+
+# Terminal 2 - Frontend Development Server (http://localhost:5173)
+cd Frontend
 npm run dev
 ```
 
-Make sure MongoDB is accessible and the frontend API base URL matches the backend server address.
+### 6. Run Tests and Quality Checks
+
+EduHub includes a comprehensive test suite (295 unit and integration tests):
+
+```bash
+# Run Backend Vitest test suite
+cd Backend
+npm test
+
+# Build Backend TypeScript
+cd Backend
+npm run build
+
+# Run Frontend Linting & Production Build
+cd Frontend
+npm run lint
+npm run build
+```
 
 ## 📸 Screenshots
 
