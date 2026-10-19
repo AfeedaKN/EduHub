@@ -5,22 +5,27 @@ export class CryptoUtils {
    * Generates a cryptographically secure random alphanumeric string (e.g. for refresh tokens & reset tokens)
    */
   static generateRandomToken(bytes: number = 32): string {
-    return crypto.randomBytes(bytes).toString('hex');
+    const validBytes = Math.max(16, bytes);
+    return crypto.randomBytes(validBytes).toString('hex');
   }
 
   /**
-   * Generates a 6-digit numeric OTP code
+   * Generates a numeric OTP code with minimum 4 and maximum 10 digits
    */
   static generateOtp(digits: number = 6): string {
-    const min = Math.pow(10, digits - 1);
-    const max = Math.pow(10, digits) - 1;
+    const validDigits = Math.max(4, Math.min(10, digits));
+    const min = Math.pow(10, validDigits - 1);
+    const max = Math.pow(10, validDigits) - 1;
     return crypto.randomInt(min, max + 1).toString();
   }
 
   /**
-   * Produces a SHA-256 hash of any input string (e.g. for hashing opaque refresh tokens and reset tokens before DB persistence)
+   * Produces a SHA-256 hash of any input string
    */
   static hashToken(token: string): string {
+    if (typeof token !== 'string') {
+      throw new Error('Input token must be a string to hash.');
+    }
     return crypto.createHash('sha256').update(token).digest('hex');
   }
 }
