@@ -758,6 +758,7 @@ export const AdminExamsPage: React.FC = () => {
                 className="admin-search-clear-btn"
                 onClick={() => setSearchTerm('')}
                 title="Clear search"
+                aria-label="Clear search query"
               >
                 <X size={14} />
               </button>
@@ -1044,6 +1045,7 @@ export const AdminExamsPage: React.FC = () => {
                   type="button"
                   className="admin-modal-close"
                   onClick={() => setShowExamModal(false)}
+                  aria-label="Close examination modal"
                 >
                   <X size={18} />
                 </button>
@@ -1318,6 +1320,7 @@ export const AdminExamsPage: React.FC = () => {
                   type="button"
                   className="admin-modal-close"
                   onClick={closeScheduleDrawer}
+                  aria-label="Close examination schedule drawer"
                 >
                   <X size={20} />
                 </button>
@@ -1535,6 +1538,7 @@ export const AdminExamsPage: React.FC = () => {
                   type="button"
                   className="admin-modal-close"
                   onClick={() => setShowScheduleFormModal(false)}
+                  aria-label="Close subject schedule form"
                 >
                   <X size={18} />
                 </button>
@@ -1800,6 +1804,7 @@ export const AdminExamsPage: React.FC = () => {
                   type="button"
                   className="admin-modal-close"
                   onClick={() => setConfirmModal(null)}
+                  aria-label="Close confirmation dialog"
                 >
                   <X size={18} />
                 </button>

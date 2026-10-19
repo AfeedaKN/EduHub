@@ -391,6 +391,7 @@ export const ParentAssignmentsPage: React.FC = () => {
               type="button"
               onClick={() => setSubmissionSuccessMessage(null)}
               style={{ background: 'none', border: 'none', color: '#065F46', cursor: 'pointer' }}
+              aria-label="Dismiss success notification"
             >
               <X size={16} />
             </button>
@@ -594,6 +595,7 @@ export const ParentAssignmentsPage: React.FC = () => {
                     className="parent-search-clear"
                     onClick={() => setSearchQuery('')}
                     title="Clear search"
+                    aria-label="Clear assignment search"
                   >
                     <X size={14} />
                   </button>
