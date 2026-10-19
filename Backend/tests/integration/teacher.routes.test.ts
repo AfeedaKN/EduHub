@@ -9,7 +9,10 @@ import { TeacherModel } from '../../src/modules/admin/models/Teacher.model';
 import { UserModel } from '../../src/modules/auth/models/User.model';
 import { StudentModel } from '../../src/modules/parent/models/Student.model';
 import { AttendanceModel } from '../../src/modules/teacher/models/Attendance.model';
+import { AssignmentModel } from '../../src/modules/teacher/models/Assignment.model';
+import { SubmissionModel } from '../../src/modules/teacher/models/Submission.model';
 import { TimetablePeriodModel } from '../../src/modules/admin/models/TimetablePeriod.model';
+
 
 describe('Teacher Routes Integration Tests', () => {
   const app = createApp();
@@ -489,5 +492,260 @@ describe('Teacher Routes Integration Tests', () => {
         expect(res.body.error.code).toBe('FORBIDDEN_SECTION');
       });
     });
+
+    describe('Teacher Assignments Management Endpoints', () => {
+      let createdAssignmentId: string;
+
+      afterAll(async () => {
+        await AssignmentModel.deleteMany({ teacherUserId: new mongoose.Types.ObjectId(teacherUserId) });
+      });
+
+      it('POST /api/v1/teacher/assignments creates a new assignment for assigned class', async () => {
+        const payload = {
+          title: 'Kinematics Problem Set 1',
+          description: 'Solve questions 1 through 10 on page 50.',
+          className: 'Grade 8',
+          section: 'A',
+          subject: 'Physics',
+          assignedDate: '2026-10-14',
+          dueDate: '2026-10-21',
+          maxMarks: 50,
+          status: 'PUBLISHED',
+          attachmentUrl: 'https://example.com/physics-sheet.pdf',
+          attachmentName: 'physics-sheet.pdf',
+        };
+
+        const res = await request(app)
+          .post('/api/v1/teacher/assignments')
+          .set('Authorization', `Bearer ${teacherToken}`)
+          .send(payload);
+
+        expect(res.status).toBe(201);
+        expect(res.body.success).toBe(true);
+        expect(res.body.data.id).toBeDefined();
+        expect(res.body.data.title).toBe(payload.title);
+        expect(res.body.data.status).toBe('PUBLISHED');
+        expect(res.body.data.maxMarks).toBe(50);
+        expect(res.body.data.teacherName).toBe('Prof. Marcus Vance');
+
+        createdAssignmentId = res.body.data.id;
+      });
+
+      it('POST /api/v1/teacher/assignments fails when teacher is not assigned to the class', async () => {
+        const payload = {
+          title: 'Unauthorized Assignment',
+          description: 'Should not be allowed',
+          className: 'Grade 12',
+          section: 'C',
+          subject: 'Economics',
+          dueDate: '2026-10-25',
+          maxMarks: 50,
+        };
+
+        const res = await request(app)
+          .post('/api/v1/teacher/assignments')
+          .set('Authorization', `Bearer ${teacherToken}`)
+          .send(payload);
+
+        expect(res.status).toBe(403);
+        expect(res.body.success).toBe(false);
+        expect(res.body.error.code).toBe('FORBIDDEN_CLASS_ASSIGNMENT');
+      });
+
+      it('POST /api/v1/teacher/assignments fails when dueDate is earlier than assignedDate', async () => {
+        const payload = {
+          title: 'Invalid Date Assignment',
+          description: 'Testing backwards dates',
+          className: 'Grade 8',
+          section: 'A',
+          subject: 'Physics',
+          assignedDate: '2026-10-25',
+          dueDate: '2026-10-20',
+          maxMarks: 50,
+        };
+
+        const res = await request(app)
+          .post('/api/v1/teacher/assignments')
+          .set('Authorization', `Bearer ${teacherToken}`)
+          .send(payload);
+
+        expect(res.status).toBe(400);
+        expect(res.body.success).toBe(false);
+        expect(res.body.error.message).toContain('Due date cannot be earlier than assigned date');
+      });
+
+      it('GET /api/v1/teacher/assignments returns assignments list and summary metrics', async () => {
+        const res = await request(app)
+          .get('/api/v1/teacher/assignments')
+          .set('Authorization', `Bearer ${teacherToken}`);
+
+        expect(res.status).toBe(200);
+        expect(res.body.success).toBe(true);
+        expect(Array.isArray(res.body.data.assignments)).toBe(true);
+        expect(res.body.data.assignments.length).toBeGreaterThanOrEqual(1);
+        expect(res.body.data.summary).toBeDefined();
+        expect(res.body.data.summary.total).toBeGreaterThanOrEqual(1);
+        expect(res.body.data.summary.published).toBeGreaterThanOrEqual(1);
+      });
+
+      it('GET /api/v1/teacher/assignments/:id returns the assignment details', async () => {
+        const res = await request(app)
+          .get(`/api/v1/teacher/assignments/${createdAssignmentId}`)
+          .set('Authorization', `Bearer ${teacherToken}`);
+
+        expect(res.status).toBe(200);
+        expect(res.body.success).toBe(true);
+        expect(res.body.data.id).toBe(createdAssignmentId);
+        expect(res.body.data.title).toBe('Kinematics Problem Set 1');
+      });
+
+      it('GET /api/v1/teacher/assignments/:id/submissions and PUT .../grade flow', async () => {
+        // Seed a test student in Grade 8 A
+        const student = await StudentModel.create({
+          parentId: new mongoose.Types.ObjectId(),
+          fullName: 'David Miller',
+          studentId: 'STU-GR8-01',
+          grade: 'Grade 8',
+          section: 'A',
+          academicYear: '2026-2027',
+          status: 'ACTIVE',
+        });
+
+        // Seed a submission
+        const sub = await SubmissionModel.create({
+          assignmentId: new mongoose.Types.ObjectId(createdAssignmentId),
+          studentId: student._id,
+          parentId: student.parentId,
+          teacherUserId: new mongoose.Types.ObjectId(teacherUserId),
+          className: 'Grade 8',
+          section: 'A',
+          academicYear: '2026-2027',
+          subject: 'Physics',
+          answerText: 'Kinematics formulas: v = u + at, s = ut + 0.5at^2',
+          attachmentUrl: '',
+          attachmentName: '',
+          attachmentSize: 0,
+          attachmentType: '',
+          submittedAt: new Date(),
+          status: 'SUBMITTED',
+          isLate: false,
+          version: 1,
+          gradingStatus: 'PENDING',
+          maxMarks: 50,
+          isPublished: false,
+        });
+
+        // 1. Fetch submissions for assignment
+        const listRes = await request(app)
+          .get(`/api/v1/teacher/assignments/${createdAssignmentId}/submissions`)
+          .set('Authorization', `Bearer ${teacherToken}`);
+
+        expect(listRes.status).toBe(200);
+        expect(listRes.body.success).toBe(true);
+        expect(Array.isArray(listRes.body.data)).toBe(true);
+        expect(listRes.body.data.length).toBe(1);
+        expect(listRes.body.data[0].studentName).toBe('David Miller');
+        expect(listRes.body.data[0].studentAdmissionNumber).toBe('STU-GR8-01');
+
+        // 2. Save draft review (publishResult = false)
+        const draftGradeRes = await request(app)
+          .put(`/api/v1/teacher/assignments/${createdAssignmentId}/submissions/${sub._id}/grade`)
+          .set('Authorization', `Bearer ${teacherToken}`)
+          .send({
+            marksObtained: 42,
+            feedback: 'Good work, please double check units in question 4.',
+            publishResult: false,
+          });
+
+        expect(draftGradeRes.status).toBe(200);
+        expect(draftGradeRes.body.success).toBe(true);
+        expect(draftGradeRes.body.data.marksObtained).toBe(42);
+        expect(draftGradeRes.body.data.status).toBe('UNDER_REVIEW');
+        expect(draftGradeRes.body.data.isPublished).toBe(false);
+
+        // 3. Reject invalid marks (> maxMarks)
+        const invalidMarksRes = await request(app)
+          .put(`/api/v1/teacher/assignments/${createdAssignmentId}/submissions/${sub._id}/grade`)
+          .set('Authorization', `Bearer ${teacherToken}`)
+          .send({
+            marksObtained: 999,
+            publishResult: true,
+          });
+
+        expect(invalidMarksRes.status).toBe(400);
+        expect(invalidMarksRes.body.success).toBe(false);
+
+        // 4. Publish graded result (publishResult = true)
+        const publishGradeRes = await request(app)
+          .put(`/api/v1/teacher/assignments/${createdAssignmentId}/submissions/${sub._id}/grade`)
+          .set('Authorization', `Bearer ${teacherToken}`)
+          .send({
+            marksObtained: 45,
+            feedback: 'Excellent reasoning and clear steps.',
+            publishResult: true,
+          });
+
+        expect(publishGradeRes.status).toBe(200);
+        expect(publishGradeRes.body.success).toBe(true);
+        expect(publishGradeRes.body.data.marksObtained).toBe(45);
+        expect(publishGradeRes.body.data.status).toBe('GRADED');
+        expect(publishGradeRes.body.data.isPublished).toBe(true);
+
+        // Cleanup seeded student and submission
+        await SubmissionModel.deleteMany({ assignmentId: new mongoose.Types.ObjectId(createdAssignmentId) });
+        await StudentModel.deleteMany({ _id: student._id });
+      });
+
+      it('PUT /api/v1/teacher/assignments/:id updates the assignment', async () => {
+        const res = await request(app)
+          .put(`/api/v1/teacher/assignments/${createdAssignmentId}`)
+          .set('Authorization', `Bearer ${teacherToken}`)
+          .send({
+            title: 'Kinematics Problem Set 1 (Updated)',
+            maxMarks: 75,
+          });
+
+        expect(res.status).toBe(200);
+        expect(res.body.success).toBe(true);
+        expect(res.body.data.title).toBe('Kinematics Problem Set 1 (Updated)');
+        expect(res.body.data.maxMarks).toBe(75);
+      });
+
+      it('PATCH /api/v1/teacher/assignments/:id/status updates status to DRAFT', async () => {
+        const res = await request(app)
+          .patch(`/api/v1/teacher/assignments/${createdAssignmentId}/status`)
+          .set('Authorization', `Bearer ${teacherToken}`)
+          .send({ status: 'DRAFT' });
+
+        expect(res.status).toBe(200);
+        expect(res.body.success).toBe(true);
+        expect(res.body.data.status).toBe('DRAFT');
+      });
+
+      it('DELETE /api/v1/teacher/assignments/:id deletes the assignment', async () => {
+        const res = await request(app)
+          .delete(`/api/v1/teacher/assignments/${createdAssignmentId}`)
+          .set('Authorization', `Bearer ${teacherToken}`);
+
+        expect(res.status).toBe(200);
+        expect(res.body.success).toBe(true);
+
+        // Verification: fetching deleted assignment should now return 404
+        const verifyRes = await request(app)
+          .get(`/api/v1/teacher/assignments/${createdAssignmentId}`)
+          .set('Authorization', `Bearer ${teacherToken}`);
+
+        expect(verifyRes.status).toBe(404);
+      });
+
+      it('Non-teacher role cannot access assignments endpoints', async () => {
+        const res = await request(app)
+          .get('/api/v1/teacher/assignments')
+          .set('Authorization', `Bearer ${parentToken}`);
+
+        expect(res.status).toBe(403);
+      });
+    });
   });
 });
+

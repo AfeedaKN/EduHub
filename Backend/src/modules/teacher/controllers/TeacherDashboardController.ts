@@ -1,61 +1,50 @@
 import { Request, Response, NextFunction } from 'express';
 import { TeacherDashboardService } from '../services/TeacherDashboardService';
 import { ApiResponse } from '../../../shared/presentation/responses/ApiResponse';
+import { HttpStatusCode } from '../constants/httpStatusCode';
+import { TeacherMessages } from '../constants/teacherMessages';
 
 export class TeacherDashboardController {
   constructor(private readonly service: TeacherDashboardService) {}
 
-  /**
-   * GET /api/v1/teacher/dashboard
-   */
   getDashboard = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const userId = (req as any).user?.sub || (req as any).user?.id;
       const data = await this.service.getTeacherDashboard(userId);
-      res.status(200).json(ApiResponse.success(data, 'Teacher dashboard retrieved successfully.'));
+      res.status(HttpStatusCode.OK).json(ApiResponse.success(data, TeacherMessages.DASHBOARD_RETRIEVED));
     } catch (error) {
       next(error);
     }
   };
 
-  /**
-   * GET /api/v1/teacher/classes
-   */
   getClasses = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const userId = (req as any).user?.sub || (req as any).user?.id;
       const data = await this.service.getTeacherClasses(userId);
-      res.status(200).json(ApiResponse.success(data, 'Assigned classes retrieved successfully.'));
+      res.status(HttpStatusCode.OK).json(ApiResponse.success(data, TeacherMessages.ASSIGNED_CLASSES_RETRIEVED));
     } catch (error) {
       next(error);
     }
   };
 
-  /**
-   * GET /api/v1/teacher/students
-   */
   getStudents = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const userId = (req as any).user?.sub || (req as any).user?.id;
       const data = await this.service.getTeacherStudents(userId, req.query as any);
-      res.status(200).json(ApiResponse.success(data, 'Students retrieved successfully.'));
+      res.status(HttpStatusCode.OK).json(ApiResponse.success(data, TeacherMessages.STUDENTS_RETRIEVED));
     } catch (error) {
       next(error);
     }
   };
 
-  /**
-   * GET /api/v1/teacher/timetable
-   */
   getTimetable = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const userId = (req as any).user?.sub || (req as any).user?.id;
       const academicYear = req.query.academicYear as string | undefined;
       const data = await this.service.getTeacherWeeklyTimetable(userId, academicYear);
-      res.status(200).json(ApiResponse.success(data, 'Weekly timetable retrieved successfully.'));
+      res.status(HttpStatusCode.OK).json(ApiResponse.success(data, TeacherMessages.TIMETABLE_RETRIEVED));
     } catch (error) {
       next(error);
     }
   };
 }
-

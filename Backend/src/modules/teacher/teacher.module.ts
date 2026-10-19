@@ -5,6 +5,9 @@ import { TeacherDashboardController } from './controllers/TeacherDashboardContro
 import { AttendanceRepository } from './repositories/AttendanceRepository';
 import { AttendanceService } from './services/AttendanceService';
 import { AttendanceController } from './controllers/AttendanceController';
+import { AssignmentRepository } from './repositories/AssignmentRepository';
+import { AssignmentService } from './services/AssignmentService';
+import { AssignmentController } from './controllers/AssignmentController';
 import { createTeacherRouter } from './routes/teacher.routes';
 
 export interface TeacherModuleComponents {
@@ -15,25 +18,28 @@ export interface TeacherModuleComponents {
   attendanceController: AttendanceController;
   attendanceService: AttendanceService;
   attendanceRepository: AttendanceRepository;
+  assignmentController: AssignmentController;
+  assignmentService: AssignmentService;
+  assignmentRepository: AssignmentRepository;
 }
 
 export function initTeacherModule(authenticateMiddleware: RequestHandler): TeacherModuleComponents {
-  // 1. Repositories
   const teacherDashboardRepository = new TeacherDashboardRepository();
   const attendanceRepository = new AttendanceRepository();
+  const assignmentRepository = new AssignmentRepository();
 
-  // 2. Services
   const teacherDashboardService = new TeacherDashboardService(teacherDashboardRepository);
   const attendanceService = new AttendanceService(attendanceRepository);
+  const assignmentService = new AssignmentService(assignmentRepository);
 
-  // 3. Controllers
   const teacherDashboardController = new TeacherDashboardController(teacherDashboardService);
   const attendanceController = new AttendanceController(attendanceService);
+  const assignmentController = new AssignmentController(assignmentService);
 
-  // 4. Router
   const router = createTeacherRouter({
     teacherDashboardController,
     attendanceController,
+    assignmentController,
     authenticateMiddleware,
   });
 
@@ -45,5 +51,8 @@ export function initTeacherModule(authenticateMiddleware: RequestHandler): Teach
     attendanceController,
     attendanceService,
     attendanceRepository,
+    assignmentController,
+    assignmentService,
+    assignmentRepository,
   };
 }

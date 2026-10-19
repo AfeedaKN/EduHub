@@ -96,4 +96,85 @@ export const teacherApi = {
     >('/teacher/timetable', { params });
     return res.data;
   },
+
+  // Get coursework assignments list and summary metrics
+  getAssignments: async (
+    params?: import('../types/assignment.types').AssignmentFilterParams
+  ): Promise<ApiResponse<import('../types/assignment.types').AssignmentsListResponse>> => {
+    const res = await axiosClient.get<
+      ApiResponse<import('../types/assignment.types').AssignmentsListResponse>
+    >('/teacher/assignments', { params });
+    return res.data;
+  },
+
+  // Get single assignment details
+  getAssignmentById: async (
+    id: string
+  ): Promise<ApiResponse<import('../types/assignment.types').Assignment>> => {
+    const res = await axiosClient.get<
+      ApiResponse<import('../types/assignment.types').Assignment>
+    >(`/teacher/assignments/${id}`);
+    return res.data;
+  },
+
+  // Create new assignment
+  createAssignment: async (
+    payload: import('../types/assignment.types').CreateAssignmentPayload
+  ): Promise<ApiResponse<import('../types/assignment.types').Assignment>> => {
+    const res = await axiosClient.post<
+      ApiResponse<import('../types/assignment.types').Assignment>
+    >('/teacher/assignments', payload);
+    return res.data;
+  },
+
+  // Update existing assignment
+  updateAssignment: async (
+    id: string,
+    payload: import('../types/assignment.types').UpdateAssignmentPayload
+  ): Promise<ApiResponse<import('../types/assignment.types').Assignment>> => {
+    const res = await axiosClient.put<
+      ApiResponse<import('../types/assignment.types').Assignment>
+    >(`/teacher/assignments/${id}`, payload);
+    return res.data;
+  },
+
+  // Update assignment status
+  updateAssignmentStatus: async (
+    id: string,
+    status: import('../types/assignment.types').AssignmentStatus
+  ): Promise<ApiResponse<import('../types/assignment.types').Assignment>> => {
+    const res = await axiosClient.patch<
+      ApiResponse<import('../types/assignment.types').Assignment>
+    >(`/teacher/assignments/${id}/status`, { status });
+    return res.data;
+  },
+
+  // Delete assignment
+  deleteAssignment: async (id: string): Promise<ApiResponse<null>> => {
+    const res = await axiosClient.delete<ApiResponse<null>>(`/teacher/assignments/${id}`);
+    return res.data;
+  },
+
+  // Get submissions for an assignment
+  getAssignmentSubmissions: async (
+    assignmentId: string
+  ): Promise<ApiResponse<import('../types/assignment.types').TeacherSubmissionItem[]>> => {
+    const res = await axiosClient.get<
+      ApiResponse<import('../types/assignment.types').TeacherSubmissionItem[]>
+    >(`/teacher/assignments/${assignmentId}/submissions`);
+    return res.data;
+  },
+
+  // Grade or save draft review for a student submission
+  gradeSubmission: async (
+    assignmentId: string,
+    submissionId: string,
+    payload: import('../types/assignment.types').GradeSubmissionPayload
+  ): Promise<ApiResponse<import('../types/assignment.types').TeacherSubmissionItem>> => {
+    const res = await axiosClient.put<
+      ApiResponse<import('../types/assignment.types').TeacherSubmissionItem>
+    >(`/teacher/assignments/${assignmentId}/submissions/${submissionId}/grade`, payload);
+    return res.data;
+  },
 };
+

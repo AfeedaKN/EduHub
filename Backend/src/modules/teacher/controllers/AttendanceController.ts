@@ -1,14 +1,12 @@
 import { Request, Response, NextFunction } from 'express';
 import { AttendanceService } from '../services/AttendanceService';
 import { ApiResponse } from '../../../shared/presentation/responses/ApiResponse';
+import { HttpStatusCode } from '../constants/httpStatusCode';
+import { TeacherMessages } from '../constants/teacherMessages';
 
 export class AttendanceController {
   constructor(private readonly service: AttendanceService) {}
 
-  /**
-   * GET /api/v1/teacher/attendance
-   * Query params: className, section, date
-   */
   getAttendance = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const userId = (req as any).user?.sub || (req as any).user?.id;
@@ -23,51 +21,39 @@ export class AttendanceController {
       );
 
       res
-        .status(200)
-        .json(ApiResponse.success(register, 'Attendance register retrieved successfully.'));
+        .status(HttpStatusCode.OK)
+        .json(ApiResponse.success(register, TeacherMessages.ATTENDANCE_REGISTER_RETRIEVED));
     } catch (error) {
       next(error);
     }
   };
 
-  /**
-   * POST /api/v1/teacher/attendance
-   * Body: { className, section, date, academicYear?, records: [...] }
-   */
   saveAttendance = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const userId = (req as any).user?.sub || (req as any).user?.id;
       const register = await this.service.saveSectionAttendance(userId, req.body);
 
       res
-        .status(201)
-        .json(ApiResponse.success(register, 'Attendance recorded successfully.'));
+        .status(HttpStatusCode.CREATED)
+        .json(ApiResponse.success(register, TeacherMessages.ATTENDANCE_RECORDED));
     } catch (error) {
       next(error);
     }
   };
 
-  /**
-   * PUT /api/v1/teacher/attendance
-   * Body: { className, section, date, academicYear?, records: [...] }
-   */
   updateAttendance = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const userId = (req as any).user?.sub || (req as any).user?.id;
       const register = await this.service.updateSectionAttendance(userId, req.body);
 
       res
-        .status(200)
-        .json(ApiResponse.success(register, 'Attendance updated successfully.'));
+        .status(HttpStatusCode.OK)
+        .json(ApiResponse.success(register, TeacherMessages.ATTENDANCE_UPDATED));
     } catch (error) {
       next(error);
     }
   };
 
-  /**
-   * GET /api/v1/teacher/attendance/history
-   * Query params: className, section, academicYear?
-   */
   getHistory = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const userId = (req as any).user?.sub || (req as any).user?.id;
@@ -81,8 +67,8 @@ export class AttendanceController {
       );
 
       res
-        .status(200)
-        .json(ApiResponse.success(history, 'Attendance history retrieved successfully.'));
+        .status(HttpStatusCode.OK)
+        .json(ApiResponse.success(history, TeacherMessages.ATTENDANCE_HISTORY_RETRIEVED));
     } catch (error) {
       next(error);
     }

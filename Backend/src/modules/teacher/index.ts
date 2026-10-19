@@ -1,11 +1,44 @@
-export * from './teacher.module';
-export * from './controllers/TeacherDashboardController';
-export * from './services/TeacherDashboardService';
-export * from './repositories/TeacherDashboardRepository';
-export * from './dtos/teacherDashboard.dto';
+import { TeacherDashboardRepository } from './repositories/TeacherDashboardRepository';
+import { TeacherDashboardService } from './services/TeacherDashboardService';
+import { TeacherDashboardController } from './controllers/TeacherDashboardController';
+import { AttendanceRepository } from './repositories/AttendanceRepository';
+import { AttendanceService } from './services/AttendanceService';
+import { AttendanceController } from './controllers/AttendanceController';
+import { AssignmentRepository } from './repositories/AssignmentRepository';
+import { AssignmentService } from './services/AssignmentService';
+import { AssignmentController } from './controllers/AssignmentController';
+import { createTeacherRouter } from './routes/teacher.routes';
+import { authenticateMiddleware } from '../auth';
+import { TeacherModuleComponents } from './teacher.module';
 
-export * from './models/Attendance.model';
-export * from './controllers/AttendanceController';
-export * from './services/AttendanceService';
-export * from './repositories/AttendanceRepository';
-export * from './dtos/attendance.dto';
+export const teacherDashboardRepository = new TeacherDashboardRepository();
+export const attendanceRepository = new AttendanceRepository();
+export const assignmentRepository = new AssignmentRepository();
+
+export const teacherDashboardService = new TeacherDashboardService(teacherDashboardRepository);
+export const attendanceService = new AttendanceService(attendanceRepository);
+export const assignmentService = new AssignmentService(assignmentRepository);
+
+export const teacherDashboardController = new TeacherDashboardController(teacherDashboardService);
+export const attendanceController = new AttendanceController(attendanceService);
+export const assignmentController = new AssignmentController(assignmentService);
+
+export const teacherRouter = createTeacherRouter({
+  teacherDashboardController,
+  attendanceController,
+  assignmentController,
+  authenticateMiddleware,
+});
+
+export const teacherModule: TeacherModuleComponents = {
+  router: teacherRouter,
+  teacherDashboardController,
+  teacherDashboardService,
+  teacherDashboardRepository,
+  attendanceController,
+  attendanceService,
+  attendanceRepository,
+  assignmentController,
+  assignmentService,
+  assignmentRepository,
+};
