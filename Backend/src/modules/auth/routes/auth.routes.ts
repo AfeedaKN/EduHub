@@ -21,7 +21,6 @@ export function createAuthRouter(deps: AuthRoutesDependencies): Router {
   const router = Router();
   const { authController, authenticateMiddleware, authRateLimiter } = deps;
 
-  // Public Parent Registration
   router.post(
     '/parents/register',
     authRateLimiter,
@@ -29,7 +28,6 @@ export function createAuthRouter(deps: AuthRoutesDependencies): Router {
     authController.registerParent
   );
 
-  // Email Verification & OTP
   router.post(
     '/verify-email',
     authRateLimiter,
@@ -44,7 +42,6 @@ export function createAuthRouter(deps: AuthRoutesDependencies): Router {
     authController.resendVerification
   );
 
-  // Common Login for All Roles
   router.post(
     '/login',
     authRateLimiter,
@@ -52,14 +49,11 @@ export function createAuthRouter(deps: AuthRoutesDependencies): Router {
     authController.login
   );
 
-  // Session Lifecycle
   router.post('/refresh', authController.refresh);
   router.post('/logout', authController.logout);
 
-  // Current User Profile (Protected)
   router.get('/me', authenticateMiddleware, authController.me);
 
-  // Password Recovery
   router.post(
     '/forgot-password',
     authRateLimiter,
@@ -74,7 +68,6 @@ export function createAuthRouter(deps: AuthRoutesDependencies): Router {
     authController.resetPassword
   );
 
-  // Change Password (Protected)
   router.patch(
     '/change-password',
     authenticateMiddleware,

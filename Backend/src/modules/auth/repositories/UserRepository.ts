@@ -11,8 +11,19 @@ export class UserRepository implements IUserRepository {
     return UserModel.findById(id);
   }
 
+  async findByIdWithPassword(id: string): Promise<IUserDocument | null> {
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return null;
+    }
+    return UserModel.findById(id).select('+passwordHash');
+  }
+
   async findByEmail(email: string): Promise<IUserDocument | null> {
     return UserModel.findOne({ email: email.toLowerCase().trim() });
+  }
+
+  async findByEmailWithPassword(email: string): Promise<IUserDocument | null> {
+    return UserModel.findOne({ email: email.toLowerCase().trim() }).select('+passwordHash');
   }
 
   async existsByEmail(email: string): Promise<boolean> {

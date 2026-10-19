@@ -36,4 +36,9 @@ describe('TokenService', () => {
     expect(token1).toHaveLength(80); // 40 bytes hex = 80 chars
     expect(token1).not.toBe(token2);
   });
+
+  it('should fail safely and throw an error when JWT secret is empty or missing', () => {
+    expect(() => new TokenService('')).toThrow('[Security Error]');
+    expect(() => new TokenService('   ')).toThrow('[Security Error]');
+  });
 });

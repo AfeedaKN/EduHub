@@ -51,6 +51,39 @@ describe('Auth & API Endpoints Integration Test', () => {
     expect(res.body.error.code).toBe('UNAUTHORIZED');
   });
 
+  it('POST /api/v1/auth/parents/register should reject privilege escalation attempts with extra role field', async () => {
+    const res = await request(app)
+      .post('/api/v1/auth/parents/register')
+      .send({
+        fullName: 'Jane Attacker',
+        email: 'attacker@example.com',
+        phone: '1234567890',
+        password: 'Password123!',
+        acceptedTerms: true,
+        role: 'MANAGEMENT', // Extraneous field should be rejected by strict schema
+      });
+
+    expect(res.status).toBe(400);
+    expect(res.body.success).toBe(false);
+    expect(res.body.error.code).toBe('VALIDATION_ERROR');
+  });
+
+  it('POST /api/v1/auth/parents/register should reject password without special character', async () => {
+    const res = await request(app)
+      .post('/api/v1/auth/parents/register')
+      .send({
+        fullName: 'Jane Parent',
+        email: 'parent@example.com',
+        phone: '1234567890',
+        password: 'Password123', // Missing special character
+        acceptedTerms: true,
+      });
+
+    expect(res.status).toBe(400);
+    expect(res.body.success).toBe(false);
+    expect(res.body.error.code).toBe('VALIDATION_ERROR');
+  });
+
   it('GET /api/v1/unknown-route should return 404', async () => {
     const res = await request(app).get('/api/v1/unknown-route');
     expect(res.status).toBe(404);
@@ -58,3 +91,4 @@ describe('Auth & API Endpoints Integration Test', () => {
     expect(res.body.error.code).toBe('NOT_FOUND');
   });
 });
+

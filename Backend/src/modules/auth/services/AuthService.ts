@@ -20,6 +20,7 @@ import {
   UserRole,
   AccountStatus,
   ChallengeType,
+  mapUserToResponseDTO,
 } from '../dtos/auth.dto';
 import {
   ConflictError,
@@ -29,6 +30,10 @@ import {
   AccountDisabledError,
   UnverifiedAccountError,
 } from '../../../shared/domain/errors/AppError';
+import {
+  AuthErrorMessages,
+  AuthSuccessMessages,
+} from '../constants/authMessages';
 import { generateSecureOtp, generateSecureToken, hashString } from '../../../shared/utils/cryptoUtils';
 
 export class AuthService implements IAuthService {
@@ -41,35 +46,22 @@ export class AuthService implements IAuthService {
     private readonly tokenService: ITokenService,
     private readonly emailService: IEmailService,
     private readonly refreshExpiryDays: number = 7
-  ) { }
-
-  private mapUserResponse(userDoc: any): UserResponseDTO {
-    return {
-      id: userDoc._id.toString(),
-      fullName: userDoc.fullName,
-      email: userDoc.email,
-      phone: userDoc.phone,
-      role: userDoc.role,
-      status: userDoc.status,
-      emailVerifiedAt: userDoc.emailVerifiedAt,
-      createdAt: userDoc.createdAt,
-    };
-  }
+  ) {}
 
   async registerParent(dto: RegisterParentDTO): Promise<{ user: UserResponseDTO; message: string }> {
     const email = dto.email.toLowerCase().trim();
 
     if (!dto.acceptedTerms) {
-      throw new ValidationError('You must accept the terms and conditions to register.');
+      throw new ValidationError(AuthErrorMessages.TERMS_REQUIRED);
     }
 
     if (!dto.password || dto.password.length < 8) {
-      throw new ValidationError('Password must be at least 8 characters long.');
+      throw new ValidationError(AuthErrorMessages.PASSWORD_LENGTH_ERROR);
     }
 
     const exists = await this.userRepo.existsByEmail(email);
     if (exists) {
-      throw new ConflictError('An account with this email address already exists.');
+      throw new ConflictError(AuthErrorMessages.USER_ALREADY_EXISTS);
     }
 
     const passwordHash = await this.passwordService.hash(dto.password);
@@ -79,7 +71,7 @@ export class AuthService implements IAuthService {
       email,
       phone: dto.phone.trim(),
       passwordHash,
-      role: UserRole.PARENT, // Strictly forced
+      role: UserRole.PARENT,
       status: AccountStatus.PENDING_VERIFICATION,
       acceptedTerms: true,
       acceptedTermsAt: new Date(),
@@ -87,15 +79,11 @@ export class AuthService implements IAuthService {
 
     const userId = newUser._id.toString();
 
-    // Invalidate old challenges
     await this.challengeRepo.invalidateAllForUser(userId, ChallengeType.EMAIL_VERIFICATION);
 
-    // Generate 6-digit OTP
     const rawOtp = generateSecureOtp(6);
-    console.log("otp", rawOtp);
-
     const codeHash = hashString(rawOtp);
-    const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 mins
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
 
     await this.challengeRepo.create({
       userId,
@@ -107,8 +95,8 @@ export class AuthService implements IAuthService {
     await this.emailService.sendVerificationEmail(newUser.email, newUser.fullName, rawOtp);
 
     return {
-      user: this.mapUserResponse(newUser),
-      message: 'Registration successful. A verification code has been sent to your email.',
+      user: mapUserToResponseDTO(newUser),
+      message: AuthSuccessMessages.REGISTRATION_SUCCESS,
     };
   }
 
@@ -117,13 +105,13 @@ export class AuthService implements IAuthService {
     const user = await this.userRepo.findByEmail(email);
 
     if (!user) {
-      throw new NotFoundError('Account with this email does not exist.');
+      throw new NotFoundError(AuthErrorMessages.USER_NOT_FOUND);
     }
 
     if (user.status === AccountStatus.ACTIVE) {
       return {
-        user: this.mapUserResponse(user),
-        message: 'Account email is already verified.',
+        user: mapUserToResponseDTO(user),
+        message: AuthSuccessMessages.EMAIL_ALREADY_VERIFIED,
       };
     }
 
@@ -132,7 +120,7 @@ export class AuthService implements IAuthService {
 
     if (!challenge) {
       throw new ValidationError(
-        'Verification code has expired or is invalid. Please request a new code.',
+        AuthErrorMessages.INVALID_OR_EXPIRED_CODE,
         'INVALID_OR_EXPIRED_CODE'
       );
     }
@@ -146,25 +134,23 @@ export class AuthService implements IAuthService {
 
       if (remaining <= 0) {
         throw new ValidationError(
-          'Maximum verification attempts exceeded. Please request a new code.',
+          AuthErrorMessages.MAX_ATTEMPTS_EXCEEDED,
           'MAX_ATTEMPTS_EXCEEDED'
         );
       }
       throw new ValidationError(
-        `Invalid verification code. ${remaining} attempt(s) remaining.`,
+        AuthErrorMessages.INVALID_CODE_ATTEMPTS_REMAINING(remaining),
         'INVALID_CODE'
       );
     }
 
-    // Consume challenge
     await this.challengeRepo.consume(challenge._id.toString());
 
-    // Activate user
     const updatedUser = await this.userRepo.updateStatus(userId, AccountStatus.ACTIVE, new Date());
 
     return {
-      user: this.mapUserResponse(updatedUser || user),
-      message: 'Email successfully verified. You can now log in to your account.',
+      user: mapUserToResponseDTO(updatedUser || user),
+      message: AuthSuccessMessages.EMAIL_VERIFIED,
     };
   }
 
@@ -172,16 +158,15 @@ export class AuthService implements IAuthService {
     const email = dto.email.toLowerCase().trim();
     const user = await this.userRepo.findByEmail(email);
 
-    // Enumeration defense
     if (!user) {
       return {
-        message: 'If an unverified account exists with this email, a new verification code has been sent.',
+        message: AuthSuccessMessages.VERIFICATION_CODE_RESENT_GENERIC,
       };
     }
 
     if (user.status === AccountStatus.ACTIVE) {
       return {
-        message: 'This account email is already verified.',
+        message: AuthSuccessMessages.EMAIL_ALREADY_VERIFIED,
       };
     }
 
@@ -202,38 +187,37 @@ export class AuthService implements IAuthService {
     await this.emailService.sendVerificationEmail(user.email, user.fullName, rawOtp);
 
     return {
-      message: 'A new verification code has been sent to your email.',
+      message: AuthSuccessMessages.VERIFICATION_CODE_SENT,
     };
   }
 
   async login(dto: LoginDTO): Promise<LoginResponseDTO> {
     const email = dto.email.toLowerCase().trim();
-    const user = await this.userRepo.findByEmail(email);
+    const user = await this.userRepo.findByEmailWithPassword(email);
 
-    if (!user) {
-      throw new UnauthorizedError('Invalid email, password, or selected role.', 'INVALID_CREDENTIALS');
+    if (!user || !user.passwordHash) {
+      throw new UnauthorizedError(AuthErrorMessages.INVALID_CREDENTIALS, 'INVALID_CREDENTIALS');
     }
 
     const isMatch = await this.passwordService.compare(dto.password, user.passwordHash);
     if (!isMatch) {
-      throw new UnauthorizedError('Invalid email, password, or selected role.', 'INVALID_CREDENTIALS');
+      throw new UnauthorizedError(AuthErrorMessages.INVALID_CREDENTIALS, 'INVALID_CREDENTIALS');
     }
 
     if (user.role.toUpperCase() !== dto.selectedRole.toUpperCase()) {
-      throw new UnauthorizedError('Invalid email, password, or selected role.', 'INVALID_CREDENTIALS');
+      throw new UnauthorizedError(AuthErrorMessages.INVALID_CREDENTIALS, 'INVALID_CREDENTIALS');
     }
 
     if (user.status === AccountStatus.DISABLED) {
-      throw new AccountDisabledError('Your account has been disabled. Please contact school administration.');
+      throw new AccountDisabledError(AuthErrorMessages.ACCOUNT_DISABLED);
     }
 
     if (user.status === AccountStatus.PENDING_VERIFICATION) {
-      throw new UnverifiedAccountError('Please verify your email address before logging in.');
+      throw new UnverifiedAccountError(AuthErrorMessages.EMAIL_NOT_VERIFIED);
     }
 
     const userId = user._id.toString();
 
-    // Access Token
     const accessToken = this.tokenService.generateAccessToken({
       sub: userId,
       email: user.email,
@@ -241,7 +225,6 @@ export class AuthService implements IAuthService {
       fullName: user.fullName,
     });
 
-    // Refresh Token
     const rawRefreshToken = this.tokenService.generateRefreshToken();
     const tokenHash = hashString(rawRefreshToken);
     const expiresAt = new Date(Date.now() + this.refreshExpiryDays * 24 * 60 * 60 * 1000);
@@ -255,7 +238,7 @@ export class AuthService implements IAuthService {
     });
 
     return {
-      user: this.mapUserResponse(user),
+      user: mapUserToResponseDTO(user),
       accessToken,
       refreshToken: rawRefreshToken,
       expiresIn: '15m',
@@ -264,25 +247,25 @@ export class AuthService implements IAuthService {
 
   async refreshSession(dto: RefreshTokenDTO): Promise<{ accessToken: string; refreshToken: string }> {
     if (!dto.refreshToken) {
-      throw new UnauthorizedError('Refresh token is required.', 'MISSING_REFRESH_TOKEN');
+      throw new UnauthorizedError(AuthErrorMessages.REFRESH_TOKEN_REQUIRED, 'MISSING_REFRESH_TOKEN');
     }
 
     const tokenHash = hashString(dto.refreshToken);
     const session = await this.sessionRepo.findByTokenHash(tokenHash);
 
     if (!session) {
-      throw new UnauthorizedError('Invalid or expired refresh session.', 'INVALID_SESSION');
+      throw new UnauthorizedError(AuthErrorMessages.INVALID_SESSION, 'INVALID_SESSION');
     }
 
     const userId = session.userId.toString();
 
     if (session.isRevoked) {
       await this.sessionRepo.revokeAllForUser(userId);
-      throw new UnauthorizedError('Session reuse detected. All sessions revoked for security.', 'SESSION_REUSED');
+      throw new UnauthorizedError(AuthErrorMessages.SESSION_REUSED, 'SESSION_REUSED');
     }
 
     if (new Date() > session.expiresAt) {
-      throw new UnauthorizedError('Session has expired. Please log in again.', 'SESSION_EXPIRED');
+      throw new UnauthorizedError(AuthErrorMessages.SESSION_EXPIRED, 'SESSION_EXPIRED');
     }
 
     const user = await this.userRepo.findById(userId);
@@ -291,7 +274,6 @@ export class AuthService implements IAuthService {
       throw new UnauthorizedError('User account is invalid or inactive.', 'ACCOUNT_INACTIVE');
     }
 
-    // Token Rotation
     const newRawRefreshToken = this.tokenService.generateRefreshToken();
     const newTokenHash = hashString(newRawRefreshToken);
     const expiresAt = new Date(Date.now() + this.refreshExpiryDays * 24 * 60 * 60 * 1000);
@@ -324,18 +306,18 @@ export class AuthService implements IAuthService {
       const tokenHash = hashString(refreshToken);
       await this.sessionRepo.revokeByTokenHash(tokenHash);
     }
-    return { message: 'Logged out successfully.' };
+    return { message: AuthSuccessMessages.LOGOUT_SUCCESS };
   }
 
   async getCurrentUser(userId: string): Promise<UserResponseDTO> {
     const user = await this.userRepo.findById(userId);
     if (!user) {
-      throw new NotFoundError('User not found.');
+      throw new NotFoundError(AuthErrorMessages.USER_NOT_FOUND);
     }
     if (user.status === AccountStatus.DISABLED) {
-      throw new AccountDisabledError('Your account has been disabled.');
+      throw new AccountDisabledError(AuthErrorMessages.ACCOUNT_DISABLED);
     }
-    return this.mapUserResponse(user);
+    return mapUserToResponseDTO(user);
   }
 
   async requestPasswordReset(dto: ForgotPasswordDTO, resetUrlBase: string): Promise<{ message: string }> {
@@ -343,7 +325,7 @@ export class AuthService implements IAuthService {
     const user = await this.userRepo.findByEmail(email);
 
     const genericResponse = {
-      message: 'If an account exists with this email, a password reset link has been sent.',
+      message: AuthSuccessMessages.PASSWORD_RESET_REQUESTED,
     };
 
     if (!user || user.status === AccountStatus.DISABLED) {
@@ -355,7 +337,7 @@ export class AuthService implements IAuthService {
 
     const rawToken = generateSecureToken(32);
     const tokenHash = hashString(rawToken);
-    const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
 
     await this.resetTokenRepo.create({
       userId,
@@ -375,7 +357,7 @@ export class AuthService implements IAuthService {
     }
 
     if (!dto.newPassword || dto.newPassword.length < 8) {
-      throw new ValidationError('New password must be at least 8 characters long.');
+      throw new ValidationError(AuthErrorMessages.PASSWORD_LENGTH_ERROR);
     }
 
     const tokenHash = hashString(dto.token);
@@ -383,7 +365,7 @@ export class AuthService implements IAuthService {
 
     if (!resetToken) {
       throw new ValidationError(
-        'Invalid or expired password reset link. Please request a new one.',
+        AuthErrorMessages.INVALID_RESET_TOKEN,
         'INVALID_RESET_TOKEN'
       );
     }
@@ -401,27 +383,27 @@ export class AuthService implements IAuthService {
     await this.sessionRepo.revokeAllForUser(userId);
 
     return {
-      message: 'Password has been successfully reset. You can now log in with your new password.',
+      message: AuthSuccessMessages.PASSWORD_RESET_SUCCESS,
     };
   }
 
   async changePassword(dto: ChangePasswordDTO): Promise<{ message: string }> {
     if (!dto.newPassword || dto.newPassword.length < 8) {
-      throw new ValidationError('New password must be at least 8 characters long.');
+      throw new ValidationError(AuthErrorMessages.PASSWORD_LENGTH_ERROR);
     }
 
     if (dto.currentPassword === dto.newPassword) {
-      throw new ValidationError('New password cannot be the same as the current password.');
+      throw new ValidationError(AuthErrorMessages.SAME_PASSWORD_ERROR);
     }
 
-    const user = await this.userRepo.findById(dto.userId);
-    if (!user) {
-      throw new NotFoundError('User not found.');
+    const user = await this.userRepo.findByIdWithPassword(dto.userId);
+    if (!user || !user.passwordHash) {
+      throw new NotFoundError(AuthErrorMessages.USER_NOT_FOUND);
     }
 
     const isCurrentValid = await this.passwordService.compare(dto.currentPassword, user.passwordHash);
     if (!isCurrentValid) {
-      throw new UnauthorizedError('Current password is incorrect.', 'INVALID_PASSWORD');
+      throw new UnauthorizedError(AuthErrorMessages.CURRENT_PASSWORD_INCORRECT, 'INVALID_PASSWORD');
     }
 
     const newHash = await this.passwordService.hash(dto.newPassword);
@@ -430,7 +412,7 @@ export class AuthService implements IAuthService {
     await this.sessionRepo.revokeAllForUser(dto.userId);
 
     return {
-      message: 'Password changed successfully.',
+      message: AuthSuccessMessages.PASSWORD_CHANGED_SUCCESS,
     };
   }
 }

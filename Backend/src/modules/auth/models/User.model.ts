@@ -38,6 +38,7 @@ const userSchema = new Schema<IUserDocument>(
     passwordHash: {
       type: String,
       required: true,
+      select: false,
     },
     role: {
       type: String,

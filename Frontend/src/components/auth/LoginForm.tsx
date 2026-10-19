@@ -111,7 +111,6 @@ export const LoginForm: React.FC<LoginFormProps> = ({ selectedRole, onSuccess })
 
     setIsLoading(true);
     setFormFeedback(null);
-
     try {
       const response = await authApi.login({
         email: email.trim().toLowerCase(),

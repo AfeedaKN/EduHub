@@ -40,7 +40,14 @@ describe('AuthService (Modular Monolith Repository Pattern)', () => {
 
     userRepo = {
       findById: vi.fn(async (id: string) => usersDb.get(id) || null),
+      findByIdWithPassword: vi.fn(async (id: string) => usersDb.get(id) || null),
       findByEmail: vi.fn(async (email: string) => {
+        for (const u of usersDb.values()) {
+          if (u.email === email.toLowerCase()) return u;
+        }
+        return null;
+      }),
+      findByEmailWithPassword: vi.fn(async (email: string) => {
         for (const u of usersDb.values()) {
           if (u.email === email.toLowerCase()) return u;
         }
@@ -350,4 +357,86 @@ describe('AuthService (Modular Monolith Repository Pattern)', () => {
     expect(result.refreshToken).not.toBe(rawToken);
     expect(sessionRepo.revokeByTokenHash).toHaveBeenCalled();
   });
+
+  it('should strictly enforce PARENT role during public registration and never leak passwordHash', async () => {
+    const payload: any = {
+      fullName: 'Attacker Parent',
+      email: 'attacker@school.org',
+      phone: '1234567890',
+      password: 'Password123!',
+      acceptedTerms: true,
+      role: 'MANAGEMENT', // Attempted role escalation
+    };
+
+    const result = await authService.registerParent(payload);
+
+    expect(result.user.role).toBe(UserRole.PARENT);
+    expect((result.user as any).passwordHash).toBeUndefined();
+    expect((result.user as any).password).toBeUndefined();
+  });
+
+  it('should never expose passwordHash in login response', async () => {
+    usersDb.set('user-active-2', {
+      _id: 'user-active-2',
+      fullName: 'Management User',
+      email: 'manager@school.org',
+      phone: '1234567890',
+      passwordHash: 'hashed_Password123!',
+      role: UserRole.MANAGEMENT,
+      status: AccountStatus.ACTIVE,
+    });
+
+    const result = await authService.login({
+      email: 'manager@school.org',
+      password: 'Password123!',
+      selectedRole: UserRole.MANAGEMENT,
+    });
+
+    expect((result.user as any).passwordHash).toBeUndefined();
+    expect((result.user as any).password).toBeUndefined();
+    expect(result.user.email).toBe('manager@school.org');
+  });
+
+  it('should change password successfully and revoke existing sessions', async () => {
+    usersDb.set('user-active-3', {
+      _id: 'user-active-3',
+      fullName: 'Teacher Three',
+      email: 'teacher3@school.org',
+      phone: '1234567890',
+      passwordHash: 'hashed_OldPassword123!',
+      role: UserRole.TEACHER,
+      status: AccountStatus.ACTIVE,
+    });
+
+    const res = await authService.changePassword({
+      userId: 'user-active-3',
+      currentPassword: 'OldPassword123!',
+      newPassword: 'NewPassword123!',
+    });
+
+    expect(res.message).toBe('Password changed successfully.');
+    expect(userRepo.updatePasswordHash).toHaveBeenCalledWith('user-active-3', 'hashed_NewPassword123!');
+    expect(sessionRepo.revokeAllForUser).toHaveBeenCalledWith('user-active-3');
+  });
+
+  it('should reject change password if current password is wrong', async () => {
+    usersDb.set('user-active-4', {
+      _id: 'user-active-4',
+      fullName: 'Teacher Four',
+      email: 'teacher4@school.org',
+      phone: '1234567890',
+      passwordHash: 'hashed_CorrectPassword123!',
+      role: UserRole.TEACHER,
+      status: AccountStatus.ACTIVE,
+    });
+
+    await expect(
+      authService.changePassword({
+        userId: 'user-active-4',
+        currentPassword: 'WrongPassword!',
+        newPassword: 'NewPassword123!',
+      })
+    ).rejects.toThrow(UnauthorizedError);
+  });
 });
+

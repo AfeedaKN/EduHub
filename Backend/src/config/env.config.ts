@@ -39,7 +39,23 @@ const envSchema = z.object({
   INITIAL_MANAGEMENT_EMAIL: z.string().default('admin@eduhub.school'),
   INITIAL_MANAGEMENT_PASSWORD: z.string().default('EduHubAdmin@2026!'),
   INITIAL_MANAGEMENT_PHONE: z.string().default('+1234567890'),
-});
+}).refine(
+  (data) => {
+    if (data.NODE_ENV === 'production') {
+      return (
+        data.JWT_ACCESS_SECRET !== 'eduhub_dev_access_secret_key_change_in_production_2026' &&
+        data.JWT_REFRESH_SECRET !== 'eduhub_dev_refresh_secret_key_change_in_production_2026' &&
+        data.JWT_ACCESS_SECRET.length >= 32 &&
+        data.JWT_REFRESH_SECRET.length >= 32
+      );
+    }
+    return true;
+  },
+  {
+    message: 'In production, secure, non-default JWT_ACCESS_SECRET and JWT_REFRESH_SECRET of at least 32 characters must be provided.',
+    path: ['JWT_ACCESS_SECRET'],
+  }
+);
 
 const parsedEnv = envSchema.safeParse(process.env);
 

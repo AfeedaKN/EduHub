@@ -26,6 +26,29 @@ export interface UserResponseDTO {
   createdAt?: Date;
 }
 
+export const mapUserToResponseDTO = (user: {
+  _id?: any;
+  id?: string;
+  fullName: string;
+  email: string;
+  phone: string;
+  role: UserRole;
+  status: AccountStatus;
+  emailVerifiedAt?: Date | null;
+  createdAt?: Date;
+}): UserResponseDTO => {
+  return {
+    id: user._id ? user._id.toString() : (user.id || ''),
+    fullName: user.fullName,
+    email: user.email,
+    phone: user.phone,
+    role: user.role,
+    status: user.status,
+    emailVerifiedAt: user.emailVerifiedAt ?? null,
+    createdAt: user.createdAt,
+  };
+};
+
 export interface RegisterParentDTO {
   fullName: string;
   email: string;

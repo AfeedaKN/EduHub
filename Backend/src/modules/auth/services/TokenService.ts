@@ -20,7 +20,11 @@ export class TokenService implements ITokenService {
   constructor(
     private readonly secret: string,
     private readonly expiresIn: string = '15m'
-  ) {}
+  ) {
+    if (!secret || secret.trim().length === 0) {
+      throw new Error('[Security Error] JWT access secret must be provided and cannot be empty.');
+    }
+  }
 
   generateAccessToken(payload: TokenPayload): string {
     return jwt.sign(payload, this.secret, {
@@ -32,15 +36,17 @@ export class TokenService implements ITokenService {
 
   verifyAccessToken(token: string): TokenPayload {
     try {
-      return jwt.verify(token, this.secret, {
+      const decoded = jwt.verify(token, this.secret, {
         issuer: 'EduHub',
         audience: 'EduHubUsers',
       }) as TokenPayload;
+
+      return decoded;
     } catch (error: any) {
-      if (error.name === 'TokenExpiredError') {
-        throw new UnauthorizedError('Access token has expired', 'TOKEN_EXPIRED');
+      if (error?.name === 'TokenExpiredError') {
+        throw new UnauthorizedError('Access token has expired.', 'TOKEN_EXPIRED');
       }
-      throw new UnauthorizedError('Invalid access token', 'INVALID_TOKEN');
+      throw new UnauthorizedError('Invalid or malformed access token.', 'INVALID_TOKEN');
     }
   }
 

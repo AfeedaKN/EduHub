@@ -15,7 +15,9 @@ export interface CreateUserData {
 
 export interface IUserRepository {
   findById(id: string): Promise<IUserDocument | null>;
+  findByIdWithPassword(id: string): Promise<IUserDocument | null>;
   findByEmail(email: string): Promise<IUserDocument | null>;
+  findByEmailWithPassword(email: string): Promise<IUserDocument | null>;
   existsByEmail(email: string): Promise<boolean>;
   create(data: CreateUserData): Promise<IUserDocument>;
   updateStatus(id: string, status: AccountStatus, emailVerifiedAt?: Date): Promise<IUserDocument | null>;

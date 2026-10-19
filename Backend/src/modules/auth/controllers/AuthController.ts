@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { IAuthService } from '../interfaces/IAuthService';
 import { ApiResponse } from '../../../shared/presentation/responses/ApiResponse';
+import { HttpStatusCode } from '../constants/httpStatusCode';
 import { CookieOptions } from 'express';
 
 export interface AuthCookieConfig {
@@ -27,10 +28,23 @@ export class AuthController {
     };
   }
 
+  private setTokenCookie(res: Response, token: string): void {
+    res.cookie(this.cookieConfig.cookieName, token, this.getCookieOptions());
+  }
+
+  private clearTokenCookie(res: Response): void {
+    res.clearCookie(this.cookieConfig.cookieName, {
+      httpOnly: true,
+      secure: this.cookieConfig.isProduction,
+      sameSite: this.cookieConfig.sameSite,
+      path: '/api/v1/auth',
+    });
+  }
+
   registerParent = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const result = await this.authService.registerParent(req.body);
-      res.status(201).json(ApiResponse.success(result.user, result.message));
+      res.status(HttpStatusCode.CREATED).json(ApiResponse.success(result.user, result.message));
     } catch (error) {
       next(error);
     }
@@ -39,7 +53,7 @@ export class AuthController {
   verifyEmail = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const result = await this.authService.verifyEmail(req.body);
-      res.status(200).json(ApiResponse.success(result.user, result.message));
+      res.status(HttpStatusCode.OK).json(ApiResponse.success(result.user, result.message));
     } catch (error) {
       next(error);
     }
@@ -48,7 +62,7 @@ export class AuthController {
   resendVerification = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const result = await this.authService.resendVerification(req.body);
-      res.status(200).json(ApiResponse.success(null, result.message));
+      res.status(HttpStatusCode.OK).json(ApiResponse.success(null, result.message));
     } catch (error) {
       next(error);
     }
@@ -65,9 +79,9 @@ export class AuthController {
         ipAddress,
       });
 
-      res.cookie(this.cookieConfig.cookieName, result.refreshToken, this.getCookieOptions());
+      this.setTokenCookie(res, result.refreshToken);
 
-      res.status(200).json(
+      res.status(HttpStatusCode.OK).json(
         ApiResponse.success(
           {
             user: result.user,
@@ -94,9 +108,9 @@ export class AuthController {
         ipAddress,
       });
 
-      res.cookie(this.cookieConfig.cookieName, result.refreshToken, this.getCookieOptions());
+      this.setTokenCookie(res, result.refreshToken);
 
-      res.status(200).json(
+      res.status(HttpStatusCode.OK).json(
         ApiResponse.success(
           {
             accessToken: result.accessToken,
@@ -114,15 +128,9 @@ export class AuthController {
       const refreshToken = req.cookies[this.cookieConfig.cookieName] || req.body?.refreshToken;
 
       const result = await this.authService.logout(refreshToken);
+      this.clearTokenCookie(res);
 
-      res.clearCookie(this.cookieConfig.cookieName, {
-        httpOnly: true,
-        secure: this.cookieConfig.isProduction,
-        sameSite: this.cookieConfig.sameSite,
-        path: '/api/v1/auth',
-      });
-
-      res.status(200).json(ApiResponse.success(null, result.message));
+      res.status(HttpStatusCode.OK).json(ApiResponse.success(null, result.message));
     } catch (error) {
       next(error);
     }
@@ -131,7 +139,7 @@ export class AuthController {
   me = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const user = await this.authService.getCurrentUser(req.user!.sub);
-      res.status(200).json(ApiResponse.success(user, 'User profile retrieved successfully.'));
+      res.status(HttpStatusCode.OK).json(ApiResponse.success(user, 'User profile retrieved successfully.'));
     } catch (error) {
       next(error);
     }
@@ -140,7 +148,7 @@ export class AuthController {
   forgotPassword = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const result = await this.authService.requestPasswordReset(req.body, this.resetUrlBase);
-      res.status(200).json(ApiResponse.success(null, result.message));
+      res.status(HttpStatusCode.OK).json(ApiResponse.success(null, result.message));
     } catch (error) {
       next(error);
     }
@@ -149,7 +157,7 @@ export class AuthController {
   resetPassword = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const result = await this.authService.resetPassword(req.body);
-      res.status(200).json(ApiResponse.success(null, result.message));
+      res.status(HttpStatusCode.OK).json(ApiResponse.success(null, result.message));
     } catch (error) {
       next(error);
     }
@@ -162,7 +170,7 @@ export class AuthController {
         currentPassword: req.body.currentPassword,
         newPassword: req.body.newPassword,
       });
-      res.status(200).json(ApiResponse.success(null, result.message));
+      res.status(HttpStatusCode.OK).json(ApiResponse.success(null, result.message));
     } catch (error) {
       next(error);
     }

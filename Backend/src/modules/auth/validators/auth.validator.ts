@@ -1,30 +1,34 @@
 import { z } from 'zod';
 import { UserRole } from '../dtos/auth.dto';
 
+const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*(),.?":{}|<>_\-+~`=[\]\\;/])/;
+
 export const registerParentSchema = z.object({
-  body: z.object({
-    fullName: z
-      .string()
-      .min(2, 'Full name must be at least 2 characters')
-      .max(100, 'Full name cannot exceed 100 characters'),
-    email: z
-      .string()
-      .email('Invalid email address format'),
-    phone: z
-      .string()
-      .min(7, 'Phone number must be at least 7 characters')
-      .max(20, 'Phone number cannot exceed 20 characters'),
-    password: z
-      .string()
-      .min(8, 'Password must be at least 8 characters')
-      .regex(
-        /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/,
-        'Password must contain at least one uppercase letter, one lowercase letter, and one number'
-      ),
-    acceptedTerms: z
-      .boolean()
-      .refine((val) => val === true, 'You must accept the terms and conditions'),
-  }),
+  body: z
+    .object({
+      fullName: z
+        .string()
+        .min(2, 'Full name must be at least 2 characters')
+        .max(100, 'Full name cannot exceed 100 characters'),
+      email: z
+        .string()
+        .email('Invalid email address format'),
+      phone: z
+        .string()
+        .min(7, 'Phone number must be at least 7 characters')
+        .max(20, 'Phone number cannot exceed 20 characters'),
+      password: z
+        .string()
+        .min(8, 'Password must be at least 8 characters')
+        .regex(
+          PASSWORD_REGEX,
+          'Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character'
+        ),
+      acceptedTerms: z
+        .boolean()
+        .refine((val) => val === true, 'You must accept the terms and conditions'),
+    })
+    .strict(),
 });
 
 export const verifyEmailSchema = z.object({
@@ -63,8 +67,8 @@ export const resetPasswordSchema = z.object({
       .string()
       .min(8, 'Password must be at least 8 characters')
       .regex(
-        /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/,
-        'Password must contain at least one uppercase letter, one lowercase letter, and one number'
+        PASSWORD_REGEX,
+        'Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character'
       ),
   }),
 });
@@ -76,8 +80,8 @@ export const changePasswordSchema = z.object({
       .string()
       .min(8, 'Password must be at least 8 characters')
       .regex(
-        /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/,
-        'Password must contain at least one uppercase letter, one lowercase letter, and one number'
+        PASSWORD_REGEX,
+        'Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character'
       ),
   }),
 });
