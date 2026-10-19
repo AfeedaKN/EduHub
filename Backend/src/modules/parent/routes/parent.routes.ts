@@ -36,5 +36,11 @@ export function createParentRouter(deps: ParentRoutesDependencies): Router {
   // Children List
   router.get('/children', parentController.getChildren);
 
+  // Assignments List, Details & Submission
+  router.get('/assignments', parentController.getAssignments);
+  router.get('/assignments/:id', parentController.getAssignmentById);
+  router.post('/assignments/:id/submit', parentController.submitAssignment);
+
   return router;
 }
+

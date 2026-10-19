@@ -2,6 +2,8 @@ import { Request, Response, NextFunction } from 'express';
 import { IParentService } from '../services/ParentService';
 import { ApiResponse } from '../../../shared/presentation/responses/ApiResponse';
 import { UnauthorizedError } from '../../../shared/domain/errors/AppError';
+import { HttpStatusCode } from '../constants/httpStatusCode';
+import { ParentMessages } from '../constants/parentMessages';
 
 export class ParentController {
   constructor(private readonly parentService: IParentService) {}
@@ -15,11 +17,11 @@ export class ParentController {
       const result = await this.parentService.createRegistrationRequest(req.user.sub, req.body);
 
       return res
-        .status(201)
+        .status(HttpStatusCode.CREATED)
         .json(
           ApiResponse.success(
             result,
-            "Your child's registration request has been submitted successfully and is pending review by school management."
+            ParentMessages.REGISTRATION_REQUEST_CREATED
           )
         );
     } catch (error) {
@@ -34,7 +36,7 @@ export class ParentController {
       }
 
       const result = await this.parentService.getParentDashboard(req.user.sub);
-      return res.status(200).json(ApiResponse.success(result, 'Parent dashboard data retrieved successfully.'));
+      return res.status(HttpStatusCode.OK).json(ApiResponse.success(result, ParentMessages.DASHBOARD_DATA_FETCHED));
     } catch (error) {
       next(error);
     }
@@ -47,7 +49,7 @@ export class ParentController {
       }
 
       const result = await this.parentService.getRegistrationRequests(req.user.sub);
-      return res.status(200).json(ApiResponse.success(result, 'Registration requests retrieved successfully.'));
+      return res.status(HttpStatusCode.OK).json(ApiResponse.success(result, ParentMessages.REGISTRATION_REQUESTS_FETCHED));
     } catch (error) {
       next(error);
     }
@@ -60,7 +62,7 @@ export class ParentController {
       }
 
       const result = await this.parentService.getChildren(req.user.sub);
-      return res.status(200).json(ApiResponse.success(result, 'Children list retrieved successfully.'));
+      return res.status(HttpStatusCode.OK).json(ApiResponse.success(result, ParentMessages.CHILDREN_FETCHED));
     } catch (error) {
       next(error);
     }
@@ -69,7 +71,69 @@ export class ParentController {
   getMetadata = async (_req: Request, res: Response, next: NextFunction) => {
     try {
       const meta = this.parentService.getSchoolMetadata();
-      return res.status(200).json(ApiResponse.success(meta, 'School admission metadata retrieved successfully.'));
+      return res.status(HttpStatusCode.OK).json(ApiResponse.success(meta, ParentMessages.METADATA_FETCHED));
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  getAssignments = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      if (!req.user || !req.user.sub) {
+        throw new UnauthorizedError('Authenticated parent session required.', 'UNAUTHORIZED');
+      }
+
+      const { studentId, subject, status, search } = req.query;
+
+      const result = await this.parentService.getParentAssignments(req.user.sub, {
+        studentId: studentId ? String(studentId) : undefined,
+        subject: subject ? String(subject) : undefined,
+        status: status ? String(status) : undefined,
+        search: search ? String(search) : undefined,
+      });
+
+      return res
+        .status(HttpStatusCode.OK)
+        .json(ApiResponse.success(result, ParentMessages.ASSIGNMENTS_FETCHED));
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  getAssignmentById = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      if (!req.user || !req.user.sub) {
+        throw new UnauthorizedError('Authenticated parent session required.', 'UNAUTHORIZED');
+      }
+
+      const { id } = req.params;
+      const result = await this.parentService.getParentAssignmentById(req.user.sub, id);
+
+      return res.status(HttpStatusCode.OK).json(ApiResponse.success(result, ParentMessages.ASSIGNMENT_DETAIL_FETCHED));
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  submitAssignment = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      if (!req.user || !req.user.sub) {
+        throw new UnauthorizedError('Authenticated parent session required.', 'UNAUTHORIZED');
+      }
+
+      const { id } = req.params;
+      const { studentId, answerText, attachmentUrl, attachmentName, attachmentSize, attachmentType } = req.body;
+
+      const result = await this.parentService.submitAssignment(req.user.sub, id, {
+        studentId,
+        answerText,
+        attachmentUrl,
+        attachmentName,
+        attachmentSize,
+        attachmentType,
+      });
+
+      return res.status(HttpStatusCode.CREATED).json(ApiResponse.success(result, ParentMessages.ASSIGNMENT_SUBMITTED));
     } catch (error) {
       next(error);
     }

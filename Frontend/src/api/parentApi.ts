@@ -5,6 +5,11 @@ import {
   StudentRegistrationRequest,
   AddStudentPayload,
   AdmissionMetadata,
+  ParentAssignmentsQueryParams,
+  ParentAssignmentsResponse,
+  ParentAssignment,
+  SubmitAssignmentPayload,
+  SubmissionDetails,
 } from '../types/parent.types';
 
 export interface ApiResponse<T> {
@@ -82,5 +87,29 @@ export const parentApi = {
         },
       };
     }
+  },
+
+  // Get assignments for parent's children
+  getAssignments: async (params?: ParentAssignmentsQueryParams): Promise<ApiResponse<ParentAssignmentsResponse>> => {
+    const res = await axiosClient.get<ApiResponse<ParentAssignmentsResponse>>('/parent/assignments', { params });
+    return res.data;
+  },
+
+  // Get single assignment details
+  getAssignmentById: async (id: string): Promise<ApiResponse<ParentAssignment>> => {
+    const res = await axiosClient.get<ApiResponse<ParentAssignment>>(`/parent/assignments/${id}`);
+    return res.data;
+  },
+
+  // Submit or resubmit assignment coursework
+  submitAssignment: async (
+    assignmentId: string,
+    payload: SubmitAssignmentPayload
+  ): Promise<ApiResponse<SubmissionDetails>> => {
+    const res = await axiosClient.post<ApiResponse<SubmissionDetails>>(
+      `/parent/assignments/${assignmentId}/submit`,
+      payload
+    );
+    return res.data;
   },
 };

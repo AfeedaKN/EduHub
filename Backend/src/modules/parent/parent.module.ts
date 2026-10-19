@@ -14,20 +14,16 @@ export interface ParentModuleComponents {
 }
 
 export function initParentModule(authenticateMiddleware: RequestHandler): ParentModuleComponents {
-  // 1. Repositories
   const registrationRequestRepository = new RegistrationRequestRepository();
   const studentRepository = new StudentRepository();
 
-  // 2. Services
   const parentService = new ParentService(
     registrationRequestRepository,
     studentRepository
   );
 
-  // 3. Controller
   const parentController = new ParentController(parentService);
 
-  // 4. Router
   const router = createParentRouter({
     parentController,
     authenticateMiddleware,
