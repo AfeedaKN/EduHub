@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { AdminLayout } from '../../components/admin/AdminLayout';
 import { adminApi } from '../../api/adminApi';
+import { getApiErrorMessage } from '../../api/axiosClient';
 import {
   Exam,
   ExamType,
@@ -190,12 +191,10 @@ export const AdminExamsPage: React.FC = () => {
           openScheduleDrawer(target);
         }
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to fetch exams data:', err);
       setError(
-        err?.response?.data?.error?.message ||
-          err?.response?.data?.message ||
-          'Failed to load examinations. Please refresh and try again.'
+        getApiErrorMessage(err, 'Failed to load examinations. Please refresh and try again.')
       );
     } finally {
       setLoading(false);
@@ -325,12 +324,10 @@ export const AdminExamsPage: React.FC = () => {
           fetchData();
         }
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to save exam:', err);
       setExamModalError(
-        err?.response?.data?.error?.message ||
-          err?.response?.data?.message ||
-          'Failed to save examination. Please verify input and try again.'
+        getApiErrorMessage(err, 'Failed to save examination. Please verify input and try again.')
       );
     } finally {
       setExamSubmitting(false);
@@ -351,12 +348,8 @@ export const AdminExamsPage: React.FC = () => {
             closeScheduleDrawer();
           }
           fetchData();
-        } catch (err: any) {
-          showError(
-            err?.response?.data?.error?.message ||
-              err?.response?.data?.message ||
-              'Failed to delete examination.'
-          );
+        } catch (err: unknown) {
+          showError(getApiErrorMessage(err, 'Failed to delete examination.'));
         } finally {
           setConfirming(false);
         }
@@ -375,12 +368,10 @@ export const AdminExamsPage: React.FC = () => {
     try {
       const res = await adminApi.getExamSchedules(exam.id);
       setSchedules(res.data || []);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to load schedules for exam:', err);
       setSchedulesError(
-        err?.response?.data?.error?.message ||
-          err?.response?.data?.message ||
-          'Failed to load subject schedules for this examination.'
+        getApiErrorMessage(err, 'Failed to load subject schedules for this examination.')
       );
     } finally {
       setSchedulesLoading(false);
@@ -587,12 +578,13 @@ export const AdminExamsPage: React.FC = () => {
           fetchData();
         }
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to save subject schedule:', err);
       setScheduleFormError(
-        err?.response?.data?.error?.message ||
-          err?.response?.data?.message ||
+        getApiErrorMessage(
+          err,
           'Failed to schedule subject. Please check schedule conflicts and try again.'
+        )
       );
     } finally {
       setScheduleSubmitting(false);
@@ -612,12 +604,8 @@ export const AdminExamsPage: React.FC = () => {
           setConfirmModal(null);
           openScheduleDrawer(activeExamForSchedule);
           fetchData();
-        } catch (err: any) {
-          showError(
-            err?.response?.data?.error?.message ||
-              err?.response?.data?.message ||
-              'Failed to delete subject schedule.'
-          );
+        } catch (err: unknown) {
+          showError(getApiErrorMessage(err, 'Failed to delete subject schedule.'));
         } finally {
           setConfirming(false);
         }

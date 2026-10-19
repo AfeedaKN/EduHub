@@ -25,6 +25,7 @@ import {
 
 import { TeacherLayout } from '../../components/teacher/TeacherLayout';
 import { teacherApi } from '../../api/teacherApi';
+import { getApiErrorMessage } from '../../api/axiosClient';
 import type {
   Assignment,
   AssignmentStatus,
@@ -140,11 +141,13 @@ export const TeacherAssignmentsPage: React.FC = () => {
           }
         );
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to fetch assignments:', err);
       setError(
-        err?.response?.data?.message ||
+        getApiErrorMessage(
+          err,
           'Failed to load assignments. Please check your connection and try again.'
+        )
       );
     } finally {
       setLoading(false);
@@ -345,12 +348,13 @@ export const TeacherAssignmentsPage: React.FC = () => {
           fetchAssignments();
         }
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to save assignment:', err);
       setFormError(
-        err?.response?.data?.message ||
-          err?.response?.data?.error?.message ||
+        getApiErrorMessage(
+          err,
           'Failed to save assignment. Please check all fields and try again.'
+        )
       );
     } finally {
       setIsSubmitting(false);
@@ -370,9 +374,9 @@ export const TeacherAssignmentsPage: React.FC = () => {
         );
         fetchAssignments();
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to update assignment status:', err);
-      showToast(err?.response?.data?.message || 'Failed to update assignment status.', 'error');
+      showToast(getApiErrorMessage(err, 'Failed to update assignment status.'), 'error');
     }
   };
 
@@ -387,9 +391,9 @@ export const TeacherAssignmentsPage: React.FC = () => {
         setDeleteConfirmAssignment(null);
         fetchAssignments();
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to delete assignment:', err);
-      showToast(err?.response?.data?.message || 'Failed to delete assignment.', 'error');
+      showToast(getApiErrorMessage(err, 'Failed to delete assignment.'), 'error');
     } finally {
       setIsSubmitting(false);
     }
@@ -426,9 +430,9 @@ export const TeacherAssignmentsPage: React.FC = () => {
       if (res.success && res.data) {
         setSubmissionsList(res.data);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to load submissions:', err);
-      setSubmissionsError(err?.response?.data?.message || 'Failed to load student submissions.');
+      setSubmissionsError(getApiErrorMessage(err, 'Failed to load student submissions.'));
     } finally {
       setSubmissionsLoading(false);
     }
@@ -554,10 +558,13 @@ export const TeacherAssignmentsPage: React.FC = () => {
         setGradingSubmission(null);
         setIsPublishConfirmOpen(false);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to save review:', err);
       setGradingError(
-        err?.response?.data?.message || 'Failed to save review. Please check your connection and try again.'
+        getApiErrorMessage(
+          err,
+          'Failed to save review. Please check your connection and try again.'
+        )
       );
       setIsPublishConfirmOpen(false);
     } finally {
