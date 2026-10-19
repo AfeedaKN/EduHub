@@ -42,4 +42,36 @@ axiosClient.interceptors.response.use(
   }
 );
 
+export interface ApiCustomError {
+  message: string;
+  code?: string;
+  details?: unknown;
+  status?: number;
+}
+
+export function isApiCustomError(error: unknown): error is ApiCustomError {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'message' in error &&
+    typeof (error as Record<string, unknown>).message === 'string'
+  );
+}
+
+export function getApiErrorMessage(
+  error: unknown,
+  fallbackMessage = 'An unexpected error occurred. Please try again.'
+): string {
+  if (isApiCustomError(error)) {
+    return error.message;
+  }
+  if (error instanceof Error) {
+    return error.message;
+  }
+  if (typeof error === 'string' && error.trim().length > 0) {
+    return error;
+  }
+  return fallbackMessage;
+}
+
 export default axiosClient;
