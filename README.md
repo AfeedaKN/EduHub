@@ -368,3 +368,10 @@ Full Stack Developer in Training
 - Use appropriate HTTP status codes.
 - Write tests for important API behaviour.
 
+
+## Development Guidelines
+
+- Keep TypeScript types explicit and maintainable.
+- Validate user input before processing requests.
+- Handle API errors consistently.
+
