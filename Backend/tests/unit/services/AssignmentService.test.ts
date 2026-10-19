@@ -214,8 +214,8 @@ describe('AssignmentService Unit Tests', () => {
     });
 
     it('should throw ValidationError if due date is earlier than assigned date', async () => {
-      await expect(
-        service.createAssignment(validUserId, {
+      try {
+        await service.createAssignment(validUserId, {
           title: 'Valid Title',
           description: 'Valid description',
           className: 'Grade 10',
@@ -224,8 +224,31 @@ describe('AssignmentService Unit Tests', () => {
           assignedDate: '2026-10-25',
           dueDate: '2026-10-20', // Earlier!
           maxMarks: 50,
-        })
-      ).rejects.toThrow('Due date cannot be earlier than assigned date');
+        });
+        expect.unreachable('Should have thrown ValidationError');
+      } catch (err: any) {
+        expect(err).toBeInstanceOf(ValidationError);
+        expect(err.message).toContain('Due date cannot be earlier than assigned date');
+      }
+    });
+
+    it('should throw ValidationError if assigned date format is invalid', async () => {
+      try {
+        await service.createAssignment(validUserId, {
+          title: 'Valid Title',
+          description: 'Valid description',
+          className: 'Grade 10',
+          section: 'A',
+          subject: 'Mathematics',
+          assignedDate: '25-10-2026', // Invalid format (not YYYY-MM-DD)
+          dueDate: '2026-10-30',
+          maxMarks: 50,
+        });
+        expect.unreachable('Should have thrown ValidationError');
+      } catch (err: any) {
+        expect(err).toBeInstanceOf(ValidationError);
+        expect(err.message).toContain('Assigned date must be formatted as YYYY-MM-DD');
+      }
     });
 
     it('should throw UnauthorizedError if teacher profile is not found or inactive', async () => {

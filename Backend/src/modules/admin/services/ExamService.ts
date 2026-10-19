@@ -104,10 +104,10 @@ export class ExamService {
     const end = new Date(endDateStr);
 
     if (isNaN(start.getTime())) {
-      throw new ValidationError(`Invalid start date format: "${startDateStr}".`);
+      throw new ValidationError(`Invalid start date format: "${startDateStr}".`, 'INVALID_DATE_FORMAT');
     }
     if (isNaN(end.getTime())) {
-      throw new ValidationError(`Invalid end date format: "${endDateStr}".`);
+      throw new ValidationError(`Invalid end date format: "${endDateStr}".`, 'INVALID_DATE_FORMAT');
     }
 
     // Zero-out hours for pure date comparison
@@ -115,7 +115,7 @@ export class ExamService {
     const endZero = new Date(Date.UTC(end.getUTCFullYear(), end.getUTCMonth(), end.getUTCDate()));
 
     if (endZero < startZero) {
-      throw new ValidationError('Exam end date cannot be earlier than start date.');
+      throw new ValidationError('Exam end date cannot be earlier than start date.', 'INVALID_DATE_RANGE');
     }
 
     return { start, end };

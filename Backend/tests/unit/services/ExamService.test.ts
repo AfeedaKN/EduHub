@@ -191,16 +191,37 @@ describe('ExamService Unit Tests', () => {
     });
 
     it('should throw ValidationError if end date is earlier than start date', async () => {
-      await expect(
-        service.createExam({
+      try {
+        await service.createExam({
           name: 'Unit Test 1',
           examType: 'UNIT_TEST',
           academicYear: '2026-2027',
           applicableClassIds: [validClassId1],
           startDate: '2026-09-10',
           endDate: '2026-09-05',
-        })
-      ).rejects.toThrow(ValidationError);
+        });
+        expect.unreachable('Should have thrown ValidationError');
+      } catch (err: any) {
+        expect(err).toBeInstanceOf(ValidationError);
+        expect(err.message).toContain('Exam end date cannot be earlier than start date');
+      }
+    });
+
+    it('should throw ValidationError if date format is invalid', async () => {
+      try {
+        await service.createExam({
+          name: 'Unit Test 1',
+          examType: 'UNIT_TEST',
+          academicYear: '2026-2027',
+          applicableClassIds: [validClassId1],
+          startDate: 'invalid-date',
+          endDate: '2026-09-05',
+        });
+        expect.unreachable('Should have thrown ValidationError');
+      } catch (err: any) {
+        expect(err).toBeInstanceOf(ValidationError);
+        expect(err.message).toContain('Invalid start date format');
+      }
     });
 
     it('should throw ConflictError if duplicate exam name in same academic year', async () => {

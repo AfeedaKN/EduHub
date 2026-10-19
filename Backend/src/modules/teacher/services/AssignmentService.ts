@@ -95,14 +95,14 @@ export class AssignmentService {
     const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
 
     if (!dateRegex.test(assignedDate)) {
-      throw new ValidationError('Assigned date must be formatted as YYYY-MM-DD.');
+      throw new ValidationError('Assigned date must be formatted as YYYY-MM-DD.', 'INVALID_DATE_FORMAT');
     }
     if (!dateRegex.test(dueDate)) {
-      throw new ValidationError('Due date must be formatted as YYYY-MM-DD.');
+      throw new ValidationError('Due date must be formatted as YYYY-MM-DD.', 'INVALID_DATE_FORMAT');
     }
 
     if (dueDate < assignedDate) {
-      throw new ValidationError('Due date cannot be earlier than assigned date.');
+      throw new ValidationError('Due date cannot be earlier than assigned date.', 'INVALID_DUE_DATE');
     }
 
     return { assignedDate, dueDate };
