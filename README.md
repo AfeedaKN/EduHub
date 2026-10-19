@@ -359,3 +359,12 @@ Full Stack Developer in Training
 - Add tests when changing business logic.
 - Keep frontend and backend responsibilities separate.
 
+
+## API Development
+
+- Keep API endpoints consistent and predictable.
+- Validate incoming request data.
+- Return clear error responses.
+- Use appropriate HTTP status codes.
+- Write tests for important API behaviour.
+
