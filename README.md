@@ -596,3 +596,10 @@ Full Stack Developer in Training
 - Optimize slow API responses.
 - Reduce unnecessary processing.
 
+
+## Middleware
+
+- Keep middleware focused on specific responsibilities.
+- Validate requests before processing them.
+- Handle middleware errors consistently.
+
