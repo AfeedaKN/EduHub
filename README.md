@@ -389,3 +389,17 @@ Full Stack Developer in Training
 - Cover invalid inputs and edge cases.
 - Run relevant tests before committing changes.
 
+
+## Testing Practices
+
+- Test important business logic.
+- Cover invalid inputs and edge cases.
+- Run relevant tests before committing changes.
+
+
+## API Development
+
+- Use consistent endpoint naming.
+- Return appropriate HTTP status codes.
+- Validate request data.
+
