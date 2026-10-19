@@ -603,3 +603,10 @@ Full Stack Developer in Training
 - Validate requests before processing them.
 - Handle middleware errors consistently.
 
+
+## Middleware
+
+- Keep middleware focused on specific responsibilities.
+- Validate requests before processing them.
+- Handle middleware errors consistently.
+
