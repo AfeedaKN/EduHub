@@ -236,6 +236,27 @@ describe('TeacherService Unit Tests', () => {
         })
       ).rejects.toThrow(NotFoundError);
     });
+
+    it('should throw ValidationError if updated email is invalid format or empty', async () => {
+      const fakeTeacherId = new mongoose.Types.ObjectId().toString();
+      vi.mocked(mockRepo.findTeacherById).mockResolvedValue({
+        _id: new mongoose.Types.ObjectId(fakeTeacherId),
+        userId: new mongoose.Types.ObjectId(),
+        email: 'original@eduhub.school',
+      } as any);
+
+      await expect(
+        teacherService.updateTeacher(fakeTeacherId, {
+          email: 'invalid-email-format',
+        })
+      ).rejects.toThrow(ValidationError);
+
+      await expect(
+        teacherService.updateTeacher(fakeTeacherId, {
+          email: '   ',
+        })
+      ).rejects.toThrow(ValidationError);
+    });
   });
 
   describe('changeTeacherStatus', () => {

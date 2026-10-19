@@ -262,8 +262,15 @@ export class TeacherService {
       userUpdateData.fullName = dto.fullName.trim();
     }
 
-    if (dto.email && dto.email.trim()) {
+    if (dto.email !== undefined) {
+      if (!dto.email.trim()) {
+        throw new ValidationError('Teacher email address cannot be empty.', 'MISSING_EMAIL');
+      }
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       const cleanEmail = dto.email.toLowerCase().trim();
+      if (!emailRegex.test(cleanEmail)) {
+        throw new ValidationError('A valid email address is required.', 'INVALID_EMAIL');
+      }
       if (cleanEmail !== teacher.email.toLowerCase()) {
         const existing = await this.teacherRepo.findUserByEmail(cleanEmail);
         if (existing && existing._id.toString() !== teacher.userId.toString()) {
