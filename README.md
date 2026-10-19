@@ -617,3 +617,10 @@ Full Stack Developer in Training
 - Protect administrative endpoints.
 - Verify authorization on the server.
 
+
+## File Management
+
+- Validate uploaded file types.
+- Set appropriate upload size limits.
+- Handle upload failures safely.
+
