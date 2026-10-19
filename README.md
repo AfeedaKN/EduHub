@@ -403,3 +403,11 @@ Full Stack Developer in Training
 - Return appropriate HTTP status codes.
 - Validate request data.
 
+
+## Code Quality
+
+- Follow a consistent coding style.
+- Use meaningful variable and function names.
+- Keep functions small and focused.
+- Handle errors properly.
+
