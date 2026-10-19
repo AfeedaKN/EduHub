@@ -24,6 +24,14 @@ export const errorHandler = (
     statusCode = 409;
     errorCode = 'DUPLICATE_RESOURCE';
     message = 'A resource with this identifier already exists.';
+  } else if (err.name === 'CastError') {
+    statusCode = 400;
+    errorCode = 'INVALID_IDENTIFIER';
+    message = 'Invalid resource identifier format.';
+  } else if (err.name === 'ValidationError') {
+    statusCode = 400;
+    errorCode = 'VALIDATION_ERROR';
+    message = err.message;
   } else if (err.name === 'JsonWebTokenError' || err.name === 'TokenExpiredError') {
     statusCode = 401;
     errorCode = 'INVALID_OR_EXPIRED_TOKEN';
