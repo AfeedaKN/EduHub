@@ -624,3 +624,10 @@ Full Stack Developer in Training
 - Set appropriate upload size limits.
 - Handle upload failures safely.
 
+
+## API Response Standards
+
+- Use consistent response structures.
+- Return suitable HTTP status codes.
+- Provide clear error messages.
+
