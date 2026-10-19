@@ -610,3 +610,10 @@ Full Stack Developer in Training
 - Validate requests before processing them.
 - Handle middleware errors consistently.
 
+
+## Role-Based Access Control
+
+- Separate permissions by user role.
+- Protect administrative endpoints.
+- Verify authorization on the server.
+
