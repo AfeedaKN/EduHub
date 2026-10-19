@@ -35,8 +35,12 @@ export class TokenService implements ITokenService {
   }
 
   verifyAccessToken(token: string): TokenPayload {
+    if (!token || typeof token !== 'string' || !token.trim()) {
+      throw new UnauthorizedError('Access token is required and cannot be empty.', 'MISSING_TOKEN');
+    }
+
     try {
-      const decoded = jwt.verify(token, this.secret, {
+      const decoded = jwt.verify(token.trim(), this.secret, {
         issuer: 'EduHub',
         audience: 'EduHubUsers',
       }) as TokenPayload;
