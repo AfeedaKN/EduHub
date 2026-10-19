@@ -360,7 +360,7 @@ export class AuthService implements IAuthService {
       throw new ValidationError(AuthErrorMessages.PASSWORD_LENGTH_ERROR);
     }
 
-    const tokenHash = hashString(dto.token);
+    const tokenHash = hashString(dto.token.trim());
     const resetToken = await this.resetTokenRepo.findByTokenHash(tokenHash);
 
     if (!resetToken) {
