@@ -124,6 +124,16 @@ describe('AttendanceService (Unit Tests)', () => {
         attendanceService.getSectionAttendance(validUserId, 'Grade 10', 'A', '2099-12-31')
       ).rejects.toThrow(ValidationError);
     });
+
+    it('should throw ValidationError if calendar date does not exist (e.g. Feb 30, Apr 31)', async () => {
+      await expect(
+        attendanceService.getSectionAttendance(validUserId, 'Grade 10', 'A', '2026-02-30')
+      ).rejects.toThrow(ValidationError);
+
+      await expect(
+        attendanceService.getSectionAttendance(validUserId, 'Grade 10', 'A', '2026-04-31')
+      ).rejects.toThrow(ValidationError);
+    });
   });
 
   describe('getSectionAttendance', () => {

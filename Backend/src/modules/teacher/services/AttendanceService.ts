@@ -103,8 +103,18 @@ export class AttendanceService {
       );
     }
 
-    const parsedDate = new Date(`${cleanDate}T00:00:00.000Z`);
-    if (isNaN(parsedDate.getTime())) {
+    const [yearStr, monthStr, dayStr] = cleanDate.split('-');
+    const year = parseInt(yearStr, 10);
+    const month = parseInt(monthStr, 10);
+    const day = parseInt(dayStr, 10);
+
+    const parsedDate = new Date(Date.UTC(year, month - 1, day));
+    if (
+      isNaN(parsedDate.getTime()) ||
+      parsedDate.getUTCFullYear() !== year ||
+      parsedDate.getUTCMonth() + 1 !== month ||
+      parsedDate.getUTCDate() !== day
+    ) {
       throw new ValidationError('Invalid calendar date specified.', 'INVALID_DATE');
     }
 
