@@ -65,9 +65,20 @@ export const createStudentRegistrationSchema = z.object({
     documents: z
       .array(
         z.object({
-          name: z.string().min(1, 'Document name is required.'),
-          url: z.string().url('Invalid document URL.'),
-          fileType: z.string().optional(),
+          name: z
+            .string()
+            .trim()
+            .min(1, 'Document name is required.')
+            .max(100, 'Document name cannot exceed 100 characters.'),
+          url: z
+            .string()
+            .trim()
+            .url('Invalid document URL.'),
+          fileType: z
+            .string()
+            .trim()
+            .max(50, 'File type cannot exceed 50 characters.')
+            .optional(),
         })
       )
       .optional(),
