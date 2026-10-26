@@ -16,4 +16,8 @@ export const TeacherMessages = {
   SUBMISSIONS_RETRIEVED: 'Submissions retrieved successfully.',
   SUBMISSION_GRADED_PUBLISHED: 'Submission graded and result published successfully.',
   SUBMISSION_REVIEW_SAVED: 'Submission review saved as draft successfully.',
+  EXAMS_RETRIEVED: 'Teacher assigned exams retrieved successfully.',
+  EXAM_MARKS_RETRIEVED: 'Exam schedule marks retrieved successfully.',
+  EXAM_MARKS_DRAFT_SAVED: 'Exam marks draft saved successfully.',
+  EXAM_MARKS_SUBMITTED: 'Exam marks submitted for review successfully.',
 } as const;

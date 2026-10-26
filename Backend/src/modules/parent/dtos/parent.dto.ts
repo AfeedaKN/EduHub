@@ -152,3 +152,55 @@ export interface ParentAssignmentsResponseDTO {
   subjects: string[];
 }
 
+export interface ParentSubjectResultDTO {
+  scheduleId: string;
+  examId: string;
+  examName: string;
+  examType: string;
+  subject: string;
+  examDate: string;
+  maxMarks: number;
+  passingMarks: number;
+  marksObtained: number | null;
+  isAbsent: boolean;
+  percentage: number | null;
+  grade: string;
+  isPassed: boolean;
+  remarks: string;
+  publishedAt: string | null;
+}
+
+export interface ParentExamCardDTO {
+  examId: string;
+  examName: string;
+  examType: string;
+  academicYear: string;
+  examDate?: string;
+  publishedAt?: string | null;
+  totalSubjects: number;
+  totalMaxMarks: number;
+  totalObtainedMarks: number;
+  overallPercentage: number;
+  overallGrade: string;
+  isPassed: boolean;
+  subjects: ParentSubjectResultDTO[];
+}
+
+export interface ParentExamResultsQueryDTO {
+  studentId?: string;
+  academicYear?: string;
+  search?: string;
+}
+
+export interface ParentExamResultsResponseDTO {
+  children: ChildProfileDTO[];
+  selectedChild: ChildProfileDTO | null;
+  summary: {
+    totalExams: number;
+    totalSubjectsPassed: number;
+    totalSubjectsFailed: number;
+    overallAveragePercentage: number;
+  };
+  exams: ParentExamCardDTO[];
+}
+

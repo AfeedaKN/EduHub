@@ -13,13 +13,23 @@ import {
   ExamScheduleResponseDTO,
   ExamType,
   ExamStatus,
+  ExamMarksStatus,
+  ManagementResultsFilterDTO,
+  ManagementResultsDashboardResponseDTO,
+  ManagementScheduleMarksReviewDetailsDTO,
+  ManagementSubjectScheduleItemDTO,
+  StudentEvaluationItemDTO,
 } from '../dtos/exam.dto';
-import { IExamDoc } from '../models/Exam.model';
-import { IExamScheduleDoc } from '../models/ExamSchedule.model';
+import { ExamModel, IExamDoc } from '../models/Exam.model';
+import { ExamScheduleModel, IExamScheduleDoc } from '../models/ExamSchedule.model';
+import { ExamMarksModel } from '../models/ExamMarks.model';
+import { StudentModel } from '../../parent/models/Student.model';
+import { TeacherModel } from '../models/Teacher.model';
 import {
   ValidationError,
   ConflictError,
   NotFoundError,
+  ForbiddenError,
 } from '../../../shared/domain/errors/AppError';
 
 export class ExamService {
@@ -713,4 +723,616 @@ export class ExamService {
     }
     await this.examRepo.deleteSchedule(scheduleId);
   }
+
+  async getScheduleMarks(examId: string, scheduleId: string) {
+    const exam = await this.examRepo.findExamById(examId);
+    if (!exam) {
+      throw new NotFoundError(`Examination with ID "${examId}" was not found.`);
+    }
+    const schedule = await this.examRepo.findScheduleById(scheduleId);
+    if (!schedule || schedule.examId.toString() !== examId) {
+      throw new NotFoundError(`Subject schedule with ID "${scheduleId}" was not found.`);
+    }
+
+    const marksDoc = await ExamMarksModel.findOne({
+      examScheduleId: new mongoose.Types.ObjectId(scheduleId),
+    }).exec();
+
+    return {
+      schedule: this.mapScheduleToResponseDTO(schedule),
+      marks: marksDoc || null,
+    };
+  }
+
+  private calculateLetterGrade(percentage: number | null, isAbsent: boolean): string {
+    if (isAbsent) return 'AB';
+    if (percentage === null || percentage === undefined) return '-';
+    if (percentage >= 90) return 'A+';
+    if (percentage >= 80) return 'A';
+    if (percentage >= 70) return 'B+';
+    if (percentage >= 60) return 'B';
+    if (percentage >= 50) return 'C';
+    if (percentage >= 40) return 'D';
+    return 'F';
+  }
+
+  async getResultsDashboard(
+    filter: ManagementResultsFilterDTO
+  ): Promise<ManagementResultsDashboardResponseDTO> {
+    const exams = await ExamModel.find().lean().exec();
+    const examMap = new Map<string, any>();
+    exams.forEach((e) => examMap.set(e._id.toString(), e));
+
+    const allSchedules = await ExamScheduleModel.find()
+      .sort({ examDate: -1, startTime: 1 })
+      .lean()
+      .exec();
+    const allScheduleIds = allSchedules.map((s) => s._id);
+
+    const allMarksDocs = await ExamMarksModel.find({
+      examScheduleId: { $in: allScheduleIds },
+    })
+      .lean()
+      .exec();
+    const marksMap = new Map<string, any>();
+    allMarksDocs.forEach((m) => marksMap.set(m.examScheduleId.toString(), m));
+
+    let totalScheduledSubjects = 0;
+    let pendingReviews = 0;
+    let returnedForCorrection = 0;
+    let publishedResults = 0;
+
+    for (const sch of allSchedules) {
+      if (
+        filter.academicYear &&
+        filter.academicYear !== 'ALL' &&
+        sch.academicYear !== filter.academicYear
+      ) {
+        continue;
+      }
+      totalScheduledSubjects++;
+      const mDoc = marksMap.get(sch._id.toString());
+      const status = mDoc ? mDoc.status : 'PENDING';
+      if (status === 'SUBMITTED') pendingReviews++;
+      else if (status === 'RETURNED') returnedForCorrection++;
+      else if (status === 'PUBLISHED') publishedResults++;
+    }
+
+    const summary = {
+      totalExams: exams.length,
+      scheduledSubjects: totalScheduledSubjects,
+      pendingReviews,
+      returnedForCorrection,
+      publishedResults,
+    };
+
+    const studentCounts = await StudentModel.aggregate([
+      { $match: { status: 'ACTIVE' } },
+      {
+        $group: {
+          _id: {
+            grade: { $toLower: '$grade' },
+            section: { $toLower: '$section' },
+          },
+          count: { $sum: 1 },
+        },
+      },
+    ]);
+    const studentCountMap = new Map<string, number>();
+    studentCounts.forEach((sc) => {
+      if (sc._id?.grade && sc._id?.section) {
+        studentCountMap.set(`${sc._id.grade.trim()}_${sc._id.section.trim()}`, sc.count);
+      }
+    });
+
+    const teachers = await TeacherModel.find({ status: 'ACTIVE' }).lean().exec();
+    const teacherAssignmentMap = new Map<string, string>();
+    for (const t of teachers) {
+      if (Array.isArray(t.assignedClasses)) {
+        for (const ac of t.assignedClasses) {
+          const key = `${ac.className?.trim().toLowerCase()}_${ac.section?.trim().toLowerCase()}_${ac.subject?.trim().toLowerCase()}`;
+          teacherAssignmentMap.set(key, t.fullName);
+        }
+      }
+    }
+
+    const records: ManagementSubjectScheduleItemDTO[] = [];
+
+    for (const sch of allSchedules) {
+      const exam = examMap.get(sch.examId.toString());
+      if (!exam) continue;
+
+      if (
+        filter.academicYear &&
+        filter.academicYear !== 'ALL' &&
+        sch.academicYear !== filter.academicYear
+      ) {
+        continue;
+      }
+      if (
+        filter.examId &&
+        filter.examId !== 'ALL' &&
+        sch.examId.toString() !== filter.examId
+      ) {
+        continue;
+      }
+      if (
+        filter.className &&
+        filter.className !== 'ALL' &&
+        sch.className.toLowerCase() !== filter.className.trim().toLowerCase()
+      ) {
+        continue;
+      }
+      if (
+        filter.section &&
+        filter.section !== 'ALL' &&
+        sch.section.toLowerCase() !== filter.section.trim().toLowerCase()
+      ) {
+        continue;
+      }
+      if (
+        filter.subject &&
+        filter.subject !== 'ALL' &&
+        sch.subject.toLowerCase() !== filter.subject.trim().toLowerCase()
+      ) {
+        continue;
+      }
+
+      const mDoc = marksMap.get(sch._id.toString());
+      const marksStatus: ExamMarksStatus | 'PENDING' = mDoc ? mDoc.status : 'PENDING';
+
+      if (filter.status && filter.status !== 'ALL') {
+        if (filter.status !== marksStatus) {
+          continue;
+        }
+      }
+
+      const rosterCountKey = `${sch.className.trim().toLowerCase()}_${sch.section.trim().toLowerCase()}`;
+      const officialStudentCount =
+        studentCountMap.get(rosterCountKey) || (mDoc ? mDoc.totalStudents : 0);
+
+      let evaluatedCount = 0;
+      if (mDoc && Array.isArray(mDoc.students)) {
+        evaluatedCount = mDoc.students.filter(
+          (s: any) =>
+            s.isAbsent === true ||
+            (s.marksObtained !== null && s.marksObtained !== undefined)
+        ).length;
+      }
+
+      const missingCount = Math.max(0, officialStudentCount - evaluatedCount);
+
+      const teacherKey = `${sch.className.trim().toLowerCase()}_${sch.section.trim().toLowerCase()}_${sch.subject.trim().toLowerCase()}`;
+      const assignedTeacherName =
+        mDoc?.teacherName ||
+        teacherAssignmentMap.get(teacherKey) ||
+        sch.invigilatorName ||
+        'Assigned Teacher';
+
+      if (filter.search && filter.search.trim()) {
+        const q = filter.search.trim().toLowerCase();
+        const matchesExam = exam.name.toLowerCase().includes(q);
+        const matchesSubject = sch.subject.toLowerCase().includes(q);
+        const matchesClass = `${sch.className} ${sch.section}`.toLowerCase().includes(q);
+        const matchesTeacher = assignedTeacherName.toLowerCase().includes(q);
+        if (!matchesExam && !matchesSubject && !matchesClass && !matchesTeacher) {
+          continue;
+        }
+      }
+
+      records.push({
+        id: sch._id.toString(),
+        examId: exam._id.toString(),
+        examName: exam.name,
+        examType: exam.examType,
+        academicYear: sch.academicYear,
+        className: sch.className,
+        classId: sch.classId.toString(),
+        section: sch.section,
+        subject: sch.subject,
+        examDate: this.formatDateString(sch.examDate),
+        maxMarks: sch.maxMarks,
+        passingMarks: sch.passingMarks,
+        roomNumber: sch.roomNumber || '',
+        assignedTeacherName,
+        totalStudents: officialStudentCount,
+        evaluatedStudentsCount: evaluatedCount,
+        missingStudentsCount: missingCount,
+        marksStatus,
+        submittedAt: mDoc?.submittedAt ? mDoc.submittedAt.toISOString() : null,
+        submittedByName: mDoc?.submittedByName || '',
+        returnedAt: mDoc?.returnedAt ? mDoc.returnedAt.toISOString() : null,
+        returnedByName: mDoc?.returnedByName || '',
+        returnReason: mDoc?.returnReason || '',
+        publishedAt: mDoc?.publishedAt ? mDoc.publishedAt.toISOString() : null,
+        publishedByName: mDoc?.publishedByName || '',
+      });
+    }
+
+    return {
+      summary,
+      records,
+    };
+  }
+
+  async getScheduleMarksDetails(
+    examId: string,
+    scheduleId: string
+  ): Promise<ManagementScheduleMarksReviewDetailsDTO> {
+    const exam = await this.examRepo.findExamById(examId);
+    if (!exam) {
+      throw new NotFoundError(`Examination with ID "${examId}" was not found.`);
+    }
+    const schedule = await this.examRepo.findScheduleById(scheduleId);
+    if (!schedule || schedule.examId.toString() !== examId) {
+      throw new NotFoundError(`Subject schedule with ID "${scheduleId}" was not found.`);
+    }
+
+    const marksDoc = await ExamMarksModel.findOne({
+      examScheduleId: new mongoose.Types.ObjectId(scheduleId),
+    })
+      .lean()
+      .exec();
+
+    const baseQuery: Record<string, any> = {
+      grade: { $regex: new RegExp(`^${schedule.className.trim()}$`, 'i') },
+      section: { $regex: new RegExp(`^${schedule.section.trim()}$`, 'i') },
+      status: 'ACTIVE',
+    };
+
+    let enrolledStudents = await StudentModel.find(baseQuery)
+      .sort({ rollNumber: 1, fullName: 1 })
+      .lean()
+      .exec();
+
+    if (
+      schedule.academicYear &&
+      schedule.academicYear.trim() &&
+      schedule.academicYear !== 'ALL'
+    ) {
+      const yearQuery = {
+        ...baseQuery,
+        $or: [
+          { academicYear: schedule.academicYear.trim() },
+          { academicYear: { $exists: false } },
+          { academicYear: '' },
+        ],
+      };
+      const yearStudents = await StudentModel.find(yearQuery)
+        .sort({ rollNumber: 1, fullName: 1 })
+        .lean()
+        .exec();
+      if (yearStudents.length > 0) {
+        enrolledStudents = yearStudents;
+      }
+    }
+
+    const marksStudentMap = new Map<string, any>();
+    if (marksDoc && Array.isArray(marksDoc.students)) {
+      for (const s of marksDoc.students) {
+        marksStudentMap.set(s.studentId.toString(), s);
+        if (s.admissionNumber) {
+          marksStudentMap.set(s.admissionNumber.toLowerCase(), s);
+        }
+      }
+    }
+
+    const roster: StudentEvaluationItemDTO[] = enrolledStudents.map((stu) => {
+      const stuIdStr = stu._id.toString();
+      const markEntry =
+        marksStudentMap.get(stuIdStr) ||
+        marksStudentMap.get(stu.studentId?.toLowerCase());
+
+      const isAbsent = markEntry ? !!markEntry.isAbsent : false;
+      const marksObtained =
+        markEntry &&
+        markEntry.marksObtained !== null &&
+        markEntry.marksObtained !== undefined
+          ? markEntry.marksObtained
+          : null;
+      const remarks = markEntry?.remarks || '';
+      const isMissing = !isAbsent && marksObtained === null;
+
+      let percentage: number | null = null;
+      let isPassed: boolean | null = null;
+      let grade: string | null = null;
+
+      if (isAbsent) {
+        isPassed = false;
+        grade = 'AB';
+      } else if (marksObtained !== null) {
+        percentage =
+          Math.round((marksObtained / schedule.maxMarks) * 100 * 10) / 10;
+        isPassed = marksObtained >= schedule.passingMarks;
+        grade = this.calculateLetterGrade(percentage, false);
+      }
+
+      return {
+        studentId: stuIdStr,
+        studentName: stu.fullName,
+        admissionNumber: stu.studentId,
+        rollNumber: stu.rollNumber || '',
+        marksObtained,
+        isAbsent,
+        remarks,
+        isMissing,
+        isPassed,
+        percentage,
+        grade,
+      };
+    });
+
+    const totalEnrolled = roster.length;
+    const validMarksCount = roster.filter(
+      (r) => r.marksObtained !== null && !r.isAbsent
+    ).length;
+    const absentCount = roster.filter((r) => r.isAbsent).length;
+    const missingCount = roster.filter((r) => r.isMissing).length;
+    const isComplete = totalEnrolled > 0 && missingCount === 0;
+    const canPublish = marksDoc?.status === 'SUBMITTED' && isComplete;
+    const canReturn = marksDoc?.status === 'SUBMITTED';
+
+    let sumMarks = 0;
+    let passingCount = 0;
+    let failingCount = 0;
+    for (const r of roster) {
+      if (r.marksObtained !== null && !r.isAbsent) {
+        sumMarks += r.marksObtained;
+      }
+      if (r.isPassed === true) passingCount++;
+      if (r.isPassed === false) failingCount++;
+    }
+    const averageMarks =
+      validMarksCount > 0
+        ? Math.round((sumMarks / validMarksCount) * 10) / 10
+        : null;
+
+    return {
+      schedule: this.mapScheduleToResponseDTO(schedule),
+      examName: exam.name,
+      examType: exam.examType,
+      marksDoc: marksDoc
+        ? {
+            id: marksDoc._id.toString(),
+            status: marksDoc.status,
+            teacherName: marksDoc.teacherName,
+            submittedAt: marksDoc.submittedAt
+              ? marksDoc.submittedAt.toISOString()
+              : null,
+            submittedByName: marksDoc.submittedByName,
+            returnedAt: marksDoc.returnedAt
+              ? marksDoc.returnedAt.toISOString()
+              : null,
+            returnedByName: marksDoc.returnedByName,
+            returnReason: marksDoc.returnReason,
+            publishedAt: marksDoc.publishedAt
+              ? marksDoc.publishedAt.toISOString()
+              : null,
+            publishedByName: marksDoc.publishedByName,
+            reviewHistory: (marksDoc.reviewHistory || []).map((h: any) => ({
+              status: h.status,
+              changedAt: h.changedAt
+                ? new Date(h.changedAt).toISOString()
+                : new Date().toISOString(),
+              changedByName: h.changedByName || '',
+              reason: h.reason || '',
+            })),
+          }
+        : null,
+      roster,
+      summary: {
+        totalEnrolled,
+        validMarksCount,
+        absentCount,
+        missingCount,
+        isComplete,
+        canPublish,
+        canReturn,
+        averageMarks,
+        passingCount,
+        failingCount,
+      },
+    };
+  }
+
+  async returnScheduleMarks(
+    examId: string,
+    scheduleId: string,
+    reason: string,
+    managementUser: { id: string; name?: string }
+  ) {
+    if (!reason || !reason.trim()) {
+      throw new ValidationError('A reason is required to return marks for correction.');
+    }
+    const exam = await this.examRepo.findExamById(examId);
+    if (!exam) {
+      throw new NotFoundError(`Examination with ID "${examId}" was not found.`);
+    }
+    const schedule = await this.examRepo.findScheduleById(scheduleId);
+    if (!schedule || schedule.examId.toString() !== examId) {
+      throw new NotFoundError(`Subject schedule with ID "${scheduleId}" was not found.`);
+    }
+
+    const marksDoc = await ExamMarksModel.findOne({
+      examScheduleId: new mongoose.Types.ObjectId(scheduleId),
+    }).exec();
+
+    if (!marksDoc) {
+      throw new NotFoundError('No marks entry found for this subject schedule.');
+    }
+    if (marksDoc.status === 'PUBLISHED') {
+      throw new ForbiddenError(
+        'Cannot return marks: Official results have already been published. Use Reopen for Correction if post-publication correction is required.'
+      );
+    }
+    if (marksDoc.status !== 'SUBMITTED') {
+      throw new ValidationError(
+        `Cannot return marks with status "${marksDoc.status}". Only submitted marks can be returned for correction.`
+      );
+    }
+
+    const now = new Date();
+    marksDoc.status = 'RETURNED';
+    marksDoc.returnedAt = now;
+    marksDoc.returnedBy = managementUser.id
+      ? new mongoose.Types.ObjectId(managementUser.id)
+      : null;
+    marksDoc.returnedByName = managementUser.name || 'Management';
+    marksDoc.returnReason = reason.trim();
+
+    if (!Array.isArray(marksDoc.reviewHistory)) {
+      marksDoc.reviewHistory = [];
+    }
+    marksDoc.reviewHistory.push({
+      status: 'RETURNED',
+      changedAt: now,
+      changedBy: managementUser.id
+        ? new mongoose.Types.ObjectId(managementUser.id)
+        : null,
+      changedByName: managementUser.name || 'Management',
+      reason: reason.trim(),
+    });
+
+    await marksDoc.save();
+
+    return {
+      schedule: this.mapScheduleToResponseDTO(schedule),
+      marks: marksDoc,
+    };
+  }
+
+  async publishScheduleMarks(
+    examId: string,
+    scheduleId: string,
+    managementUser?: { id: string; name?: string }
+  ) {
+    const exam = await this.examRepo.findExamById(examId);
+    if (!exam) {
+      throw new NotFoundError(`Examination with ID "${examId}" was not found.`);
+    }
+    const schedule = await this.examRepo.findScheduleById(scheduleId);
+    if (!schedule || schedule.examId.toString() !== examId) {
+      throw new NotFoundError(`Subject schedule with ID "${scheduleId}" was not found.`);
+    }
+
+    const marksDoc = await ExamMarksModel.findOne({
+      examScheduleId: new mongoose.Types.ObjectId(scheduleId),
+    }).exec();
+
+    if (!marksDoc) {
+      throw new NotFoundError('No marks entry found for this subject schedule.');
+    }
+    if (marksDoc.status === 'PUBLISHED') {
+      throw new ConflictError(
+        'Results for this subject schedule have already been published.'
+      );
+    }
+    if (marksDoc.status !== 'SUBMITTED') {
+      throw new ValidationError(
+        `Cannot publish marks with status "${marksDoc.status}". Only submitted marks can be approved and published.`
+      );
+    }
+
+    const reviewDetails = await this.getScheduleMarksDetails(examId, scheduleId);
+    if (!reviewDetails.summary.isComplete) {
+      throw new ValidationError(
+        `Cannot publish results: Submission is incomplete. ${reviewDetails.summary.missingCount} enrolled student(s) have missing marks. All students on the official roster must be evaluated or marked absent before publication.`
+      );
+    }
+
+    const now = new Date();
+    marksDoc.status = 'PUBLISHED';
+    marksDoc.publishedAt = now;
+    marksDoc.publishedBy = managementUser?.id
+      ? new mongoose.Types.ObjectId(managementUser.id)
+      : null;
+    marksDoc.publishedByName = managementUser?.name || 'Management';
+
+    if (!Array.isArray(marksDoc.reviewHistory)) {
+      marksDoc.reviewHistory = [];
+    }
+    marksDoc.reviewHistory.push({
+      status: 'PUBLISHED',
+      changedAt: now,
+      changedBy: managementUser?.id
+        ? new mongoose.Types.ObjectId(managementUser.id)
+        : null,
+      changedByName: managementUser?.name || 'Management',
+      reason: 'Approved and published official results',
+    });
+
+    await marksDoc.save();
+
+    return {
+      schedule: this.mapScheduleToResponseDTO(schedule),
+      marks: marksDoc,
+    };
+  }
+
+  async reopenScheduleMarks(
+    examId: string,
+    scheduleId: string,
+    reason: string,
+    managementUser: { id: string; name?: string }
+  ) {
+    if (!reason || !reason.trim()) {
+      throw new ValidationError(
+        'A reason is required to reopen published results for correction.'
+      );
+    }
+    const exam = await this.examRepo.findExamById(examId);
+    if (!exam) {
+      throw new NotFoundError(`Examination with ID "${examId}" was not found.`);
+    }
+    const schedule = await this.examRepo.findScheduleById(scheduleId);
+    if (!schedule || schedule.examId.toString() !== examId) {
+      throw new NotFoundError(`Subject schedule with ID "${scheduleId}" was not found.`);
+    }
+
+    const marksDoc = await ExamMarksModel.findOne({
+      examScheduleId: new mongoose.Types.ObjectId(scheduleId),
+    }).exec();
+
+    if (!marksDoc) {
+      throw new NotFoundError('No marks entry found for this subject schedule.');
+    }
+    if (marksDoc.status !== 'PUBLISHED') {
+      throw new ValidationError(
+        `Cannot reopen marks with status "${marksDoc.status}". Only published results can be reopened for correction.`
+      );
+    }
+
+    const now = new Date();
+    marksDoc.status = 'RETURNED';
+    marksDoc.returnedAt = now;
+    marksDoc.returnedBy = managementUser.id
+      ? new mongoose.Types.ObjectId(managementUser.id)
+      : null;
+    marksDoc.returnedByName = managementUser.name || 'Management';
+    marksDoc.returnReason = `[Reopened Post-Publication]: ${reason.trim()}`;
+    marksDoc.publishedAt = null;
+    marksDoc.publishedBy = null;
+    marksDoc.publishedByName = '';
+
+    if (!Array.isArray(marksDoc.reviewHistory)) {
+      marksDoc.reviewHistory = [];
+    }
+    marksDoc.reviewHistory.push({
+      status: 'RETURNED',
+      changedAt: now,
+      changedBy: managementUser.id
+        ? new mongoose.Types.ObjectId(managementUser.id)
+        : null,
+      changedByName: managementUser.name || 'Management',
+      reason: `Reopened published results for correction: ${reason.trim()}`,
+    });
+
+    await marksDoc.save();
+
+    return {
+      schedule: this.mapScheduleToResponseDTO(schedule),
+      marks: marksDoc,
+    };
+  }
 }
+

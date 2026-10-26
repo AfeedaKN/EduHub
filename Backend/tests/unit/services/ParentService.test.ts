@@ -9,7 +9,14 @@ import {
   RegistrationStatus,
   CreateStudentRegistrationDTO,
 } from '../../../src/modules/parent/dtos/parent.dto';
-import { ConflictError, ValidationError } from '../../../src/shared/domain/errors/AppError';
+import {
+  ConflictError,
+  ValidationError,
+  ForbiddenError,
+} from '../../../src/shared/domain/errors/AppError';
+import { ExamMarksModel } from '../../../src/modules/admin/models/ExamMarks.model';
+import { ExamModel } from '../../../src/modules/admin/models/Exam.model';
+import { ExamScheduleModel } from '../../../src/modules/admin/models/ExamSchedule.model';
 
 describe('ParentService Unit Tests', () => {
   let parentService: ParentService;
@@ -533,5 +540,272 @@ describe('ParentService Unit Tests', () => {
       ).rejects.toThrow('This assignment has already been evaluated and graded and cannot be resubmitted.');
     });
   });
+
+  describe('getParentExamResults', () => {
+    const childId = new mongoose.Types.ObjectId();
+    const mockChild: any = {
+      _id: childId,
+      parentId: new mongoose.Types.ObjectId(validParentId),
+      fullName: 'Sarah Jenkins',
+      studentId: 'STU-1001',
+      grade: 'Grade 3',
+      section: 'A',
+      status: 'ACTIVE',
+      academicYear: '2026-2027',
+    };
+
+    it('should throw ValidationError if parentId is invalid', async () => {
+      await expect(parentService.getParentExamResults('invalid-id')).rejects.toThrow(
+        ValidationError
+      );
+    });
+
+    it('should return empty result if parent has no active children', async () => {
+      vi.mocked(mockStudentRepo.findByParentId).mockResolvedValue([]);
+
+      const result = await parentService.getParentExamResults(validParentId);
+      expect(result.children).toEqual([]);
+      expect(result.selectedChild).toBeNull();
+      expect(result.exams).toEqual([]);
+      expect(result.summary.totalExams).toBe(0);
+    });
+
+    it('should throw ForbiddenError if parent queries for a studentId not in their active children', async () => {
+      vi.mocked(mockStudentRepo.findByParentId).mockResolvedValue([mockChild]);
+
+      const foreignStudentId = new mongoose.Types.ObjectId().toString();
+      await expect(
+        parentService.getParentExamResults(validParentId, { studentId: foreignStudentId })
+      ).rejects.toThrow(ForbiddenError);
+    });
+
+    it('should return published examination results and omit unpublished marks', async () => {
+      vi.mocked(mockStudentRepo.findByParentId).mockResolvedValue([mockChild]);
+
+      const examId = new mongoose.Types.ObjectId();
+      const scheduleId = new mongoose.Types.ObjectId();
+
+      const mockPublishedMark: any = {
+        _id: new mongoose.Types.ObjectId(),
+        examId,
+        examScheduleId: scheduleId,
+        academicYear: '2026-2027',
+        subject: 'Mathematics',
+        maxMarks: 100,
+        passingMarks: 40,
+        status: 'PUBLISHED',
+        publishedAt: new Date('2026-10-25T10:00:00Z'),
+        students: [
+          {
+            studentId: childId,
+            admissionNumber: 'STU-1001',
+            studentName: 'Sarah Jenkins',
+            marksObtained: 85,
+            isAbsent: false,
+            remarks: 'Great work!',
+          },
+        ],
+      };
+
+      vi.spyOn(ExamMarksModel, 'find').mockReturnValueOnce({
+        sort: vi.fn().mockReturnValueOnce({
+          lean: vi.fn().mockReturnValueOnce({
+            exec: vi.fn().mockResolvedValue([mockPublishedMark]),
+          }),
+        }),
+      } as any);
+
+      vi.spyOn(ExamModel, 'find').mockReturnValueOnce({
+        lean: vi.fn().mockReturnValueOnce({
+          exec: vi.fn().mockResolvedValue([
+            {
+              _id: examId,
+              name: 'Mid-Term Exam',
+              examType: 'MID-TERM',
+            },
+          ]),
+        }),
+      } as any);
+
+      vi.spyOn(ExamScheduleModel, 'find').mockReturnValueOnce({
+        lean: vi.fn().mockReturnValueOnce({
+          exec: vi.fn().mockResolvedValue([
+            {
+              _id: scheduleId,
+              examId,
+              subject: 'Mathematics',
+              maxMarks: 100,
+              passingMarks: 40,
+              examDate: new Date('2026-10-20'),
+            },
+          ]),
+        }),
+      } as any);
+
+      const result = await parentService.getParentExamResults(validParentId, {
+        studentId: childId.toString(),
+      });
+
+      expect(result.selectedChild?.fullName).toBe('Sarah Jenkins');
+      expect(result.exams.length).toBe(1);
+      expect(result.exams[0].examName).toBe('Mid-Term Exam');
+      expect(result.exams[0].overallPercentage).toBe(85);
+      expect(result.exams[0].overallGrade).toBe('A');
+      expect(result.exams[0].isPassed).toBe(true);
+      expect(result.exams[0].publishedAt).toBeDefined();
+      expect(result.exams[0].subjects.length).toBe(1);
+      expect(result.exams[0].subjects[0].subject).toBe('Mathematics');
+      expect(result.exams[0].subjects[0].marksObtained).toBe(85);
+      expect(result.exams[0].subjects[0].grade).toBe('A');
+      expect(result.exams[0].subjects[0].isPassed).toBe(true);
+      expect(result.summary.totalExams).toBe(1);
+      expect(result.summary.totalSubjectsPassed).toBe(1);
+      expect(result.summary.totalSubjectsFailed).toBe(0);
+    });
+
+    it('handles absent student properly with AB grade without treating marks as zero', async () => {
+      const parentId = new mongoose.Types.ObjectId().toString();
+      const childId = new mongoose.Types.ObjectId();
+      const examId = new mongoose.Types.ObjectId();
+      const scheduleId = new mongoose.Types.ObjectId();
+
+      vi.mocked(mockStudentRepo.findByParentId).mockResolvedValueOnce([
+        {
+          _id: childId,
+          fullName: 'Sarah Jenkins',
+          studentId: 'STU-1001',
+          grade: 'Grade 5',
+          section: 'A',
+          status: 'ACTIVE',
+          parentId,
+        } as any,
+      ]);
+
+      const mockPublishedMark: any = {
+        _id: new mongoose.Types.ObjectId(),
+        examId,
+        examScheduleId: scheduleId,
+        academicYear: '2026-2027',
+        subject: 'Science',
+        maxMarks: 100,
+        passingMarks: 40,
+        status: 'PUBLISHED',
+        publishedAt: new Date('2026-10-25T10:00:00Z'),
+        students: [
+          {
+            studentId: childId,
+            admissionNumber: 'STU-1001',
+            studentName: 'Sarah Jenkins',
+            marksObtained: null,
+            isAbsent: true,
+            remarks: 'Medical leave on exam day',
+          },
+        ],
+      };
+
+      vi.spyOn(ExamMarksModel, 'find').mockReturnValueOnce({
+        sort: vi.fn().mockReturnValueOnce({
+          lean: vi.fn().mockReturnValueOnce({
+            exec: vi.fn().mockResolvedValue([mockPublishedMark]),
+          }),
+        }),
+      } as any);
+
+      vi.spyOn(ExamModel, 'find').mockReturnValueOnce({
+        lean: vi.fn().mockReturnValueOnce({
+          exec: vi.fn().mockResolvedValue([
+            {
+              _id: examId,
+              name: 'Mid-Term Exam',
+              examType: 'MID-TERM',
+            },
+          ]),
+        }),
+      } as any);
+
+      vi.spyOn(ExamScheduleModel, 'find').mockReturnValueOnce({
+        lean: vi.fn().mockReturnValueOnce({
+          exec: vi.fn().mockResolvedValue([
+            {
+              _id: scheduleId,
+              examId,
+              subject: 'Science',
+              maxMarks: 100,
+              passingMarks: 40,
+            },
+          ]),
+        }),
+      } as any);
+
+      const result = await parentService.getParentExamResults(parentId, {
+        studentId: childId.toString(),
+      });
+
+      expect(result.exams[0].subjects[0].isAbsent).toBe(true);
+      expect(result.exams[0].subjects[0].marksObtained).toBeNull();
+      expect(result.exams[0].subjects[0].grade).toBe('AB');
+      expect(result.exams[0].subjects[0].isPassed).toBe(false);
+      expect(result.exams[0].isPassed).toBe(false);
+    });
+
+    it('throws ForbiddenError when parent attempts to access results for an unauthorized student', async () => {
+      const parentId = new mongoose.Types.ObjectId().toString();
+      const authorizedChildId = new mongoose.Types.ObjectId();
+      const unauthorizedChildId = new mongoose.Types.ObjectId();
+
+      vi.mocked(mockStudentRepo.findByParentId).mockResolvedValueOnce([
+        {
+          _id: authorizedChildId,
+          fullName: 'Sarah Jenkins',
+          studentId: 'STU-1001',
+          grade: 'Grade 5',
+          section: 'A',
+          status: 'ACTIVE',
+          parentId,
+        } as any,
+      ]);
+
+      await expect(
+        parentService.getParentExamResults(parentId, {
+          studentId: unauthorizedChildId.toString(),
+        })
+      ).rejects.toThrow('You are not authorized to view examination results for this student.');
+    });
+
+    it('returns empty results list and zero metrics when no published results exist', async () => {
+      const parentId = new mongoose.Types.ObjectId().toString();
+      const childId = new mongoose.Types.ObjectId();
+
+      vi.mocked(mockStudentRepo.findByParentId).mockResolvedValueOnce([
+        {
+          _id: childId,
+          fullName: 'Sarah Jenkins',
+          studentId: 'STU-1001',
+          grade: 'Grade 5',
+          section: 'A',
+          status: 'ACTIVE',
+          parentId,
+        } as any,
+      ]);
+
+      vi.spyOn(ExamMarksModel, 'find').mockReturnValueOnce({
+        sort: vi.fn().mockReturnValueOnce({
+          lean: vi.fn().mockReturnValueOnce({
+            exec: vi.fn().mockResolvedValue([]),
+          }),
+        }),
+      } as any);
+
+      const result = await parentService.getParentExamResults(parentId, {
+        academicYear: '2026-2027',
+      });
+
+      expect(result.exams).toHaveLength(0);
+      expect(result.summary.totalExams).toBe(0);
+      expect(result.summary.totalSubjectsPassed).toBe(0);
+      expect(result.summary.totalSubjectsFailed).toBe(0);
+    });
+  });
 });
+
 

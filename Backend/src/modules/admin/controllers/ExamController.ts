@@ -147,4 +147,110 @@ export class ExamController {
       next(err);
     }
   };
+
+  getScheduleMarks = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const result = await this.examService.getScheduleMarks(
+        req.params.id,
+        req.params.scheduleId
+      );
+      res.status(HttpStatusCode.OK).json(ApiResponse.success(result, 'Schedule marks retrieved successfully.'));
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  returnScheduleMarks = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const user = req.user;
+      const result = await this.examService.returnScheduleMarks(
+        req.params.id,
+        req.params.scheduleId,
+        req.body?.reason,
+        {
+          id: user?.sub || '',
+          name: user?.email || 'Management',
+        }
+      );
+      res.status(HttpStatusCode.OK).json(
+        ApiResponse.success(result, 'Marks returned to teacher for correction successfully.')
+      );
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  getResultsDashboard = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { academicYear, examId, className, section, subject, status, search } = req.query;
+      const result = await this.examService.getResultsDashboard({
+        academicYear: academicYear ? String(academicYear) : undefined,
+        examId: examId ? String(examId) : undefined,
+        className: className ? String(className) : undefined,
+        section: section ? String(section) : undefined,
+        subject: subject ? String(subject) : undefined,
+        status: status ? String(status) : undefined,
+        search: search ? String(search) : undefined,
+      });
+      res.status(HttpStatusCode.OK).json(
+        ApiResponse.success(result, 'Results dashboard data retrieved successfully.')
+      );
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  getScheduleMarksReview = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const result = await this.examService.getScheduleMarksDetails(
+        req.params.id,
+        req.params.scheduleId
+      );
+      res.status(HttpStatusCode.OK).json(
+        ApiResponse.success(result, 'Schedule marks review details retrieved successfully.')
+      );
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  publishScheduleMarks = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const user = req.user;
+      const result = await this.examService.publishScheduleMarks(
+        req.params.id,
+        req.params.scheduleId,
+        {
+          id: user?.sub || '',
+          name: user?.email || 'Management',
+        }
+      );
+      res.status(HttpStatusCode.OK).json(
+        ApiResponse.success(result, 'Marks published successfully.')
+      );
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  reopenScheduleMarks = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const user = req.user;
+      const result = await this.examService.reopenScheduleMarks(
+        req.params.id,
+        req.params.scheduleId,
+        req.body?.reason,
+        {
+          id: user?.sub || '',
+          name: user?.email || 'Management',
+        }
+      );
+      res.status(HttpStatusCode.OK).json(
+        ApiResponse.success(result, 'Published marks reopened for correction successfully.')
+      );
+    } catch (err) {
+      next(err);
+    }
+  };
 }
+

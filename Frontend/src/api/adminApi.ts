@@ -525,5 +525,66 @@ export const adminApi = {
     );
     return res.data;
   },
+
+  getScheduleMarks: async (
+    examId: string,
+    scheduleId: string
+  ): Promise<ApiResponse<{ schedule: import('../types/exam.types').ExamSchedule; marks: any }>> => {
+    const res = await axiosClient.get<
+      ApiResponse<{ schedule: import('../types/exam.types').ExamSchedule; marks: any }>
+    >(`/admin/exams/${examId}/schedules/${scheduleId}/marks`);
+    return res.data;
+  },
+
+  returnScheduleMarks: async (
+    examId: string,
+    scheduleId: string,
+    reason: string
+  ): Promise<ApiResponse<{ schedule: import('../types/exam.types').ExamSchedule; marks: any }>> => {
+    const res = await axiosClient.post<
+      ApiResponse<{ schedule: import('../types/exam.types').ExamSchedule; marks: any }>
+    >(`/admin/exams/${examId}/schedules/${scheduleId}/marks/return`, { reason });
+    return res.data;
+  },
+
+  publishScheduleMarks: async (
+    examId: string,
+    scheduleId: string
+  ): Promise<ApiResponse<{ schedule: import('../types/exam.types').ExamSchedule; marks: any }>> => {
+    const res = await axiosClient.post<
+      ApiResponse<{ schedule: import('../types/exam.types').ExamSchedule; marks: any }>
+    >(`/admin/exams/${examId}/schedules/${scheduleId}/marks/publish`);
+    return res.data;
+  },
+
+  reopenScheduleMarks: async (
+    examId: string,
+    scheduleId: string,
+    reason: string
+  ): Promise<ApiResponse<{ schedule: import('../types/exam.types').ExamSchedule; marks: any }>> => {
+    const res = await axiosClient.post<
+      ApiResponse<{ schedule: import('../types/exam.types').ExamSchedule; marks: any }>
+    >(`/admin/exams/${examId}/schedules/${scheduleId}/marks/reopen`, { reason });
+    return res.data;
+  },
+
+  getResultsDashboard: async (
+    params?: import('../types/exam.types').ManagementResultsFilterParams
+  ): Promise<ApiResponse<import('../types/exam.types').ManagementResultsDashboardResponse>> => {
+    const res = await axiosClient.get<
+      ApiResponse<import('../types/exam.types').ManagementResultsDashboardResponse>
+    >('/admin/exams/results-dashboard', { params });
+    return res.data;
+  },
+
+  getScheduleMarksReview: async (
+    examId: string,
+    scheduleId: string
+  ): Promise<ApiResponse<import('../types/exam.types').ManagementScheduleMarksReviewDetails>> => {
+    const res = await axiosClient.get<
+      ApiResponse<import('../types/exam.types').ManagementScheduleMarksReviewDetails>
+    >(`/admin/exams/${examId}/schedules/${scheduleId}/marks-review`);
+    return res.data;
+  },
 };
 

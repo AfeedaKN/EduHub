@@ -7,4 +7,5 @@ export const ParentMessages = {
   ASSIGNMENTS_FETCHED: "Student's assignments retrieved successfully.",
   ASSIGNMENT_DETAIL_FETCHED: 'Assignment details retrieved successfully.',
   ASSIGNMENT_SUBMITTED: 'Assignment submitted successfully.',
+  EXAM_RESULTS_FETCHED: "Student's examination results retrieved successfully.",
 } as const;

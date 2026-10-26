@@ -27,7 +27,14 @@ import {
   ParentAssignmentsQueryDTO,
   SubmissionDetailsDTO,
   SubmitAssignmentDTO,
+  ParentSubjectResultDTO,
+  ParentExamCardDTO,
+  ParentExamResultsQueryDTO,
+  ParentExamResultsResponseDTO,
 } from '../dtos/parent.dto';
+import { ExamMarksModel } from '../../admin/models/ExamMarks.model';
+import { ExamModel } from '../../admin/models/Exam.model';
+import { ExamScheduleModel } from '../../admin/models/ExamSchedule.model';
 import {
   ConflictError,
   ValidationError,
@@ -53,6 +60,10 @@ export interface IParentService {
     assignmentId: string,
     dto: SubmitAssignmentDTO
   ): Promise<SubmissionDetailsDTO>;
+  getParentExamResults(
+    parentId: string,
+    query?: ParentExamResultsQueryDTO
+  ): Promise<ParentExamResultsResponseDTO>;
   getSchoolMetadata(): {
     classes: string[];
     academicYears: string[];
@@ -670,6 +681,307 @@ export class ParentService implements IParentService {
       isPublished,
       publishedAt: isPublished && sub.publishedAt ? sub.publishedAt.toISOString() : undefined,
       canResubmit: !isPublished && (!isPastDue || allowLateSubmissions),
+    };
+  }
+
+  private calculateExamGrade(percentage: number | null, isAbsent: boolean): string {
+    if (isAbsent) return 'AB';
+    if (percentage === null || percentage === undefined) return '-';
+    if (percentage >= 90) return 'A+';
+    if (percentage >= 80) return 'A';
+    if (percentage >= 70) return 'B+';
+    if (percentage >= 60) return 'B';
+    if (percentage >= 50) return 'C';
+    if (percentage >= 40) return 'D';
+    return 'F';
+  }
+
+  async getParentExamResults(
+    parentId: string,
+    query?: ParentExamResultsQueryDTO
+  ): Promise<ParentExamResultsResponseDTO> {
+    if (!parentId || !mongoose.Types.ObjectId.isValid(parentId)) {
+      throw new ValidationError('Invalid parent account identification.');
+    }
+
+    const childrenDocs = await this.studentRepo.findByParentId(parentId);
+    const activeChildren = childrenDocs.filter((c) => c.status === 'ACTIVE');
+
+    const childrenDTOs: ChildProfileDTO[] = activeChildren.map((c) => ({
+      id: c._id.toString(),
+      fullName: c.fullName,
+      studentId: c.studentId,
+      grade: c.grade,
+      section: c.section,
+      classTeacher: c.classTeacher,
+      status: c.status,
+      avatarUrl: c.avatarUrl,
+      rollNumber: c.rollNumber,
+      academicYear: c.academicYear,
+    }));
+
+    if (activeChildren.length === 0) {
+      return {
+        children: [],
+        selectedChild: null,
+        summary: {
+          totalExams: 0,
+          totalSubjectsPassed: 0,
+          totalSubjectsFailed: 0,
+          overallAveragePercentage: 0,
+        },
+        exams: [],
+      };
+    }
+
+    let selectedChild = activeChildren[0];
+    if (query?.studentId && query.studentId.trim() && query.studentId !== 'ALL') {
+      const match = activeChildren.find(
+        (c) => c._id.toString() === query.studentId || c.studentId === query.studentId
+      );
+      if (!match) {
+        throw new ForbiddenError(
+          'You are not authorized to view examination results for this student.'
+        );
+      }
+      selectedChild = match;
+    }
+
+    const selectedChildDTO: ChildProfileDTO = {
+      id: selectedChild._id.toString(),
+      fullName: selectedChild.fullName,
+      studentId: selectedChild.studentId,
+      grade: selectedChild.grade,
+      section: selectedChild.section,
+      classTeacher: selectedChild.classTeacher,
+      status: selectedChild.status,
+      avatarUrl: selectedChild.avatarUrl,
+      rollNumber: selectedChild.rollNumber,
+      academicYear: selectedChild.academicYear,
+    };
+
+    // Query ONLY published results for this child
+    const marksFilter: Record<string, any> = {
+      status: 'PUBLISHED',
+      $or: [
+        { 'students.studentId': selectedChild._id },
+        { 'students.admissionNumber': selectedChild.studentId },
+      ],
+    };
+
+    if (query?.academicYear && query.academicYear !== 'ALL') {
+      marksFilter.academicYear = query.academicYear.trim();
+    }
+
+    const publishedMarksDocs = await ExamMarksModel.find(marksFilter)
+      .sort({ createdAt: -1 })
+      .lean()
+      .exec();
+
+    if (publishedMarksDocs.length === 0) {
+      return {
+        children: childrenDTOs,
+        selectedChild: selectedChildDTO,
+        summary: {
+          totalExams: 0,
+          totalSubjectsPassed: 0,
+          totalSubjectsFailed: 0,
+          overallAveragePercentage: 0,
+        },
+        exams: [],
+      };
+    }
+
+    // Batch fetch associated Exams & Schedules
+    const examIds = publishedMarksDocs.map((m) => m.examId);
+    const scheduleIds = publishedMarksDocs.map((m) => m.examScheduleId);
+
+    const [exams, schedules] = await Promise.all([
+      ExamModel.find({ _id: { $in: examIds } }).lean().exec(),
+      ExamScheduleModel.find({ _id: { $in: scheduleIds } }).lean().exec(),
+    ]);
+
+    const examMap = new Map<string, any>();
+    exams.forEach((e) => examMap.set(e._id.toString(), e));
+
+    const scheduleMap = new Map<string, any>();
+    schedules.forEach((s) => scheduleMap.set(s._id.toString(), s));
+
+    // Group subjects by Exam
+    const examGroups = new Map<
+      string,
+      {
+        examId: string;
+        examName: string;
+        examType: string;
+        academicYear: string;
+        subjects: ParentSubjectResultDTO[];
+      }
+    >();
+
+    for (const mDoc of publishedMarksDocs) {
+      const exam = examMap.get(mDoc.examId.toString());
+      const schedule = scheduleMap.get(mDoc.examScheduleId.toString());
+      const examIdStr = mDoc.examId.toString();
+
+      // Find the student's entry in marksDoc.students
+      const studentEntry = (mDoc.students || []).find(
+        (s: any) =>
+          (s.studentId && s.studentId.toString() === selectedChild._id.toString()) ||
+          s.admissionNumber === selectedChild.studentId
+      );
+
+      if (!studentEntry) continue;
+
+      const isAbsent = !!studentEntry.isAbsent;
+      const marksObtained =
+        studentEntry.marksObtained !== null && studentEntry.marksObtained !== undefined
+          ? studentEntry.marksObtained
+          : null;
+      const maxMarks = schedule?.maxMarks || mDoc.maxMarks || 100;
+      const passingMarks = schedule?.passingMarks || mDoc.passingMarks || 40;
+
+      let percentage: number | null = null;
+      let isPassed = false;
+      let grade = 'AB';
+
+      if (!isAbsent && marksObtained !== null) {
+        percentage = Math.round((marksObtained / maxMarks) * 100 * 10) / 10;
+        isPassed = marksObtained >= passingMarks;
+        grade = this.calculateExamGrade(percentage, false);
+      }
+
+      const examDateStr = schedule?.examDate
+        ? new Date(schedule.examDate).toISOString().split('T')[0]
+        : '';
+
+      const subjectResult: ParentSubjectResultDTO = {
+        scheduleId: mDoc.examScheduleId.toString(),
+        examId: examIdStr,
+        examName: exam?.name || 'Examination',
+        examType: exam?.examType || 'REGULAR',
+        subject: mDoc.subject,
+        examDate: examDateStr,
+        maxMarks,
+        passingMarks,
+        marksObtained,
+        isAbsent,
+        percentage,
+        grade,
+        isPassed,
+        remarks: studentEntry.remarks || '',
+        publishedAt: mDoc.publishedAt ? new Date(mDoc.publishedAt).toISOString() : null,
+      };
+
+      if (!examGroups.has(examIdStr)) {
+        let examDateDisplay = '';
+        if (exam?.startDate) {
+          const s = new Date(exam.startDate).toISOString().split('T')[0];
+          const e = exam.endDate ? new Date(exam.endDate).toISOString().split('T')[0] : '';
+          examDateDisplay = e && e !== s ? `${s} to ${e}` : s;
+        } else if (schedule?.examDate) {
+          examDateDisplay = new Date(schedule.examDate).toISOString().split('T')[0];
+        }
+
+        examGroups.set(examIdStr, {
+          examId: examIdStr,
+          examName: exam?.name || 'Examination',
+          examType: exam?.examType || 'REGULAR',
+          academicYear: mDoc.academicYear,
+          examDate: examDateDisplay,
+          publishedAt: mDoc.publishedAt ? new Date(mDoc.publishedAt).toISOString() : null,
+          subjects: [],
+        });
+      }
+
+      const grp = examGroups.get(examIdStr)!;
+      if (mDoc.publishedAt) {
+        const pDate = new Date(mDoc.publishedAt);
+        if (!grp.publishedAt || new Date(grp.publishedAt) < pDate) {
+          grp.publishedAt = pDate.toISOString();
+        }
+      }
+      grp.subjects.push(subjectResult);
+    }
+
+    const examCards: ParentExamCardDTO[] = [];
+    let totalSubjectsPassed = 0;
+    let totalSubjectsFailed = 0;
+    let sumPercentages = 0;
+    let percentageCount = 0;
+
+    for (const group of examGroups.values()) {
+      let examMaxMarks = 0;
+      let examObtainedMarks = 0;
+      let examPassed = true;
+
+      for (const subj of group.subjects) {
+        examMaxMarks += subj.maxMarks;
+        if (subj.marksObtained !== null && !subj.isAbsent) {
+          examObtainedMarks += subj.marksObtained;
+        }
+        if (subj.isPassed) {
+          totalSubjectsPassed++;
+        } else {
+          totalSubjectsFailed++;
+          examPassed = false;
+        }
+
+        if (subj.percentage !== null) {
+          sumPercentages += subj.percentage;
+          percentageCount++;
+        }
+      }
+
+      const overallPercentage =
+        examMaxMarks > 0
+          ? Math.round((examObtainedMarks / examMaxMarks) * 100 * 10) / 10
+          : 0;
+      const overallGrade = this.calculateExamGrade(overallPercentage, false);
+
+      examCards.push({
+        examId: group.examId,
+        examName: group.examName,
+        examType: group.examType,
+        academicYear: group.academicYear,
+        examDate: group.examDate,
+        publishedAt: group.publishedAt,
+        totalSubjects: group.subjects.length,
+        totalMaxMarks: examMaxMarks,
+        totalObtainedMarks: examObtainedMarks,
+        overallPercentage,
+        overallGrade,
+        isPassed: examPassed,
+        subjects: group.subjects,
+      });
+    }
+
+    let filteredExamCards = examCards;
+    if (query?.search && query.search.trim()) {
+      const q = query.search.trim().toLowerCase();
+      filteredExamCards = examCards.filter(
+        (card) =>
+          card.examName.toLowerCase().includes(q) ||
+          card.examType.toLowerCase().includes(q) ||
+          card.subjects.some((s) => s.subject.toLowerCase().includes(q))
+      );
+    }
+
+    const overallAveragePercentage =
+      percentageCount > 0
+        ? Math.round((sumPercentages / percentageCount) * 10) / 10
+        : 0;
+
+    return {
+      children: childrenDTOs,
+      selectedChild: selectedChildDTO,
+      summary: {
+        totalExams: filteredExamCards.length,
+        totalSubjectsPassed,
+        totalSubjectsFailed,
+        overallAveragePercentage,
+      },
+      exams: filteredExamCards,
     };
   }
 }

@@ -26,21 +26,21 @@ describe('Admin Routes Integration Tests', () => {
 
   const tokenService = new TokenService(
     'eduhub_dev_access_secret_key_change_in_production_2026',
-    '15m',
-    'eduhub_dev_refresh_secret_key_change_in_production_2026',
-    7
+    '15m'
   );
 
   const managementToken = tokenService.generateAccessToken({
     sub: '65f1234567890abcdef12345',
     email: 'admin@eduhub.school',
     role: UserRole.MANAGEMENT,
+    fullName: 'Admin User',
   });
 
   const parentToken = tokenService.generateAccessToken({
     sub: '65f1234567890abcdef12346',
     email: 'parent@eduhub.school',
     role: UserRole.PARENT,
+    fullName: 'Parent User',
   });
 
   it('GET /api/v1/admin/dashboard without token should return 401 Unauthorized', async () => {
@@ -705,6 +705,7 @@ describe('Admin Routes Integration Tests', () => {
         sub: '65f1234567890abcdef12347',
         email: 'teacher.temp@eduhub.school',
         role: UserRole.TEACHER,
+        fullName: 'Teacher User',
       });
 
       beforeAll(async () => {

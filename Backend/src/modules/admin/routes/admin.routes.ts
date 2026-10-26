@@ -86,6 +86,7 @@ export function createAdminRouter(deps: AdminRoutesDependencies): Router {
 
   // Examinations & Subject-wise Scheduling Management
   router.get('/exams/summary', examController.getSummary);
+  router.get('/exams/results-dashboard', examController.getResultsDashboard);
   router.get('/exams/classes/:classId/sections/:section/subjects', examController.getValidSubjects);
   router.get('/exams', examController.getExams);
   router.post('/exams', examController.createExam);
@@ -96,6 +97,11 @@ export function createAdminRouter(deps: AdminRoutesDependencies): Router {
   // Subject Schedules for an Exam
   router.get('/exams/:id/schedules', examController.getSchedules);
   router.post('/exams/:id/schedules', examController.createSchedule);
+  router.get('/exams/:id/schedules/:scheduleId/marks', examController.getScheduleMarks);
+  router.get('/exams/:id/schedules/:scheduleId/marks-review', examController.getScheduleMarksReview);
+  router.post('/exams/:id/schedules/:scheduleId/marks/return', examController.returnScheduleMarks);
+  router.post('/exams/:id/schedules/:scheduleId/marks/publish', examController.publishScheduleMarks);
+  router.post('/exams/:id/schedules/:scheduleId/marks/reopen', examController.reopenScheduleMarks);
   router.put('/exams/:id/schedules/:scheduleId', examController.updateSchedule);
   router.delete('/exams/:id/schedules/:scheduleId', examController.deleteSchedule);
 

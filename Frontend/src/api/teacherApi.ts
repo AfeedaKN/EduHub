@@ -176,5 +176,47 @@ export const teacherApi = {
     >(`/teacher/assignments/${assignmentId}/submissions/${submissionId}/grade`, payload);
     return res.data;
   },
+
+  // Get assigned exams and schedule marks overview
+  getTeacherExams: async (
+    params?: import('../types/exam.types').TeacherExamFilterParams
+  ): Promise<ApiResponse<import('../types/exam.types').TeacherExamsListResponse>> => {
+    const res = await axiosClient.get<
+      ApiResponse<import('../types/exam.types').TeacherExamsListResponse>
+    >('/teacher/exams', { params });
+    return res.data;
+  },
+
+  // Get detailed marks roster for an authorized scheduled subject
+  getExamScheduleMarks: async (
+    scheduleId: string
+  ): Promise<ApiResponse<import('../types/exam.types').TeacherExamScheduleDetails>> => {
+    const res = await axiosClient.get<
+      ApiResponse<import('../types/exam.types').TeacherExamScheduleDetails>
+    >(`/teacher/exams/schedules/${scheduleId}`);
+    return res.data;
+  },
+
+  // Save draft marks for an exam schedule
+  saveExamMarksDraft: async (
+    scheduleId: string,
+    payload: import('../types/exam.types').SaveMarksPayload
+  ): Promise<ApiResponse<import('../types/exam.types').TeacherExamScheduleDetails>> => {
+    const res = await axiosClient.post<
+      ApiResponse<import('../types/exam.types').TeacherExamScheduleDetails>
+    >(`/teacher/exams/schedules/${scheduleId}/draft`, payload);
+    return res.data;
+  },
+
+  // Submit marks for Management review
+  submitExamMarks: async (
+    scheduleId: string,
+    payload: import('../types/exam.types').SaveMarksPayload
+  ): Promise<ApiResponse<import('../types/exam.types').TeacherExamScheduleDetails>> => {
+    const res = await axiosClient.post<
+      ApiResponse<import('../types/exam.types').TeacherExamScheduleDetails>
+    >(`/teacher/exams/schedules/${scheduleId}/submit`, payload);
+    return res.data;
+  },
 };
 

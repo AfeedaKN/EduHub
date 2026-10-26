@@ -138,4 +138,25 @@ export class ParentController {
       next(error);
     }
   };
+
+  getExamResults = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      if (!req.user || !req.user.sub) {
+        throw new UnauthorizedError('Authenticated parent session required.', 'UNAUTHORIZED');
+      }
+
+      const { studentId, academicYear, search } = req.query;
+      const result = await this.parentService.getParentExamResults(req.user.sub, {
+        studentId: studentId ? String(studentId) : undefined,
+        academicYear: academicYear ? String(academicYear) : undefined,
+        search: search ? String(search) : undefined,
+      });
+
+      return res
+        .status(HttpStatusCode.OK)
+        .json(ApiResponse.success(result, ParentMessages.EXAM_RESULTS_FETCHED));
+    } catch (error) {
+      next(error);
+    }
+  };
 }

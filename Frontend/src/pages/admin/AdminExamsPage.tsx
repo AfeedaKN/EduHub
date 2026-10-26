@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Award,
   Calendar,
@@ -19,6 +19,7 @@ import {
   CalendarCheck2,
 } from 'lucide-react';
 import { AdminLayout } from '../../components/admin/AdminLayout';
+import { ManagementResultsReview } from '../../components/admin/ManagementResultsReview';
 import { adminApi } from '../../api/adminApi';
 import { getApiErrorMessage } from '../../api/axiosClient';
 import {
@@ -57,6 +58,11 @@ const QUICK_TIME_SLOTS = [
 export const AdminExamsPage: React.FC = () => {
   const { id: routeExamId } = useParams<{ id?: string }>();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeTab = searchParams.get('tab') === 'results' ? 'results' : 'scheduling';
+  const setActiveTab = (tab: 'scheduling' | 'results') => {
+    setSearchParams(tab === 'results' ? { tab: 'results' } : {});
+  };
 
   // Core Data States
   const [loading, setLoading] = useState<boolean>(true);
@@ -79,6 +85,14 @@ export const AdminExamsPage: React.FC = () => {
   // Toast Notifications
   const [toastSuccess, setToastSuccess] = useState<string | null>(null);
   const [toastError, setToastError] = useState<string | null>(null);
+  const [resultsRefreshKey, setResultsRefreshKey] = useState<number>(0);
+
+  const handleRefresh = async () => {
+    if (activeTab === 'results') {
+      setResultsRefreshKey((prev) => prev + 1);
+    }
+    await fetchData();
+  };
 
   const showSuccess = (msg: string) => {
     setToastSuccess(msg);
@@ -141,6 +155,16 @@ export const AdminExamsPage: React.FC = () => {
     onConfirm: () => Promise<void>;
   } | null>(null);
   const [confirming, setConfirming] = useState<boolean>(false);
+
+  // Review Marks Modal State
+  const [reviewModalOpen, setReviewModalOpen] = useState<boolean>(false);
+  const [reviewSchedule, setReviewSchedule] = useState<ExamSchedule | null>(null);
+  const [reviewMarksDoc, setReviewMarksDoc] = useState<any | null>(null);
+  const [reviewLoading, setReviewLoading] = useState<boolean>(false);
+  const [reviewError, setReviewError] = useState<string | null>(null);
+  const [returnReasonInput, setReturnReasonInput] = useState<string>('');
+  const [showReturnForm, setShowReturnForm] = useState<boolean>(false);
+  const [actionSubmitting, setActionSubmitting] = useState<boolean>(false);
 
   // ==========================================
   // Data Fetching
@@ -613,6 +637,67 @@ export const AdminExamsPage: React.FC = () => {
     });
   };
 
+  const handleOpenReviewMarks = async (sch: ExamSchedule) => {
+    if (!activeExamForSchedule) return;
+    setReviewSchedule(sch);
+    setReviewModalOpen(true);
+    setReviewLoading(true);
+    setReviewError(null);
+    setShowReturnForm(false);
+    setReturnReasonInput('');
+    try {
+      const res = await adminApi.getScheduleMarks(activeExamForSchedule.id, sch.id);
+      if (res.success && res.data) {
+        setReviewMarksDoc(res.data.marks);
+      }
+    } catch (err: unknown) {
+      setReviewError(getApiErrorMessage(err, 'Failed to fetch subject marks.'));
+    } finally {
+      setReviewLoading(false);
+    }
+  };
+
+  const handleReturnMarks = async () => {
+    if (!activeExamForSchedule || !reviewSchedule || !returnReasonInput.trim()) return;
+    setActionSubmitting(true);
+    try {
+      const res = await adminApi.returnScheduleMarks(
+        activeExamForSchedule.id,
+        reviewSchedule.id,
+        returnReasonInput.trim()
+      );
+      if (res.success && res.data) {
+        setReviewMarksDoc(res.data.marks);
+        setShowReturnForm(false);
+        setReturnReasonInput('');
+        showSuccess('Marks returned to teacher for correction successfully.');
+      }
+    } catch (err: unknown) {
+      setReviewError(getApiErrorMessage(err, 'Failed to return marks for correction.'));
+    } finally {
+      setActionSubmitting(false);
+    }
+  };
+
+  const handlePublishMarks = async () => {
+    if (!activeExamForSchedule || !reviewSchedule) return;
+    setActionSubmitting(true);
+    try {
+      const res = await adminApi.publishScheduleMarks(
+        activeExamForSchedule.id,
+        reviewSchedule.id
+      );
+      if (res.success && res.data) {
+        setReviewMarksDoc(res.data.marks);
+        showSuccess('Subject exam marks published successfully.');
+      }
+    } catch (err: unknown) {
+      setReviewError(getApiErrorMessage(err, 'Failed to publish marks.'));
+    } finally {
+      setActionSubmitting(false);
+    }
+  };
+
   // Helper for exam type badge style
   const getExamTypeBadge = (type: ExamType) => {
     switch (type) {
@@ -650,7 +735,7 @@ export const AdminExamsPage: React.FC = () => {
   };
 
   return (
-    <AdminLayout breadcrumbTitle="Exams & Marks Management">
+    <AdminLayout breadcrumbTitle={activeTab === 'results' ? 'Exams & Results' : 'Exams & Marks Management'}>
       <div className="admin-timetable-page-container">
         {/* Toast Notifications */}
         {toastSuccess && (
@@ -669,9 +754,11 @@ export const AdminExamsPage: React.FC = () => {
         {/* Page Title & Top Actions */}
         <div className="admin-timetable-header-wrap">
           <div className="admin-timetable-title-group">
-            <h1>Exams & Marks Management</h1>
+            <h1>{activeTab === 'results' ? 'Exams & Results' : 'Exams & Marks Management'}</h1>
             <p>
-              Create institutional examinations, define academic testing windows, and configure conflict-free subject-wise schedules for classes and sections.
+              {activeTab === 'results'
+                ? 'Review teacher submissions and publish examination results.'
+                : 'Create institutional examinations, define academic testing windows, and configure conflict-free subject-wise schedules for classes and sections.'}
             </p>
           </div>
 
@@ -679,27 +766,100 @@ export const AdminExamsPage: React.FC = () => {
             <button
               type="button"
               className="admin-btn-secondary"
-              onClick={fetchData}
+              onClick={handleRefresh}
               disabled={loading}
-              title="Refresh Examinations"
+              title={activeTab === 'results' ? 'Refresh Results' : 'Refresh Examinations'}
             >
               <RotateCw size={15} className={loading ? 'admin-spin' : ''} />
               <span>Refresh</span>
             </button>
-            <button
-              type="button"
-              className="admin-btn-primary-action"
-              onClick={handleOpenCreateExam}
-              id="admin-create-exam-btn"
-            >
-              <Plus size={16} />
-              <span>Create Exam</span>
-            </button>
+            {activeTab === 'scheduling' && (
+              <button
+                type="button"
+                className="admin-btn-primary-action"
+                onClick={handleOpenCreateExam}
+                id="admin-create-exam-btn"
+              >
+                <Plus size={16} />
+                <span>Create Exam</span>
+              </button>
+            )}
           </div>
         </div>
 
-        {/* Metric Summary Cards */}
-        <div className="admin-timetable-summary-grid">
+        {/* Module Navigation Tabs */}
+        <div
+          style={{
+            display: 'flex',
+            gap: 8,
+            borderBottom: '1px solid var(--admin-border)',
+            marginBottom: 24,
+          }}
+        >
+          <button
+            type="button"
+            className="admin-tab-btn"
+            style={{
+              padding: '10px 18px',
+              border: 'none',
+              background: 'none',
+              fontWeight: 600,
+              fontSize: '0.95rem',
+              color: activeTab === 'scheduling' ? 'var(--admin-primary)' : 'var(--admin-text-muted)',
+              borderBottom:
+                activeTab === 'scheduling'
+                  ? '3px solid var(--admin-primary)'
+                  : '3px solid transparent',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              transition: 'all 0.15s ease',
+            }}
+            onClick={() => setActiveTab('scheduling')}
+          >
+            <CalendarDays size={18} />
+            <span>Examinations & Scheduling</span>
+          </button>
+
+          <button
+            type="button"
+            className="admin-tab-btn"
+            style={{
+              padding: '10px 18px',
+              border: 'none',
+              background: 'none',
+              fontWeight: 600,
+              fontSize: '0.95rem',
+              color: activeTab === 'results' ? 'var(--admin-primary)' : 'var(--admin-text-muted)',
+              borderBottom:
+                activeTab === 'results'
+                  ? '3px solid var(--admin-primary)'
+                  : '3px solid transparent',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              transition: 'all 0.15s ease',
+            }}
+            onClick={() => setActiveTab('results')}
+          >
+            <Award size={18} />
+            <span>Results & Marks Review</span>
+          </button>
+        </div>
+
+        {activeTab === 'results' ? (
+          <ManagementResultsReview
+            exams={exams}
+            classes={classes}
+            academicYears={ACADEMIC_YEAR_OPTIONS}
+            refreshTrigger={resultsRefreshKey}
+          />
+        ) : (
+          <>
+            {/* Metric Summary Cards */}
+            <div className="admin-timetable-summary-grid">
           <div className="admin-timetable-card-stat">
             <div className="admin-timetable-card-stat-info">
               <span className="admin-card-stat-label">Total Exams</span>
@@ -1025,6 +1185,8 @@ export const AdminExamsPage: React.FC = () => {
             </div>
           </div>
         )}
+      </>
+    )}
 
         {/* ============================================================== */}
         {/* Create / Edit Exam Modal                                      */}
@@ -1473,6 +1635,14 @@ export const AdminExamsPage: React.FC = () => {
                                 <button
                                   type="button"
                                   className="admin-action-btn"
+                                  onClick={() => handleOpenReviewMarks(sch)}
+                                  title="Review marks & evaluation status"
+                                >
+                                  <FileText size={14} />
+                                </button>
+                                <button
+                                  type="button"
+                                  className="admin-action-btn"
                                   onClick={() => handleOpenEditSchedule(sch)}
                                   title="Edit subject schedule"
                                 >
@@ -1832,6 +2002,276 @@ export const AdminExamsPage: React.FC = () => {
                 >
                   {confirming ? 'Processing...' : 'Confirm Delete'}
                 </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ============================================================== */}
+        {/* Review Subject Marks Modal                                     */}
+        {/* ============================================================== */}
+        {reviewModalOpen && reviewSchedule && (
+          <div className="admin-modal-overlay" style={{ zIndex: 1200 }} role="dialog" aria-modal="true">
+            <div className="admin-modal-card" style={{ maxWidth: 760, maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
+              <div className="admin-modal-header">
+                <div>
+                  <h3 className="admin-modal-title">
+                    Review Marks: {reviewSchedule.subject}
+                  </h3>
+                  <p className="admin-modal-subtitle">
+                    {reviewSchedule.className} - Section {reviewSchedule.section} • Max Marks: {reviewSchedule.maxMarks} • Passing: {reviewSchedule.passingMarks}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  className="admin-modal-close"
+                  onClick={() => setReviewModalOpen(false)}
+                  aria-label="Close marks review dialog"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              <div className="admin-modal-body" style={{ flex: 1, overflowY: 'auto' }}>
+                {reviewLoading && (
+                  <div style={{ textAlign: 'center', padding: '40px', color: 'var(--admin-text-muted)' }}>
+                    <RotateCw size={24} className="teacher-spin" style={{ margin: '0 auto 8px' }} />
+                    <p style={{ margin: 0 }}>Loading marks register...</p>
+                  </div>
+                )}
+
+                {!reviewLoading && reviewError && (
+                  <div className="admin-toast-error" style={{ animation: 'none', marginBottom: 16 }}>
+                    <AlertCircle size={16} />
+                    <span>{reviewError}</span>
+                  </div>
+                )}
+
+                {!reviewLoading && !reviewError && !reviewMarksDoc && (
+                  <div style={{ textAlign: 'center', padding: '40px', color: 'var(--admin-text-muted)' }}>
+                    <Award size={32} style={{ color: 'var(--admin-border)', margin: '0 auto 10px' }} />
+                    <h4 style={{ margin: '0 0 6px', color: 'var(--admin-primary)' }}>No Marks Entered Yet</h4>
+                    <p style={{ margin: 0, fontSize: '0.84rem' }}>
+                      The assigned teacher has not saved or submitted marks for this subject examination yet.
+                    </p>
+                  </div>
+                )}
+
+                {!reviewLoading && reviewMarksDoc && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                    {/* Status Card */}
+                    <div
+                      style={{
+                        padding: '12px 16px',
+                        background: 'var(--admin-bg-subtle)',
+                        borderRadius: 8,
+                        border: '1px solid var(--admin-border)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        flexWrap: 'wrap',
+                        gap: 10,
+                      }}
+                    >
+                      <div>
+                        <div style={{ fontSize: '0.75rem', color: 'var(--admin-text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>
+                          Evaluator
+                        </div>
+                        <div style={{ fontWeight: 600, color: 'var(--admin-primary)' }}>
+                          {reviewMarksDoc.teacherName || 'Assigned Teacher'}
+                        </div>
+                      </div>
+
+                      <div>
+                        <div style={{ fontSize: '0.75rem', color: 'var(--admin-text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>
+                          Status
+                        </div>
+                        <div>
+                          {reviewMarksDoc.status === 'SUBMITTED' && (
+                            <span className="admin-status-pill pill-primary">Submitted for Review</span>
+                          )}
+                          {reviewMarksDoc.status === 'RETURNED' && (
+                            <span className="admin-status-pill" style={{ backgroundColor: '#FEE2E2', color: '#991B1B', border: '1px solid #FECACA' }}>
+                              Returned for Correction
+                            </span>
+                          )}
+                          {reviewMarksDoc.status === 'PUBLISHED' && (
+                            <span className="admin-status-pill pill-active">Published</span>
+                          )}
+                          {reviewMarksDoc.status === 'DRAFT' && (
+                            <span className="admin-status-pill pill-secondary">Draft Saved</span>
+                          )}
+                        </div>
+                      </div>
+
+                      <div>
+                        <div style={{ fontSize: '0.75rem', color: 'var(--admin-text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>
+                          Students Evaluated
+                        </div>
+                        <div style={{ fontWeight: 600, color: 'var(--admin-primary)' }}>
+                          {reviewMarksDoc.enteredCount || 0} / {reviewMarksDoc.totalStudents || 0}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Returned Banner if already returned */}
+                    {reviewMarksDoc.status === 'RETURNED' && (
+                      <div
+                        style={{
+                          padding: '12px 16px',
+                          background: '#FEF2F2',
+                          border: '1px solid #FECACA',
+                          borderRadius: 8,
+                          color: '#991B1B',
+                          fontSize: '0.84rem',
+                        }}
+                      >
+                        <strong>Returned for Correction:</strong> {reviewMarksDoc.returnReason || 'Revision requested.'}
+                        {reviewMarksDoc.returnedAt && (
+                          <span style={{ fontSize: '0.76rem', display: 'block', marginTop: 4, color: '#B91C1C' }}>
+                            Returned on {new Date(reviewMarksDoc.returnedAt).toLocaleString()}
+                          </span>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Return for Correction Form */}
+                    {showReturnForm && (
+                      <div
+                        style={{
+                          padding: '14px',
+                          background: '#FFFBEB',
+                          border: '1px solid #FDE68A',
+                          borderRadius: 8,
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: 10,
+                        }}
+                      >
+                        <label style={{ fontSize: '0.84rem', fontWeight: 600, color: '#92400E' }}>
+                          Reason for Returning Marks to Teacher:
+                        </label>
+                        <textarea
+                          rows={3}
+                          className="admin-form-textarea"
+                          style={{ borderColor: '#FCD34D' }}
+                          placeholder="e.g. Please verify student roll #3 marks, passing threshold requires re-evaluation..."
+                          value={returnReasonInput}
+                          onChange={(e) => setReturnReasonInput(e.target.value)}
+                        />
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+                          <button
+                            type="button"
+                            className="admin-btn-secondary"
+                            onClick={() => setShowReturnForm(false)}
+                            disabled={actionSubmitting}
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="button"
+                            className="admin-btn-primary-action"
+                            style={{ backgroundColor: '#DC2626', borderColor: '#DC2626' }}
+                            onClick={handleReturnMarks}
+                            disabled={actionSubmitting || !returnReasonInput.trim()}
+                          >
+                            {actionSubmitting ? 'Returning...' : 'Confirm Return for Correction'}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Students Marks Table */}
+                    {Array.isArray(reviewMarksDoc.students) && reviewMarksDoc.students.length > 0 && (
+                      <div className="admin-table-responsive" style={{ maxHeight: 320, overflowY: 'auto' }}>
+                        <table className="admin-table" style={{ fontSize: '0.82rem' }}>
+                          <thead>
+                            <tr>
+                              <th>Roll #</th>
+                              <th>Student Name</th>
+                              <th>Admission #</th>
+                              <th style={{ textAlign: 'center' }}>Marks ({reviewSchedule.maxMarks})</th>
+                              <th style={{ textAlign: 'center' }}>Status</th>
+                              <th>Remarks</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {reviewMarksDoc.students.map((st: any, idx: number) => {
+                              const isPass = !st.isAbsent && st.marksObtained !== null && st.marksObtained >= reviewSchedule.passingMarks;
+                              return (
+                                <tr key={st.studentId || idx}>
+                                  <td>{st.rollNumber || '-'}</td>
+                                  <td style={{ fontWeight: 600 }}>{st.studentName}</td>
+                                  <td>{st.admissionNumber}</td>
+                                  <td style={{ textAlign: 'center', fontWeight: 700 }}>
+                                    {st.isAbsent ? (
+                                      <span style={{ color: '#DC2626' }}>ABSENT</span>
+                                    ) : st.marksObtained !== null ? (
+                                      <span style={{ color: isPass ? '#166534' : '#DC2626' }}>
+                                        {st.marksObtained}
+                                      </span>
+                                    ) : (
+                                      '-'
+                                    )}
+                                  </td>
+                                  <td style={{ textAlign: 'center' }}>
+                                    {st.isAbsent ? (
+                                      <span className="admin-status-pill pill-danger">Absent</span>
+                                    ) : st.marksObtained !== null ? (
+                                      isPass ? (
+                                        <span className="admin-status-pill pill-active">Passed</span>
+                                      ) : (
+                                        <span className="admin-status-pill pill-danger">Failed</span>
+                                      )
+                                    ) : (
+                                      <span className="admin-status-pill pill-secondary">Pending</span>
+                                    )}
+                                  </td>
+                                  <td style={{ color: 'var(--admin-text-muted)' }}>{st.remarks || '-'}</td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <div className="admin-modal-footer" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <button
+                  type="button"
+                  className="admin-btn-secondary"
+                  onClick={() => setReviewModalOpen(false)}
+                >
+                  Close
+                </button>
+
+                {reviewMarksDoc?.status === 'SUBMITTED' && !showReturnForm && (
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button
+                      type="button"
+                      className="admin-btn-secondary"
+                      style={{ color: '#DC2626', borderColor: '#FECACA', backgroundColor: '#FEF2F2' }}
+                      onClick={() => setShowReturnForm(true)}
+                      disabled={actionSubmitting}
+                      id="admin-return-marks-btn"
+                    >
+                      Return for Correction
+                    </button>
+                    <button
+                      type="button"
+                      className="admin-btn-primary-action"
+                      style={{ backgroundColor: '#1E6B52', borderColor: '#1E6B52' }}
+                      onClick={handlePublishMarks}
+                      disabled={actionSubmitting}
+                      id="admin-publish-marks-btn"
+                    >
+                      {actionSubmitting ? 'Publishing...' : 'Publish Official Results'}
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           </div>

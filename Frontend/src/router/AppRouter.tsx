@@ -9,6 +9,7 @@ import { MainLayout } from '../components/layout/MainLayout';
 import { ProtectedRoute } from '../components/auth/ProtectedRoute';
 import { ParentDashboardPage } from '../pages/parent/ParentDashboardPage';
 import { ParentAssignmentsPage } from '../pages/parent/ParentAssignmentsPage';
+import { ParentExamsPage } from '../pages/parent/ParentExamsPage';
 import { ParentPlaceholderPage } from '../pages/parent/ParentPlaceholderPage';
 import { AddStudentPage } from '../pages/parent/AddStudentPage';
 import { AdminDashboardPage } from '../pages/admin/AdminDashboardPage';
@@ -24,6 +25,8 @@ import { TeacherStudentsPage } from '../pages/teacher/TeacherStudentsPage';
 import { TeacherAttendancePage } from '../pages/teacher/TeacherAttendancePage';
 import { TeacherTimetablePage } from '../pages/teacher/TeacherTimetablePage';
 import { TeacherAssignmentsPage } from '../pages/teacher/TeacherAssignmentsPage';
+import { TeacherMyExamsPage } from '../pages/teacher/TeacherMyExamsPage';
+import { TeacherEnterMarksPage } from '../pages/teacher/TeacherEnterMarksPage';
 import { TeacherPlaceholderPage } from '../pages/teacher/TeacherPlaceholderPage';
 
 export const AppRouter: React.FC = () => {
@@ -110,7 +113,7 @@ export const AppRouter: React.FC = () => {
           path="/parent/exams"
           element={
             <ProtectedRoute allowedRoles={['PARENT']}>
-              <ParentPlaceholderPage title="Examinations & Grade Reports" />
+              <ParentExamsPage />
             </ProtectedRoute>
           }
         />
@@ -382,10 +385,23 @@ export const AppRouter: React.FC = () => {
           path="/teacher/exams"
           element={
             <ProtectedRoute allowedRoles={['TEACHER']}>
-              <TeacherPlaceholderPage
-                title="Examinations & Marks Entry"
-                description="Manage term test assessments, enter student marks, and submit subject grading reports."
-              />
+              <TeacherMyExamsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/teacher/exams/:scheduleId/marks"
+          element={
+            <ProtectedRoute allowedRoles={['TEACHER']}>
+              <TeacherEnterMarksPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/teacher/exams/:examId/schedules/:scheduleId/marks"
+          element={
+            <ProtectedRoute allowedRoles={['TEACHER']}>
+              <TeacherEnterMarksPage />
             </ProtectedRoute>
           }
         />

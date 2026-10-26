@@ -16,27 +16,28 @@ describe('Exam Routes Integration Tests', () => {
 
   const tokenService = new TokenService(
     'eduhub_dev_access_secret_key_change_in_production_2026',
-    '15m',
-    'eduhub_dev_refresh_secret_key_change_in_production_2026',
-    7
+    '15m'
   );
 
   const managementToken = tokenService.generateAccessToken({
     sub: '65f1234567890abcdef12345',
     email: 'admin@eduhub.school',
     role: UserRole.MANAGEMENT,
+    fullName: 'Admin User',
   });
 
   const parentToken = tokenService.generateAccessToken({
     sub: '65f1234567890abcdef12346',
     email: 'parent@eduhub.school',
     role: UserRole.PARENT,
+    fullName: 'Parent User',
   });
 
   const teacherToken = tokenService.generateAccessToken({
     sub: '65f1234567890abcdef12347',
     email: 'teacher@eduhub.school',
     role: UserRole.TEACHER,
+    fullName: 'Teacher User',
   });
 
   let testClassId: string;
@@ -48,9 +49,8 @@ describe('Exam Routes Integration Tests', () => {
   beforeAll(async () => {
     await connectDatabase();
 
-    // Clean up test collections
-    await ExamScheduleModel.deleteMany({});
-    await ExamModel.deleteMany({});
+    // Clean up test collections only (scoped to test items)
+    await ExamModel.deleteMany({ name: { $in: ['Exam Test Exam 1', 'Exam Test Exam 2', 'Exam Test Update Exam'] } });
     await ClassModel.deleteMany({ name: { $in: ['Exam Test Grade 10', 'Exam Test Grade 9'] } });
     await SectionModel.deleteMany({ name: 'EXAM-A' });
 
@@ -110,8 +110,11 @@ describe('Exam Routes Integration Tests', () => {
   });
 
   afterAll(async () => {
-    await ExamScheduleModel.deleteMany({});
-    await ExamModel.deleteMany({});
+    if (testExamId) {
+      await ExamScheduleModel.deleteMany({ examId: testExamId });
+      await ExamModel.findByIdAndDelete(testExamId);
+    }
+    await ExamModel.deleteMany({ name: { $in: ['Exam Test Exam 1', 'Exam Test Exam 2', 'Exam Test Update Exam'] } });
     await ClassModel.deleteMany({ name: { $in: ['Exam Test Grade 10', 'Exam Test Grade 9'] } });
     await SectionModel.deleteMany({ name: 'EXAM-A' });
     await TeacherModel.deleteMany({ employeeId: 'EMP-EXAM-99' });

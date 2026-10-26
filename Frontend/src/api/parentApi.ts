@@ -112,4 +112,14 @@ export const parentApi = {
     );
     return res.data;
   },
+
+  // Get published exam results for enrolled children
+  getExamResults: async (
+    params?: import('../types/parent.types').ParentExamResultsQueryParams
+  ): Promise<ApiResponse<import('../types/parent.types').ParentExamResultsResponse>> => {
+    const res = await axiosClient.get<
+      ApiResponse<import('../types/parent.types').ParentExamResultsResponse>
+    >('/parent/exams', { params });
+    return res.data;
+  },
 };

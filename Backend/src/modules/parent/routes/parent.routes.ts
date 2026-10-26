@@ -41,6 +41,9 @@ export function createParentRouter(deps: ParentRoutesDependencies): Router {
   router.get('/assignments/:id', parentController.getAssignmentById);
   router.post('/assignments/:id/submit', parentController.submitAssignment);
 
+  // Examination Results (Published Only)
+  router.get('/exams', parentController.getExamResults);
+
   return router;
 }
 

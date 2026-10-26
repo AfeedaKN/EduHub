@@ -27,9 +27,7 @@ describe('Teacher Routes Integration Tests', () => {
 
   const tokenService = new TokenService(
     'eduhub_dev_access_secret_key_change_in_production_2026',
-    '15m',
-    'eduhub_dev_refresh_secret_key_change_in_production_2026',
-    7
+    '15m'
   );
 
   const teacherUserId = new mongoose.Types.ObjectId().toString();

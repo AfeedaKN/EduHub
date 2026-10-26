@@ -5,6 +5,7 @@ export interface RateLimiterCustomOptions {
   windowMs: number;
   max: number;
   message?: string;
+  skip?: (req: any) => boolean;
 }
 
 export function createRateLimiter(options: RateLimiterCustomOptions) {
@@ -13,6 +14,9 @@ export function createRateLimiter(options: RateLimiterCustomOptions) {
     max: options.max,
     standardHeaders: true,
     legacyHeaders: false,
+    skip:
+      options.skip ||
+      (() => process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test'),
     handler: (_req, res) => {
       res.status(429).json(
         ApiResponse.error(

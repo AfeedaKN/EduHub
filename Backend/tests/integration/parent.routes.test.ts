@@ -9,6 +9,9 @@ import { UserModel } from '../../src/modules/auth/models/User.model';
 import { StudentModel } from '../../src/modules/parent/models/Student.model';
 import { AssignmentModel } from '../../src/modules/teacher/models/Assignment.model';
 import { TeacherModel } from '../../src/modules/admin/models/Teacher.model';
+import { ExamModel } from '../../src/modules/admin/models/Exam.model';
+import { ExamScheduleModel } from '../../src/modules/admin/models/ExamSchedule.model';
+import { ExamMarksModel } from '../../src/modules/admin/models/ExamMarks.model';
 
 describe('Parent Routes Integration Tests — Assignments', () => {
   const app = createApp();
@@ -129,7 +132,7 @@ describe('Parent Routes Integration Tests — Assignments', () => {
       subject: 'Science',
       academicYear: '2026-2027',
       assignedDate: '2026-10-10',
-      dueDate: '2026-10-25',
+      dueDate: '2026-11-25',
       maxMarks: 40,
       status: 'PUBLISHED',
       attachmentUrl: 'https://example.com/journal.pdf',
@@ -358,6 +361,318 @@ describe('Parent Routes Integration Tests — Assignments', () => {
       expect(res.body.data[0].studentName).toBe('Emily Jenkins');
       expect(res.body.data[0].version).toBe(2);
       expect(res.body.data[0].answerText).toBe('Updated revised report with extra observations.');
+    });
+  });
+
+  describe('GET /api/v1/parent/exams — Examination Results and Report Cards', () => {
+    let testExamMidtermId: string;
+    let testExamAnnualId: string;
+    let schMathId: string;
+    let schScienceId: string;
+    let schEnglishId: string;
+
+    beforeAll(async () => {
+      // Create test exams
+      const exam1 = await ExamModel.create({
+        name: 'Mid-Term Institutional Examination',
+        examType: 'MID_TERM',
+        academicYear: '2026-2027',
+        status: 'ONGOING',
+        applicableClasses: [{ classId: new mongoose.Types.ObjectId(), className: 'Grade 5' }],
+        startDate: new Date('2026-10-15'),
+        endDate: new Date('2026-10-25'),
+        createdBy: new mongoose.Types.ObjectId(),
+      });
+      testExamMidtermId = exam1._id.toString();
+
+      const exam2 = await ExamModel.create({
+        name: 'Annual Examination 2026',
+        examType: 'ANNUAL_EXAM',
+        academicYear: '2026-2027',
+        status: 'SCHEDULED',
+        applicableClasses: [{ classId: new mongoose.Types.ObjectId(), className: 'Grade 5' }],
+        startDate: new Date('2026-12-01'),
+        endDate: new Date('2026-12-15'),
+        createdBy: new mongoose.Types.ObjectId(),
+      });
+      testExamAnnualId = exam2._id.toString();
+
+      // Create schedules
+      const sMath = await ExamScheduleModel.create({
+        examId: exam1._id,
+        classId: new mongoose.Types.ObjectId(),
+        className: 'Grade 5',
+        section: 'A',
+        subject: 'Mathematics',
+        examDate: new Date('2026-10-18'),
+        startTime: '09:00',
+        endTime: '12:00',
+        maxMarks: 100,
+        passingMarks: 40,
+        academicYear: '2026-2027',
+      });
+      schMathId = sMath._id.toString();
+
+      const sSci = await ExamScheduleModel.create({
+        examId: exam1._id,
+        classId: new mongoose.Types.ObjectId(),
+        className: 'Grade 5',
+        section: 'A',
+        subject: 'Science',
+        examDate: new Date('2026-10-20'),
+        startTime: '09:00',
+        endTime: '12:00',
+        maxMarks: 100,
+        passingMarks: 40,
+        academicYear: '2026-2027',
+      });
+      schScienceId = sSci._id.toString();
+
+      const sEng = await ExamScheduleModel.create({
+        examId: exam1._id,
+        classId: new mongoose.Types.ObjectId(),
+        className: 'Grade 8',
+        section: 'B',
+        subject: 'English',
+        examDate: new Date('2026-10-22'),
+        startTime: '09:00',
+        endTime: '12:00',
+        maxMarks: 100,
+        passingMarks: 40,
+        academicYear: '2026-2027',
+      });
+      schEnglishId = sEng._id.toString();
+
+      // Create Marks Documents
+      // 1. Published Marks for Math (Emily scored 92 -> Passed, Grade A+)
+      await ExamMarksModel.create({
+        examScheduleId: sMath._id,
+        examId: exam1._id,
+        academicYear: '2026-2027',
+        classId: sMath.classId,
+        className: 'Grade 5',
+        section: 'A',
+        subject: 'Mathematics',
+        maxMarks: 100,
+        passingMarks: 40,
+        status: 'PUBLISHED',
+        publishedAt: new Date('2026-10-25T14:00:00Z'),
+        publishedByName: 'Admin',
+        teacherUserId: new mongoose.Types.ObjectId(),
+        teacherId: new mongoose.Types.ObjectId(),
+        teacherName: 'Prof. Math',
+        totalStudents: 1,
+        enteredCount: 1,
+        students: [
+          {
+            studentId: new mongoose.Types.ObjectId(child1Id),
+            studentName: 'Emily Jenkins',
+            admissionNumber: 'STU-P-01',
+            marksObtained: 92,
+            isAbsent: false,
+            remarks: 'Superb problem-solving skills!',
+          },
+        ],
+      });
+
+      // 2. Published Marks for Science (Emily was Absent -> isAbsent: true, grade: AB)
+      await ExamMarksModel.create({
+        examScheduleId: sSci._id,
+        examId: exam1._id,
+        academicYear: '2026-2027',
+        classId: sSci.classId,
+        className: 'Grade 5',
+        section: 'A',
+        subject: 'Science',
+        maxMarks: 100,
+        passingMarks: 40,
+        status: 'PUBLISHED',
+        publishedAt: new Date('2026-10-25T14:30:00Z'),
+        publishedByName: 'Admin',
+        teacherUserId: new mongoose.Types.ObjectId(),
+        teacherId: new mongoose.Types.ObjectId(),
+        teacherName: 'Prof. Science',
+        totalStudents: 1,
+        enteredCount: 1,
+        students: [
+          {
+            studentId: new mongoose.Types.ObjectId(child1Id),
+            studentName: 'Emily Jenkins',
+            admissionNumber: 'STU-P-01',
+            marksObtained: null,
+            isAbsent: true,
+            remarks: 'Excused medical absence',
+          },
+        ],
+      });
+
+      // 3. Draft/Unpublished Marks for Annual Exam (Must remain hidden from parents!)
+      await ExamMarksModel.create({
+        examScheduleId: new mongoose.Types.ObjectId(),
+        examId: exam2._id,
+        academicYear: '2026-2027',
+        classId: sMath.classId,
+        className: 'Grade 5',
+        section: 'A',
+        subject: 'Social Studies',
+        maxMarks: 100,
+        passingMarks: 40,
+        status: 'DRAFT',
+        teacherUserId: new mongoose.Types.ObjectId(),
+        teacherId: new mongoose.Types.ObjectId(),
+        teacherName: 'Prof. History',
+        totalStudents: 1,
+        enteredCount: 1,
+        students: [
+          {
+            studentId: new mongoose.Types.ObjectId(child1Id),
+            studentName: 'Emily Jenkins',
+            admissionNumber: 'STU-P-01',
+            marksObtained: 75,
+            isAbsent: false,
+          },
+        ],
+      });
+
+      // 4. Published Marks for Child 2 (Lucas Jenkins in Grade 8-B)
+      await ExamMarksModel.create({
+        examScheduleId: sEng._id,
+        examId: exam1._id,
+        academicYear: '2026-2027',
+        classId: sEng.classId,
+        className: 'Grade 8',
+        section: 'B',
+        subject: 'English',
+        maxMarks: 100,
+        passingMarks: 40,
+        status: 'PUBLISHED',
+        publishedAt: new Date('2026-10-25T15:00:00Z'),
+        publishedByName: 'Admin',
+        teacherUserId: new mongoose.Types.ObjectId(),
+        teacherId: new mongoose.Types.ObjectId(),
+        teacherName: 'Prof. English',
+        totalStudents: 1,
+        enteredCount: 1,
+        students: [
+          {
+            studentId: new mongoose.Types.ObjectId(child2Id),
+            studentName: 'Lucas Jenkins',
+            admissionNumber: 'STU-P-02',
+            marksObtained: 84,
+            isAbsent: false,
+            remarks: 'Strong vocabulary and comprehension.',
+          },
+        ],
+      });
+    });
+
+    afterAll(async () => {
+      await ExamMarksModel.deleteMany({ examId: { $in: [testExamMidtermId, testExamAnnualId] } });
+      await ExamScheduleModel.deleteMany({ examId: { $in: [testExamMidtermId, testExamAnnualId] } });
+      await ExamModel.deleteMany({ _id: { $in: [testExamMidtermId, testExamAnnualId] } });
+    });
+
+    it('requires authentication: returns 401 when no token is provided', async () => {
+      const res = await request(app).get('/api/v1/parent/exams');
+      expect(res.status).toBe(401);
+    });
+
+    it('requires PARENT role: returns 403 when accessed by TEACHER role', async () => {
+      const res = await request(app)
+        .get('/api/v1/parent/exams')
+        .set('Authorization', `Bearer ${teacherToken}`);
+      expect(res.status).toBe(403);
+    });
+
+    it('returns published exam results for default child (Child 1 - Emily)', async () => {
+      const res = await request(app)
+        .get('/api/v1/parent/exams')
+        .set('Authorization', `Bearer ${parent1Token}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.selectedChild.fullName).toBe('Emily Jenkins');
+      expect(res.body.data.children).toHaveLength(2);
+
+      // Verify that ONLY published exams are returned (Annual Exam draft is excluded)
+      expect(res.body.data.exams).toHaveLength(1);
+      const midterm = res.body.data.exams[0];
+      expect(midterm.examName).toBe('Mid-Term Institutional Examination');
+      expect(midterm.subjects).toHaveLength(2); // Math and Science
+
+      // Verify Mathematics published result
+      const mathSub = midterm.subjects.find((s: any) => s.subject === 'Mathematics');
+      expect(mathSub).toBeDefined();
+      expect(mathSub.marksObtained).toBe(92);
+      expect(mathSub.maxMarks).toBe(100);
+      expect(mathSub.percentage).toBe(92);
+      expect(mathSub.grade).toBe('A+');
+      expect(mathSub.isPassed).toBe(true);
+      expect(mathSub.isAbsent).toBe(false);
+
+      // Verify Science published result (Absent student handling)
+      const sciSub = midterm.subjects.find((s: any) => s.subject === 'Science');
+      expect(sciSub).toBeDefined();
+      expect(sciSub.isAbsent).toBe(true);
+      expect(sciSub.marksObtained).toBeNull();
+      expect(sciSub.grade).toBe('AB');
+      expect(sciSub.isPassed).toBe(false);
+
+      // Verify totals: obtained is 92, max is 200, overall percentage is 46%
+      expect(midterm.totalObtainedMarks).toBe(92);
+      expect(midterm.totalMaxMarks).toBe(200);
+      expect(midterm.overallPercentage).toBe(46);
+      expect(midterm.overallGrade).toBe('D');
+      expect(midterm.isPassed).toBe(false); // Because Science was absent/not passed
+      expect(midterm.publishedAt).toBeDefined();
+    });
+
+    it('returns results for explicitly selected Child 2 (Lucas) when studentId query is passed', async () => {
+      const res = await request(app)
+        .get(`/api/v1/parent/exams?studentId=${child2Id}`)
+        .set('Authorization', `Bearer ${parent1Token}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.data.selectedChild.fullName).toBe('Lucas Jenkins');
+      expect(res.body.data.exams).toHaveLength(1);
+      const exam = res.body.data.exams[0];
+      expect(exam.subjects).toHaveLength(1);
+      expect(exam.subjects[0].subject).toBe('English');
+      expect(exam.subjects[0].marksObtained).toBe(84);
+      expect(exam.subjects[0].grade).toBe('A');
+      expect(exam.subjects[0].isPassed).toBe(true);
+      expect(exam.overallPercentage).toBe(84);
+      expect(exam.overallGrade).toBe('A');
+      expect(exam.isPassed).toBe(true);
+    });
+
+    it('rejects unauthorized access with 403 Forbidden when requesting another parent child', async () => {
+      const res = await request(app)
+        .get(`/api/v1/parent/exams?studentId=${strangerChildId}`)
+        .set('Authorization', `Bearer ${parent1Token}`);
+
+      expect(res.status).toBe(403);
+      expect(res.body.success).toBe(false);
+    });
+
+    it('filters results by academicYear properly', async () => {
+      const res = await request(app)
+        .get(`/api/v1/parent/exams?studentId=${child1Id}&academicYear=2025-2026`)
+        .set('Authorization', `Bearer ${parent1Token}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.data.exams).toHaveLength(0);
+      expect(res.body.data.summary.totalExams).toBe(0);
+    });
+
+    it('filters results by search keyword properly', async () => {
+      const res = await request(app)
+        .get(`/api/v1/parent/exams?studentId=${child1Id}&search=Mathematics`)
+        .set('Authorization', `Bearer ${parent1Token}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.data.exams).toHaveLength(1);
+      expect(res.body.data.exams[0].examName).toContain('Mid-Term');
     });
   });
 });

@@ -3,6 +3,9 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Eye, EyeOff, ArrowRight, CheckCircle2, AlertCircle, ShieldCheck, Mail, RotateCw } from 'lucide-react';
 import { authApi } from '../../api/authApi';
 
+// Matches backend PASSWORD_REGEX in auth.validator.ts: at least 1 uppercase, 1 lowercase, 1 number, and 1 special character
+const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*(),.?":{}|<>_\-+~`=[\]\\;/])/;
+
 export const RegisterForm: React.FC = () => {
   const navigate = useNavigate();
 
@@ -47,41 +50,51 @@ export const RegisterForm: React.FC = () => {
     setServerError(null);
 
     // Full Name
-    if (!fullName.trim() || fullName.trim().length < 2) {
+    const trimmedName = fullName.trim();
+    if (!trimmedName || trimmedName.length < 2) {
       setFullNameError('Please enter your full name (at least 2 characters).');
+      isValid = false;
+    } else if (trimmedName.length > 100) {
+      setFullNameError('Full name cannot exceed 100 characters.');
       isValid = false;
     }
 
     // Email
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!email.trim()) {
+    const trimmedEmail = email.trim().toLowerCase();
+    if (!trimmedEmail) {
       setEmailError('Please enter your email address.');
       isValid = false;
-    } else if (!emailRegex.test(email.trim())) {
+    } else if (!emailRegex.test(trimmedEmail)) {
       setEmailError('Please enter a valid email address.');
       isValid = false;
     }
 
     // Phone Number
     const cleanPhone = phone.replace(/\D/g, '');
-    if (!phone.trim()) {
+    const trimmedPhone = phone.trim();
+    if (!trimmedPhone) {
       setPhoneError('Please enter your phone number.');
       isValid = false;
     } else if (cleanPhone.length < 7) {
       setPhoneError('Please enter a valid phone number (at least 7 digits).');
       isValid = false;
+    } else if (trimmedPhone.length > 20) {
+      setPhoneError('Phone number cannot exceed 20 characters.');
+      isValid = false;
     }
 
     // Password
-    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/;
     if (!password) {
       setPasswordError('Password is required.');
       isValid = false;
     } else if (password.length < 8) {
       setPasswordError('Password must be at least 8 characters.');
       isValid = false;
-    } else if (!passwordRegex.test(password)) {
-      setPasswordError('Password must contain at least 1 uppercase letter, 1 lowercase letter, and 1 number.');
+    } else if (!PASSWORD_REGEX.test(password)) {
+      setPasswordError(
+        'Password must contain at least 1 uppercase letter, 1 lowercase letter, 1 number, and 1 special character.'
+      );
       isValid = false;
     }
 
@@ -105,6 +118,7 @@ export const RegisterForm: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isLoading) return;
     if (!validateForm()) return;
 
     setIsLoading(true);
@@ -122,7 +136,42 @@ export const RegisterForm: React.FC = () => {
       setIsSuccessStep(true);
       setOtpSentMessage('A 6-digit verification code has been dispatched to your email.');
     } catch (err: any) {
-      setServerError(err.message || 'Failed to create parent account. Please check your details.');
+      let mainErrorMessage = err.message || 'Failed to create parent account. Please check your details.';
+
+      // Map backend validation error details to specific fields if returned
+      if (Array.isArray(err.details) && err.details.length > 0) {
+        let firstFieldMsg = '';
+        err.details.forEach((item: { field?: string; message?: string }) => {
+          if (!item.message) return;
+          if (!firstFieldMsg) firstFieldMsg = item.message;
+
+          switch (item.field) {
+            case 'fullName':
+              setFullNameError(item.message);
+              break;
+            case 'email':
+              setEmailError(item.message);
+              break;
+            case 'phone':
+              setPhoneError(item.message);
+              break;
+            case 'password':
+              setPasswordError(item.message);
+              break;
+            case 'acceptedTerms':
+              setTermsError(item.message);
+              break;
+          }
+        });
+        // Display specific guidance instead of generic "Validation error occurred on request payload"
+        mainErrorMessage = firstFieldMsg || 'Please correct the highlighted errors below.';
+      } else if (err.status === 409 || err.code === 'CONFLICT' || err.code === 'DUPLICATE_RESOURCE') {
+        const conflictMsg = err.message || 'An account with this email address already exists.';
+        setEmailError(conflictMsg);
+        mainErrorMessage = conflictMsg;
+      }
+
+      setServerError(mainErrorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -309,6 +358,7 @@ export const RegisterForm: React.FC = () => {
             onChange={(e) => {
               setFullName(e.target.value);
               if (fullNameError) setFullNameError(null);
+              if (serverError) setServerError(null);
             }}
             placeholder="Enter your full name"
             className={`auth-field-input ${fullNameError ? 'input-error' : ''}`}
@@ -330,6 +380,7 @@ export const RegisterForm: React.FC = () => {
             onChange={(e) => {
               setEmail(e.target.value);
               if (emailError) setEmailError(null);
+              if (serverError) setServerError(null);
             }}
             placeholder="Enter your email address"
             className={`auth-field-input ${emailError ? 'input-error' : ''}`}
@@ -351,6 +402,7 @@ export const RegisterForm: React.FC = () => {
             onChange={(e) => {
               setPhone(e.target.value);
               if (phoneError) setPhoneError(null);
+              if (serverError) setServerError(null);
             }}
             placeholder="Enter your phone number"
             className={`auth-field-input ${phoneError ? 'input-error' : ''}`}
@@ -375,8 +427,9 @@ export const RegisterForm: React.FC = () => {
                 onChange={(e) => {
                   setPassword(e.target.value);
                   if (passwordError) setPasswordError(null);
+                  if (serverError) setServerError(null);
                 }}
-                placeholder="Min 8 chars, 1 uppercase, 1 number"
+                placeholder="Min 8 chars, 1 uppercase, 1 number, 1 special char"
                 className={`auth-field-input ${passwordError ? 'input-error' : ''}`}
               />
               <button
@@ -406,6 +459,7 @@ export const RegisterForm: React.FC = () => {
                 onChange={(e) => {
                   setConfirmPassword(e.target.value);
                   if (confirmPasswordError) setConfirmPasswordError(null);
+                  if (serverError) setServerError(null);
                 }}
                 placeholder="Re-enter password"
                 className={`auth-field-input ${confirmPasswordError ? 'input-error' : ''}`}
@@ -432,6 +486,7 @@ export const RegisterForm: React.FC = () => {
               onChange={(e) => {
                 setAgreeTerms(e.target.checked);
                 if (termsError) setTermsError(null);
+                if (serverError) setServerError(null);
               }}
               className="custom-checkbox-input"
               style={{ marginTop: '3px' }}

@@ -4,10 +4,12 @@ import { ExamService } from '../../../src/modules/admin/services/ExamService';
 import { IExamRepository } from '../../../src/modules/admin/repositories/ExamRepository';
 import { IClassRepository } from '../../../src/modules/admin/repositories/ClassRepository';
 import { ITeacherRepository } from '../../../src/modules/admin/repositories/TeacherRepository';
+import { ExamMarksModel } from '../../../src/modules/admin/models/ExamMarks.model';
 import {
   ValidationError,
   ConflictError,
   NotFoundError,
+  ForbiddenError,
 } from '../../../src/shared/domain/errors/AppError';
 
 describe('ExamService Unit Tests', () => {
@@ -459,6 +461,133 @@ describe('ExamService Unit Tests', () => {
           roomNumber: 'Hall A',
         })
       ).rejects.toThrow(ConflictError);
+    });
+  });
+
+  describe('Marks Review and Correction: returnScheduleMarks & publishScheduleMarks', () => {
+    const mockManagementUser = {
+      id: new mongoose.Types.ObjectId().toString(),
+      name: 'Admin User',
+    };
+
+    it('rejects returning marks if reason is missing', async () => {
+      await expect(
+        service.returnScheduleMarks(validExamId, validScheduleId, '', mockManagementUser)
+      ).rejects.toThrow(ValidationError);
+    });
+
+    it('rejects returning marks if marks are not in SUBMITTED status', async () => {
+      vi.spyOn(ExamMarksModel, 'findOne').mockReturnValueOnce({
+        exec: vi.fn().mockResolvedValue({
+          status: 'DRAFT',
+        }),
+      } as any);
+
+      await expect(
+        service.returnScheduleMarks(
+          validExamId,
+          validScheduleId,
+          'Please recheck',
+          mockManagementUser
+        )
+      ).rejects.toThrow(ValidationError);
+    });
+
+    it('rejects returning marks if already PUBLISHED', async () => {
+      vi.spyOn(ExamMarksModel, 'findOne').mockReturnValueOnce({
+        exec: vi.fn().mockResolvedValue({
+          status: 'PUBLISHED',
+        }),
+      } as any);
+
+      await expect(
+        service.returnScheduleMarks(
+          validExamId,
+          validScheduleId,
+          'Please recheck',
+          mockManagementUser
+        )
+      ).rejects.toThrow(ForbiddenError);
+    });
+
+    it('successfully returns submitted marks for correction and sets RETURNED status', async () => {
+      const mockMarksDoc: any = {
+        status: 'SUBMITTED',
+        returnedAt: null,
+        returnedBy: null,
+        returnedByName: '',
+        returnReason: '',
+        save: vi.fn().mockResolvedValue(true),
+      };
+
+      vi.spyOn(ExamMarksModel, 'findOne').mockReturnValueOnce({
+        exec: vi.fn().mockResolvedValue(mockMarksDoc),
+      } as any);
+
+      const result = await service.returnScheduleMarks(
+        validExamId,
+        validScheduleId,
+        'Please recheck Alice marks',
+        mockManagementUser
+      );
+
+      expect(mockMarksDoc.status).toBe('RETURNED');
+      expect(mockMarksDoc.returnReason).toBe('Please recheck Alice marks');
+      expect(mockMarksDoc.returnedByName).toBe('Admin User');
+      expect(mockMarksDoc.save).toHaveBeenCalled();
+      expect(result.marks.status).toBe('RETURNED');
+    });
+
+    it('successfully publishes submitted marks and sets PUBLISHED status', async () => {
+      const mockMarksDoc: any = {
+        status: 'SUBMITTED',
+        reviewHistory: [],
+        save: vi.fn().mockResolvedValue(true),
+      };
+
+      vi.spyOn(ExamMarksModel, 'findOne').mockReturnValueOnce({
+        exec: vi.fn().mockResolvedValue(mockMarksDoc),
+      } as any);
+
+      vi.spyOn(service, 'getScheduleMarksDetails').mockResolvedValueOnce({
+        summary: {
+          isComplete: true,
+          missingCount: 0,
+        },
+      } as any);
+
+      const result = await service.publishScheduleMarks(
+        validExamId,
+        validScheduleId,
+        mockManagementUser
+      );
+
+      expect(mockMarksDoc.status).toBe('PUBLISHED');
+      expect(mockMarksDoc.publishedByName).toBe('Admin User');
+      expect(mockMarksDoc.save).toHaveBeenCalled();
+      expect(result.marks.status).toBe('PUBLISHED');
+    });
+
+    it('rejects publishing if marks submission is incomplete', async () => {
+      const mockMarksDoc: any = {
+        status: 'SUBMITTED',
+        save: vi.fn().mockResolvedValue(true),
+      };
+
+      vi.spyOn(ExamMarksModel, 'findOne').mockReturnValueOnce({
+        exec: vi.fn().mockResolvedValue(mockMarksDoc),
+      } as any);
+
+      vi.spyOn(service, 'getScheduleMarksDetails').mockResolvedValueOnce({
+        summary: {
+          isComplete: false,
+          missingCount: 2,
+        },
+      } as any);
+
+      await expect(
+        service.publishScheduleMarks(validExamId, validScheduleId, mockManagementUser)
+      ).rejects.toThrow('Cannot publish results: Submission is incomplete. 2 enrolled student(s) have missing marks.');
     });
   });
 });

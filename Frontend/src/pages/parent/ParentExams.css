@@ -1,0 +1,899 @@
+/* ===================================================================
+   EduHub Parent Portal — Examination Results & Report Cards Styles
+   School-Oriented Aesthetic:
+   - Deep Navy: #20354A
+   - Muted Blue: #647F99
+   - Warm Cream: #F7F5EF
+   - Subtle Background: #FAF9F5
+   - Pure White: #FFFFFF
+   - Border: #E8E5DD / #F0EDE5
+   - Muted Sage: #879B82
+   =================================================================== */
+
+.parent-exams-container {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+/* 1. Header Banner */
+.parent-exams-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.parent-exams-title-group h1 {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: var(--parent-primary, #20354A);
+  letter-spacing: -0.02em;
+  margin: 0 0 4px;
+}
+
+.parent-exams-subtitle {
+  font-size: 0.875rem;
+  color: var(--parent-text-muted, #707781);
+  margin: 0;
+  max-width: 620px;
+  line-height: 1.5;
+}
+
+.parent-exams-filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.parent-filter-select {
+  height: 38px;
+  padding: 0 12px;
+  border: 1px solid var(--parent-border, #E8E5DD);
+  border-radius: 8px;
+  background-color: #FFFFFF;
+  color: var(--parent-text-main, #27313A);
+  font-size: 0.85rem;
+  font-family: inherit;
+  outline: none;
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.parent-filter-select:focus {
+  border-color: var(--parent-primary, #20354A);
+  box-shadow: 0 0 0 2px rgba(32, 53, 74, 0.1);
+}
+
+.parent-search-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.parent-search-icon {
+  position: absolute;
+  left: 10px;
+  color: var(--parent-text-subtle, #9EA5B0);
+  pointer-events: none;
+}
+
+.parent-search-input {
+  height: 38px;
+  padding: 0 12px 0 32px;
+  border: 1px solid var(--parent-border, #E8E5DD);
+  border-radius: 8px;
+  background-color: #FFFFFF;
+  color: var(--parent-text-main, #27313A);
+  font-size: 0.85rem;
+  font-family: inherit;
+  outline: none;
+  width: 220px;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.parent-search-input:focus {
+  border-color: var(--parent-primary, #20354A);
+  box-shadow: 0 0 0 2px rgba(32, 53, 74, 0.1);
+}
+
+.parent-btn-refresh {
+  height: 38px;
+  padding: 0 14px;
+  border: 1px solid var(--parent-border, #E8E5DD);
+  border-radius: 8px;
+  background-color: var(--parent-bg-subtle, #FAF9F5);
+  color: var(--parent-text-main, #27313A);
+  font-size: 0.85rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.parent-btn-refresh:hover {
+  background-color: #F0EDE5;
+  border-color: var(--parent-muted-blue, #647F99);
+}
+
+/* 2. Child Selector Tabs (Multiple Children) */
+.parent-children-tabs {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.parent-child-tab-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 16px;
+  background-color: #FFFFFF;
+  border: 1px solid var(--parent-border, #E8E5DD);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: left;
+}
+
+.parent-child-tab-btn:hover {
+  border-color: var(--parent-primary, #20354A);
+  background-color: var(--parent-bg-subtle, #FAF9F5);
+}
+
+.parent-child-tab-btn.active {
+  background-color: var(--parent-primary, #20354A);
+  border-color: var(--parent-primary, #20354A);
+  color: #FFFFFF;
+  box-shadow: 0 4px 12px rgba(32, 53, 74, 0.15);
+}
+
+.parent-child-tab-btn.active .parent-child-tab-name {
+  color: #FFFFFF;
+}
+
+.parent-child-tab-btn.active .parent-child-tab-meta {
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.parent-child-tab-avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  background-color: var(--parent-sage-light, #F0F4EF);
+  color: var(--parent-primary, #20354A);
+  font-weight: 700;
+  font-size: 0.85rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.parent-child-tab-btn.active .parent-child-tab-avatar {
+  background-color: rgba(255, 255, 255, 0.2);
+  color: #FFFFFF;
+}
+
+.parent-child-tab-name {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--parent-primary, #20354A);
+}
+
+.parent-child-tab-meta {
+  font-size: 0.75rem;
+  color: var(--parent-text-muted, #707781);
+}
+
+/* Single-Child Information Banner */
+.parent-single-child-badge {
+  background-color: #FFFFFF;
+  border: 1px solid var(--parent-border, #E8E5DD);
+  border-radius: 12px;
+  padding: 14px 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: 0 1px 3px rgba(32, 53, 74, 0.04);
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+/* 3. Summary Grid */
+.parent-exams-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+}
+
+@media (max-width: 900px) {
+  .parent-exams-summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 480px) {
+  .parent-exams-summary-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.parent-exams-summary-card {
+  background: #FFFFFF;
+  border: 1px solid var(--parent-border, #E8E5DD);
+  border-radius: 12px;
+  padding: 16px 18px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  box-shadow: 0 1px 3px rgba(32, 53, 74, 0.04);
+}
+
+.parent-summary-icon-wrap {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.parent-summary-icon-wrap.primary {
+  background: #EBF0F5;
+  color: var(--parent-primary, #20354A);
+}
+
+.parent-summary-icon-wrap.success {
+  background: #DCFCE7;
+  color: #15803D;
+}
+
+.parent-summary-icon-wrap.danger {
+  background: #FEE2E2;
+  color: #B91C1C;
+}
+
+.parent-summary-icon-wrap.info {
+  background: #EEF3F8;
+  color: #647F99;
+}
+
+.parent-summary-card-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--parent-text-muted, #707781);
+  margin-bottom: 2px;
+}
+
+.parent-summary-card-value {
+  font-size: 1.45rem;
+  font-weight: 800;
+  color: var(--parent-primary, #20354A);
+  line-height: 1.1;
+}
+
+/* 4. Examination Cards */
+.parent-exam-report-card {
+  background: #FFFFFF;
+  border: 1px solid var(--parent-border, #E8E5DD);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(32, 53, 74, 0.04);
+  margin-bottom: 20px;
+}
+
+.parent-exam-report-header {
+  padding: 18px 22px;
+  background: #FAF9F5;
+  border-bottom: 1px solid var(--parent-border, #E8E5DD);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.parent-exam-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.parent-exam-title-row h2 {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--parent-primary, #20354A);
+}
+
+.parent-exam-header-right {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.parent-exam-overall-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.parent-exam-overall-stat .stat-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--parent-text-muted, #707781);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.parent-exam-overall-stat .stat-val {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: var(--parent-primary, #20354A);
+}
+
+.parent-btn-view-report {
+  height: 34px;
+  padding: 0 14px;
+  border-radius: 6px;
+  background-color: var(--parent-primary, #20354A);
+  color: #FFFFFF;
+  font-size: 0.82rem;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.parent-btn-view-report:hover {
+  background-color: #152433;
+  box-shadow: 0 2px 6px rgba(32, 53, 74, 0.2);
+}
+
+.parent-grade-pill {
+  padding: 4px 12px;
+  border-radius: 16px;
+  font-size: 0.82rem;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.parent-grade-pill.grade-a {
+  background-color: #DCFCE7;
+  color: #15803D;
+  border: 1px solid #BBF7D0;
+}
+
+.parent-grade-pill.grade-b {
+  background-color: #E0E7FF;
+  color: #3730A3;
+  border: 1px solid #C7D2FE;
+}
+
+.parent-grade-pill.grade-c {
+  background-color: #FEF3C7;
+  color: #92400E;
+  border: 1px solid #FDE68A;
+}
+
+.parent-grade-pill.grade-fail {
+  background-color: #FEE2E2;
+  color: #991B1B;
+  border: 1px solid #FECACA;
+}
+
+/* 5. Subject Table inside Exam Card */
+.parent-exam-subjects-table {
+  width: 100%;
+  min-width: 860px;
+  border-collapse: collapse;
+}
+
+.parent-exam-subjects-table th {
+  background: #FFFFFF;
+  padding: 12px 18px;
+  font-size: 0.74rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--parent-text-muted, #707781);
+  border-bottom: 1px solid var(--parent-border, #E8E5DD);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.parent-exam-subjects-table td {
+  padding: 13px 18px;
+  font-size: 0.86rem;
+  color: var(--parent-text-main, #27313A);
+  border-bottom: 1px solid var(--parent-border-subtle, #F0EDE5);
+  vertical-align: middle;
+}
+
+.parent-exam-subjects-table tr:last-child td {
+  border-bottom: none;
+}
+
+.parent-exam-subjects-table tr:hover {
+  background-color: #FAF9F5;
+}
+
+.parent-badge-pass {
+  background-color: #DCFCE7;
+  color: #15803D;
+  border: 1px solid #BBF7D0;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.parent-badge-fail {
+  background-color: #FEE2E2;
+  color: #B91C1C;
+  border: 1px solid #FECACA;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.parent-badge-absent {
+  background-color: #FEF3C7;
+  color: #B45309;
+  border: 1px solid #FDE68A;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* Empty State */
+.parent-exams-empty-card {
+  background: #FFFFFF;
+  border: 1px solid var(--parent-border, #E8E5DD);
+  border-radius: 14px;
+  padding: 60px 24px;
+  text-align: center;
+  box-shadow: 0 1px 3px rgba(32, 53, 74, 0.04);
+}
+
+.parent-exams-empty-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background-color: #FAF9F5;
+  color: var(--parent-muted-blue, #647F99);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 16px;
+}
+
+/* ===================================================================
+   6. Report Card Modal & Printable Layout
+   =================================================================== */
+.parent-report-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(32, 53, 74, 0.65);
+  backdrop-filter: blur(3px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1100;
+  padding: 20px;
+  overflow-y: auto;
+}
+
+.parent-report-modal-dialog {
+  background-color: #FFFFFF;
+  border-radius: 14px;
+  max-width: 900px;
+  width: 100%;
+  max-height: 94vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 40px rgba(32, 53, 74, 0.25);
+  border: 1px solid var(--parent-border, #E8E5DD);
+  overflow: hidden;
+}
+
+.parent-report-modal-header {
+  padding: 14px 24px;
+  background-color: #FFFFFF;
+  border-bottom: 1px solid var(--parent-border, #E8E5DD);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.parent-report-modal-title {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--parent-primary, #20354A);
+}
+
+.parent-report-modal-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.parent-print-action-btn {
+  height: 34px;
+  padding: 0 16px;
+  border-radius: 6px;
+  background-color: var(--parent-primary, #20354A);
+  color: #FFFFFF;
+  font-size: 0.85rem;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.15s ease;
+}
+
+.parent-print-action-btn:hover {
+  background-color: #152433;
+}
+
+.parent-modal-close-btn {
+  background: none;
+  border: none;
+  color: var(--parent-text-subtle, #9EA5B0);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+  border-radius: 6px;
+  transition: all 0.15s ease;
+}
+
+.parent-modal-close-btn:hover {
+  background-color: var(--parent-bg-subtle, #FAF9F5);
+  color: var(--parent-text-main, #27313A);
+}
+
+.parent-report-modal-body {
+  padding: 24px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+/* Official Report Card Printable Document */
+.eduhub-official-report-card {
+  background-color: #FFFFFF;
+  border: 2px solid var(--parent-border, #E8E5DD);
+  border-radius: 8px;
+  padding: 32px 36px;
+  box-sizing: border-box;
+  font-family: var(--font-sans, 'Plus Jakarta Sans', -apple-system, sans-serif);
+  color: #20354A;
+}
+
+.report-card-inst-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 2px solid #20354A;
+  padding-bottom: 18px;
+  margin-bottom: 20px;
+}
+
+.report-card-brand {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.report-card-logo-img {
+  height: 52px;
+  width: auto;
+  object-fit: contain;
+}
+
+.report-card-school-name {
+  margin: 0;
+  font-size: 1.4rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: #20354A;
+  text-transform: uppercase;
+}
+
+.report-card-school-motto {
+  margin: 2px 0 0;
+  font-size: 0.8rem;
+  color: #707781;
+  font-weight: 500;
+}
+
+.report-card-doc-badge {
+  text-align: right;
+}
+
+.report-card-doc-title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: #20354A;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.report-card-doc-academic-year {
+  margin: 2px 0 0;
+  font-size: 0.82rem;
+  color: #647F99;
+  font-weight: 600;
+}
+
+/* Student & Exam Metadata Grid */
+.report-card-meta-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px 24px;
+  background-color: #FAF9F5;
+  border: 1px solid #E8E5DD;
+  border-radius: 8px;
+  padding: 16px 20px;
+  margin-bottom: 24px;
+}
+
+.report-card-meta-item {
+  display: flex;
+  font-size: 0.84rem;
+  line-height: 1.4;
+}
+
+.report-card-meta-label {
+  font-weight: 700;
+  color: #707781;
+  width: 140px;
+  flex-shrink: 0;
+  text-transform: uppercase;
+  font-size: 0.74rem;
+  letter-spacing: 0.03em;
+}
+
+.report-card-meta-val {
+  font-weight: 600;
+  color: #20354A;
+}
+
+/* Report Card Table */
+.report-card-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 24px;
+}
+
+.report-card-table th {
+  background-color: #20354A;
+  color: #FFFFFF;
+  padding: 10px 14px;
+  font-size: 0.74rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border: 1px solid #20354A;
+  text-align: left;
+}
+
+.report-card-table td {
+  padding: 11px 14px;
+  font-size: 0.84rem;
+  color: #20354A;
+  border: 1px solid #E8E5DD;
+  vertical-align: middle;
+}
+
+.report-card-table tr:nth-child(even) td {
+  background-color: #FAF9F5;
+}
+
+.report-card-table tfoot td {
+  background-color: #F7F5EF !important;
+  font-weight: 700;
+  border-top: 2px solid #20354A;
+}
+
+/* Cumulative Summary Box */
+.report-card-summary-strip {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  border: 1px solid #E8E5DD;
+  border-radius: 8px;
+  padding: 14px 18px;
+  margin-bottom: 24px;
+  background-color: #FAF9F5;
+  text-align: center;
+}
+
+.report-card-summary-col .strip-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: #707781;
+  letter-spacing: 0.03em;
+  margin-bottom: 4px;
+}
+
+.report-card-summary-col .strip-val {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: #20354A;
+}
+
+/* Grading Scale Key */
+.report-card-grading-scale {
+  margin-bottom: 28px;
+  border: 1px solid #E8E5DD;
+  border-radius: 6px;
+  padding: 10px 14px;
+  background-color: #FFFFFF;
+}
+
+.report-card-grading-scale-title {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: #707781;
+  margin-bottom: 6px;
+  letter-spacing: 0.03em;
+}
+
+.report-card-grading-scale-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  font-size: 0.74rem;
+  color: #27313A;
+}
+
+.report-card-scale-item strong {
+  color: #20354A;
+}
+
+/* Signatures Section */
+.report-card-signatures {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+  margin-top: 48px;
+  padding-top: 20px;
+  text-align: center;
+}
+
+.report-card-signature-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.report-card-signature-line {
+  width: 80%;
+  height: 1px;
+  background-color: #20354A;
+  margin-bottom: 8px;
+}
+
+.report-card-signature-role {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #20354A;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.report-card-official-seal {
+  font-size: 0.7rem;
+  color: #707781;
+  margin-top: 2px;
+}
+
+.report-card-footer-notice {
+  margin-top: 28px;
+  padding-top: 12px;
+  border-top: 1px dashed #E8E5DD;
+  text-align: center;
+  font-size: 0.72rem;
+  color: #707781;
+}
+
+/* ===================================================================
+   7. PRINT STYLING (@media print)
+   =================================================================== */
+@media print {
+  /* Hide all surrounding app chrome, navigation, headers, modal backdrops */
+  body {
+    background: #FFFFFF !important;
+    color: #000000 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  .parent-sidebar,
+  .parent-header,
+  .parent-sidebar-mobile-overlay,
+  .parent-exams-header,
+  .parent-children-tabs,
+  .parent-single-child-badge,
+  .parent-exams-summary-grid,
+  .parent-exam-report-card,
+  .parent-report-modal-header,
+  .parent-report-modal-backdrop {
+    display: none !important;
+  }
+
+  /* Expose the report card container cleanly on the printed page */
+  #official-report-card-print-target {
+    display: block !important;
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 24px !important;
+    background: #FFFFFF !important;
+    box-shadow: none !important;
+    border: none !important;
+  }
+
+  .eduhub-official-report-card {
+    border: 2px solid #000000 !important;
+    padding: 24px !important;
+    page-break-inside: avoid;
+    box-shadow: none !important;
+  }
+
+  .report-card-inst-header {
+    border-bottom: 2px solid #000000 !important;
+  }
+
+  .report-card-table th {
+    background-color: #20354A !important;
+    color: #FFFFFF !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .report-card-table td,
+  .report-card-table th {
+    border: 1px solid #333333 !important;
+  }
+
+  .report-card-table tr {
+    page-break-inside: avoid;
+  }
+}

@@ -2,6 +2,7 @@ import { Router, RequestHandler } from 'express';
 import { TeacherDashboardController } from '../controllers/TeacherDashboardController';
 import { AttendanceController } from '../controllers/AttendanceController';
 import { AssignmentController } from '../controllers/AssignmentController';
+import { TeacherExamController } from '../controllers/TeacherExamController';
 import { authorizeRoles } from '../../auth/middlewares/auth.middleware';
 import { UserRole } from '../../auth/dtos/auth.dto';
 
@@ -9,12 +10,19 @@ export interface TeacherRoutesDependencies {
   teacherDashboardController: TeacherDashboardController;
   attendanceController?: AttendanceController;
   assignmentController?: AssignmentController;
+  teacherExamController?: TeacherExamController;
   authenticateMiddleware: RequestHandler;
 }
 
 export function createTeacherRouter(deps: TeacherRoutesDependencies): Router {
   const router = Router();
-  const { teacherDashboardController, attendanceController, assignmentController, authenticateMiddleware } = deps;
+  const {
+    teacherDashboardController,
+    attendanceController,
+    assignmentController,
+    teacherExamController,
+    authenticateMiddleware,
+  } = deps;
 
   // Protect all Teacher endpoints with JWT authentication and TEACHER role authorization
   router.use(authenticateMiddleware, authorizeRoles(UserRole.TEACHER));
@@ -49,6 +57,19 @@ export function createTeacherRouter(deps: TeacherRoutesDependencies): Router {
     router.put('/assignments/:id', assignmentController.updateAssignment);
     router.patch('/assignments/:id/status', assignmentController.updateStatus);
     router.delete('/assignments/:id', assignmentController.deleteAssignment);
+  }
+
+  // Teacher Exams & Marks Entry Management
+  if (teacherExamController) {
+    router.get('/exams', teacherExamController.getTeacherExams);
+    router.get('/exams/schedules/:scheduleId', teacherExamController.getScheduleMarks);
+    router.get('/exams/:scheduleId/marks', teacherExamController.getScheduleMarks);
+    router.post('/exams/schedules/:scheduleId/draft', teacherExamController.saveDraftMarks);
+    router.put('/exams/schedules/:scheduleId/draft', teacherExamController.saveDraftMarks);
+    router.post('/exams/:scheduleId/marks/draft', teacherExamController.saveDraftMarks);
+    router.put('/exams/:scheduleId/marks/draft', teacherExamController.saveDraftMarks);
+    router.post('/exams/schedules/:scheduleId/submit', teacherExamController.submitMarks);
+    router.post('/exams/:scheduleId/marks/submit', teacherExamController.submitMarks);
   }
 
   return router;
