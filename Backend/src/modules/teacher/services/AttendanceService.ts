@@ -45,7 +45,8 @@ export class AttendanceService {
 
     const matchedAssignment = teacher.assignedClasses?.find(
       (c) =>
-        c.className.trim().toLowerCase() === cleanClass &&
+        (c.className.trim().toLowerCase() === cleanClass ||
+         (c.classId && c.classId.toString().toLowerCase() === cleanClass)) &&
         c.section.trim().toLowerCase() === cleanSection
     );
 
@@ -56,7 +57,8 @@ export class AttendanceService {
       );
     }
 
-    return { teacher, matchedAssignment };
+    const canonicalClassName = matchedAssignment.className || className.trim();
+    return { teacher, matchedAssignment, canonicalClassName };
   }
 
   /**
@@ -140,7 +142,7 @@ export class AttendanceService {
     dateStr: string,
     requestedAcademicYear?: string
   ): Promise<AttendanceRegisterDTO> {
-    const { matchedAssignment } = await this.validateTeacherAssignment(
+    const { matchedAssignment, canonicalClassName } = await this.validateTeacherAssignment(
       userId,
       className,
       section
@@ -149,19 +151,19 @@ export class AttendanceService {
 
     const resolvedAcademicYear = await this.resolveAcademicYear(
       matchedAssignment,
-      className,
+      canonicalClassName,
       section,
       requestedAcademicYear
     );
 
     const enrolledStudents = await this.attendanceRepo.findStudentsBySection(
-      className,
+      canonicalClassName,
       section,
       resolvedAcademicYear
     );
 
     const existingRecords = await this.attendanceRepo.findAttendanceBySectionAndDate(
-      className,
+      canonicalClassName,
       section,
       date
     );
@@ -208,11 +210,16 @@ export class AttendanceService {
     const firstMarked = existingRecords[0];
     const markedByName = (firstMarked?.markedBy as any)?.fullName;
 
+    // Academic year preference: student's actual enrollment academic year, then resolved section academic year
+    const effectiveAcademicYear =
+      enrolledStudents.find((s) => s.academicYear && s.academicYear.trim())?.academicYear ||
+      resolvedAcademicYear;
+
     return {
-      className,
+      className: canonicalClassName,
       section,
       date,
-      academicYear: enrolledStudents[0]?.academicYear || resolvedAcademicYear,
+      academicYear: effectiveAcademicYear,
       isAlreadyMarked,
       existingCount: existingRecords.length,
       summary: {
@@ -236,7 +243,7 @@ export class AttendanceService {
     userId: string,
     dto: SaveAttendanceDTO
   ): Promise<AttendanceRegisterDTO> {
-    const { teacher, matchedAssignment } = await this.validateTeacherAssignment(
+    const { teacher, matchedAssignment, canonicalClassName } = await this.validateTeacherAssignment(
       userId,
       dto.className,
       dto.section
@@ -252,7 +259,7 @@ export class AttendanceService {
 
     // 1. Conflict check: prevent silent duplicate insertion
     const existing = await this.attendanceRepo.findAttendanceBySectionAndDate(
-      dto.className,
+      canonicalClassName,
       dto.section,
       date
     );
@@ -265,14 +272,14 @@ export class AttendanceService {
 
     const resolvedAcademicYear = await this.resolveAcademicYear(
       matchedAssignment,
-      dto.className,
+      canonicalClassName,
       dto.section,
       dto.academicYear
     );
 
     // 2. Validate students against officially enrolled section roster
     const enrolledStudents = await this.attendanceRepo.findStudentsBySection(
-      dto.className,
+      canonicalClassName,
       dto.section,
       resolvedAcademicYear
     );
@@ -327,7 +334,7 @@ export class AttendanceService {
         classId: matchedAssignment.classId
           ? new mongoose.Types.ObjectId(matchedAssignment.classId.toString())
           : undefined,
-        className: dto.className.trim(),
+        className: canonicalClassName,
         section: dto.section.trim().toUpperCase(),
         academicYear: enrolledStudentDoc.academicYear || resolvedAcademicYear,
         date,
@@ -339,7 +346,7 @@ export class AttendanceService {
 
     await this.attendanceRepo.saveAttendanceBatch(batchToInsert);
 
-    return await this.getSectionAttendance(userId, dto.className, dto.section, date, resolvedAcademicYear);
+    return await this.getSectionAttendance(userId, canonicalClassName, dto.section, date, resolvedAcademicYear);
   }
 
   /**
@@ -349,7 +356,7 @@ export class AttendanceService {
     userId: string,
     dto: SaveAttendanceDTO
   ): Promise<AttendanceRegisterDTO> {
-    const { teacher, matchedAssignment } = await this.validateTeacherAssignment(
+    const { teacher, matchedAssignment, canonicalClassName } = await this.validateTeacherAssignment(
       userId,
       dto.className,
       dto.section
@@ -365,13 +372,13 @@ export class AttendanceService {
 
     const resolvedAcademicYear = await this.resolveAcademicYear(
       matchedAssignment,
-      dto.className,
+      canonicalClassName,
       dto.section,
       dto.academicYear
     );
 
     const enrolledStudents = await this.attendanceRepo.findStudentsBySection(
-      dto.className,
+      canonicalClassName,
       dto.section,
       resolvedAcademicYear
     );
@@ -426,7 +433,7 @@ export class AttendanceService {
         classId: matchedAssignment.classId
           ? new mongoose.Types.ObjectId(matchedAssignment.classId.toString())
           : undefined,
-        className: dto.className.trim(),
+        className: canonicalClassName,
         section: dto.section.trim().toUpperCase(),
         academicYear: enrolledStudentDoc.academicYear || resolvedAcademicYear,
         date,
@@ -438,7 +445,7 @@ export class AttendanceService {
 
     await this.attendanceRepo.updateAttendanceBatch(batchToUpdate);
 
-    return await this.getSectionAttendance(userId, dto.className, dto.section, date, resolvedAcademicYear);
+    return await this.getSectionAttendance(userId, canonicalClassName, dto.section, date, resolvedAcademicYear);
   }
 
   /**
@@ -450,13 +457,13 @@ export class AttendanceService {
     section: string,
     academicYear?: string
   ): Promise<AttendanceHistoryEntryDTO[]> {
-    const { matchedAssignment } = await this.validateTeacherAssignment(userId, className, section);
+    const { matchedAssignment, canonicalClassName } = await this.validateTeacherAssignment(userId, className, section);
     const resolvedAcademicYear = await this.resolveAcademicYear(
       matchedAssignment,
-      className,
+      canonicalClassName,
       section,
       academicYear
     );
-    return await this.attendanceRepo.findHistoryBySection(className, section, resolvedAcademicYear);
+    return await this.attendanceRepo.findHistoryBySection(canonicalClassName, section, resolvedAcademicYear);
   }
 }

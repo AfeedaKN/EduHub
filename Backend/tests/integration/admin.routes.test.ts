@@ -12,6 +12,8 @@ import { ClassModel } from '../../src/modules/admin/models/Class.model';
 import { SectionModel } from '../../src/modules/admin/models/Section.model';
 import { TeacherModel } from '../../src/modules/admin/models/Teacher.model';
 import { TimetablePeriodModel } from '../../src/modules/admin/models/TimetablePeriod.model';
+import { SubjectModel } from '../../src/modules/admin/models/Subject.model';
+import { AttendanceModel } from '../../src/modules/teacher/models/Attendance.model';
 
 describe('Admin Routes Integration Tests', () => {
   const app = createApp();
@@ -69,12 +71,17 @@ describe('Admin Routes Integration Tests', () => {
     expect(res.body.success).toBe(true);
     expect(res.body.data).toBeDefined();
     expect(typeof res.body.data.totalStudents).toBe('number');
+    expect(typeof res.body.data.activeStudents).toBe('number');
     expect(typeof res.body.data.totalTeachers).toBe('number');
     expect(typeof res.body.data.pendingAdmissionsCount).toBe('number');
     expect(Array.isArray(res.body.data.recentPendingAdmissions)).toBe(true);
-    expect(res.body.data.attendanceSummary).toBeNull();
     expect(res.body.data.feesSummary).toBeNull();
-    expect(res.body.data.upcomingActivities).toBeNull();
+    expect(Array.isArray(res.body.data.enrollmentByClass)).toBe(true);
+    expect(res.body.data.examOverview).toBeDefined();
+    expect(Array.isArray(res.body.data.recentActivities)).toBe(true);
+    if (res.body.data.attendanceSummary !== null) {
+      expect(typeof res.body.data.attendanceSummary.presentCount).toBe('number');
+    }
   });
 
   it('GET /api/v1/admin/admissions with Management token should return 200 with admissions list', async () => {
@@ -532,27 +539,47 @@ describe('Admin Routes Integration Tests', () => {
           department: 'Science',
         });
 
-        // Create test class and section
-        const c = await ClassModel.create({
-          name: 'Grade 10',
-          academicYear: '2026-2027',
-          status: 'ACTIVE',
+        // Clear any conflicting test assignment in dev DB
+        await TeacherModel.updateMany({}, {
+          $pull: {
+            assignedClasses: {
+              className: 'Grade 10',
+              section: 'A',
+              subject: 'Physics',
+              academicYear: '2026-2027',
+            },
+          },
         });
+
+        // Find or create test class and section
+        let c = await ClassModel.findOne({ name: 'Grade 10', academicYear: '2026-2027' });
+        if (!c) {
+          c = await ClassModel.create({
+            name: 'Grade 10',
+            academicYear: '2026-2027',
+            status: 'ACTIVE',
+          });
+        }
         assignClassId = c._id.toString();
 
-        const s = await SectionModel.create({
-          classId: c._id,
-          name: 'A',
-          academicYear: '2026-2027',
-          capacity: 35,
-          status: 'ACTIVE',
-        });
+        let s = await SectionModel.findOne({ classId: c._id, name: 'A', academicYear: '2026-2027' });
+        if (!s) {
+          s = await SectionModel.create({
+            classId: c._id,
+            name: 'A',
+            academicYear: '2026-2027',
+            capacity: 35,
+            status: 'ACTIVE',
+          });
+        }
         assignSectionId = s._id.toString();
       });
 
       afterAll(async () => {
-        await SectionModel.deleteMany({ classId: assignClassId });
-        await ClassModel.findByIdAndDelete(assignClassId);
+        // Cleanup assignments
+        await TeacherModel.findByIdAndUpdate(createdTeacherId, {
+          $set: { assignedClasses: [] },
+        });
       });
 
       it('POST /api/v1/admin/teachers/:id/assignments without token returns 401', async () => {
@@ -850,6 +877,322 @@ describe('Admin Routes Integration Tests', () => {
           .set('Authorization', `Bearer ${managementToken}`);
         expect(checkRes.status).toBe(404);
       });
+    });
+  });
+
+  describe('Subjects Management Integration Tests', () => {
+    let createdSubjectId: string;
+    const testCode = `TEST-SUB-${Date.now().toString().slice(-4)}`;
+    const testName = `Test Subject ${Date.now().toString().slice(-4)}`;
+
+    afterAll(async () => {
+      if (createdSubjectId) {
+        await SubjectModel.findByIdAndDelete(createdSubjectId);
+      }
+      await SubjectModel.deleteMany({ code: testCode });
+    });
+
+    it('GET /api/v1/admin/subjects/summary returns summary stats', async () => {
+      const res = await request(app)
+        .get('/api/v1/admin/subjects/summary')
+        .set('Authorization', `Bearer ${managementToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data).toHaveProperty('totalSubjects');
+      expect(res.body.data).toHaveProperty('activeSubjects');
+      expect(res.body.data).toHaveProperty('assignedSubjects');
+      expect(res.body.data).toHaveProperty('unassignedSubjects');
+      expect(typeof res.body.data.totalSubjects).toBe('number');
+    });
+
+    it('POST /api/v1/admin/subjects with Parent token returns 403 Forbidden', async () => {
+      const res = await request(app)
+        .post('/api/v1/admin/subjects')
+        .set('Authorization', `Bearer ${parentToken}`)
+        .send({
+          name: 'Unauthorized Subject',
+          code: 'UNAUTH-101',
+          category: 'CORE',
+        });
+
+      expect(res.status).toBe(403);
+    });
+
+    it('POST /api/v1/admin/subjects creates a new subject', async () => {
+      const res = await request(app)
+        .post('/api/v1/admin/subjects')
+        .set('Authorization', `Bearer ${managementToken}`)
+        .send({
+          name: testName,
+          code: testCode,
+          category: 'SCIENCE',
+          description: 'A test subject for integration tests',
+          applicableClasses: [],
+          status: 'ACTIVE',
+        });
+
+      expect(res.status).toBe(201);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.name).toBe(testName);
+      expect(res.body.data.code).toBe(testCode.toUpperCase());
+      expect(res.body.data.category).toBe('SCIENCE');
+      createdSubjectId = res.body.data.id;
+    });
+
+    it('POST /api/v1/admin/subjects with duplicate code returns 409 Conflict', async () => {
+      const res = await request(app)
+        .post('/api/v1/admin/subjects')
+        .set('Authorization', `Bearer ${managementToken}`)
+        .send({
+          name: 'Another Subject With Same Code',
+          code: testCode,
+          category: 'CORE',
+        });
+
+      expect(res.status).toBe(409);
+      expect(res.body.success).toBe(false);
+      expect(res.body.error.code).toBe('DUPLICATE_SUBJECT_CODE');
+    });
+
+    it('GET /api/v1/admin/subjects lists subjects including the newly created one', async () => {
+      const res = await request(app)
+        .get('/api/v1/admin/subjects')
+        .query({ search: testCode })
+        .set('Authorization', `Bearer ${managementToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data).toHaveProperty('subjects');
+      const found = res.body.data.subjects.find((s: any) => s.id === createdSubjectId);
+      expect(found).toBeDefined();
+      expect(found.code).toBe(testCode.toUpperCase());
+    });
+
+    it('GET /api/v1/admin/subjects/:id returns full subject details', async () => {
+      const res = await request(app)
+        .get(`/api/v1/admin/subjects/${createdSubjectId}`)
+        .set('Authorization', `Bearer ${managementToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.id).toBe(createdSubjectId);
+      expect(res.body.data.name).toBe(testName);
+      expect(Array.isArray(res.body.data.assignedTeachers)).toBe(true);
+    });
+
+    it('PUT /api/v1/admin/subjects/:id updates subject details', async () => {
+      const res = await request(app)
+        .put(`/api/v1/admin/subjects/${createdSubjectId}`)
+        .set('Authorization', `Bearer ${managementToken}`)
+        .send({
+          description: 'Updated test description',
+        });
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.description).toBe('Updated test description');
+    });
+
+    it('PATCH /api/v1/admin/subjects/:id/status updates status', async () => {
+      const res = await request(app)
+        .patch(`/api/v1/admin/subjects/${createdSubjectId}/status`)
+        .set('Authorization', `Bearer ${managementToken}`)
+        .send({ status: 'INACTIVE' });
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.status).toBe('INACTIVE');
+    });
+
+    it('GET /api/v1/admin/subjects/:id/references returns reference counts', async () => {
+      const res = await request(app)
+        .get(`/api/v1/admin/subjects/${createdSubjectId}/references`)
+        .set('Authorization', `Bearer ${managementToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data).toHaveProperty('totalReferences');
+      expect(res.body.data.totalReferences).toBe(0);
+    });
+
+    it('DELETE /api/v1/admin/subjects/:id removes the test subject', async () => {
+      const res = await request(app)
+        .delete(`/api/v1/admin/subjects/${createdSubjectId}`)
+        .set('Authorization', `Bearer ${managementToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+
+      const checkRes = await request(app)
+        .get(`/api/v1/admin/subjects/${createdSubjectId}`)
+        .set('Authorization', `Bearer ${managementToken}`);
+      expect(checkRes.status).toBe(404);
+    });
+  });
+
+  describe('School Attendance Management Integration Tests', () => {
+    const testDate = '2026-10-20';
+    let testAttendanceId: string;
+    let testStudentId: string;
+
+    beforeAll(async () => {
+      // Find or create a test student
+      let student = await StudentModel.findOne({ status: 'ACTIVE' });
+      if (!student) {
+        student = await StudentModel.create({
+          parentId: new mongoose.Types.ObjectId(),
+          fullName: 'Attendance Test Student',
+          studentId: `TEST-ATT-${Date.now().toString().slice(-4)}`,
+          grade: 'Grade 8',
+          section: 'A',
+          status: 'ACTIVE',
+        });
+      }
+      testStudentId = student._id.toString();
+
+      // Create a test attendance record for testDate
+      const record = await AttendanceModel.create({
+        studentId: student._id,
+        className: student.grade,
+        section: student.section,
+        academicYear: '2026-2027',
+        date: testDate,
+        status: 'ABSENT',
+        remarks: 'Initial absent record',
+        markedBy: new mongoose.Types.ObjectId('65f1234567890abcdef12345'),
+      });
+      testAttendanceId = record._id.toString();
+    });
+
+    afterAll(async () => {
+      if (testAttendanceId) {
+        await AttendanceModel.findByIdAndDelete(testAttendanceId);
+      }
+    });
+
+    it('GET /api/v1/admin/attendance/summary without token returns 401 Unauthorized', async () => {
+      const res = await request(app).get('/api/v1/admin/attendance/summary');
+      expect(res.status).toBe(401);
+      expect(res.body.success).toBe(false);
+    });
+
+    it('GET /api/v1/admin/attendance/summary with Parent token returns 403 Forbidden', async () => {
+      const res = await request(app)
+        .get('/api/v1/admin/attendance/summary')
+        .set('Authorization', `Bearer ${parentToken}`);
+
+      expect(res.status).toBe(403);
+      expect(res.body.success).toBe(false);
+    });
+
+    it('GET /api/v1/admin/attendance/summary returns school metrics for date', async () => {
+      const res = await request(app)
+        .get('/api/v1/admin/attendance/summary')
+        .query({ date: testDate })
+        .set('Authorization', `Bearer ${managementToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data).toHaveProperty('totalEnrolled');
+      expect(res.body.data).toHaveProperty('presentCount');
+      expect(res.body.data).toHaveProperty('absentCount');
+      expect(res.body.data).toHaveProperty('lateCount');
+      expect(res.body.data).toHaveProperty('unmarkedCount');
+      expect(res.body.data).toHaveProperty('attendancePercentage');
+      expect(res.body.data.date).toBe(testDate);
+    });
+
+    it('GET /api/v1/admin/attendance/register returns paginated student register', async () => {
+      const res = await request(app)
+        .get('/api/v1/admin/attendance/register')
+        .query({ date: testDate, limit: 10 })
+        .set('Authorization', `Bearer ${managementToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data).toHaveProperty('records');
+      expect(res.body.data).toHaveProperty('summary');
+      expect(Array.isArray(res.body.data.records)).toBe(true);
+    });
+
+    it('GET /api/v1/admin/attendance/classes-overview returns class breakdown', async () => {
+      const res = await request(app)
+        .get('/api/v1/admin/attendance/classes-overview')
+        .query({ date: testDate })
+        .set('Authorization', `Bearer ${managementToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(Array.isArray(res.body.data)).toBe(true);
+      if (res.body.data.length > 0) {
+        expect(res.body.data[0]).toHaveProperty('className');
+        expect(res.body.data[0]).toHaveProperty('section');
+        expect(res.body.data[0]).toHaveProperty('submissionStatus');
+      }
+    });
+
+    it('GET /api/v1/admin/attendance/submissions returns submission monitoring status', async () => {
+      const res = await request(app)
+        .get('/api/v1/admin/attendance/submissions')
+        .query({ date: testDate })
+        .set('Authorization', `Bearer ${managementToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(Array.isArray(res.body.data)).toBe(true);
+    });
+
+    it('GET /api/v1/admin/attendance/reports/monthly returns month breakdown', async () => {
+      const res = await request(app)
+        .get('/api/v1/admin/attendance/reports/monthly')
+        .query({ month: '2026-10' })
+        .set('Authorization', `Bearer ${managementToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data).toHaveProperty('month');
+      expect(res.body.data).toHaveProperty('days');
+      expect(Array.isArray(res.body.data.days)).toBe(true);
+      expect(res.body.data.days.length).toBe(31);
+    });
+
+    it('GET /api/v1/admin/attendance/reports/low-attendance returns low attendance list', async () => {
+      const res = await request(app)
+        .get('/api/v1/admin/attendance/reports/low-attendance')
+        .query({ threshold: 85 })
+        .set('Authorization', `Bearer ${managementToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(Array.isArray(res.body.data)).toBe(true);
+    });
+
+    it('GET /api/v1/admin/attendance/reports/student/:studentId returns student history', async () => {
+      const res = await request(app)
+        .get(`/api/v1/admin/attendance/reports/student/${testStudentId}`)
+        .set('Authorization', `Bearer ${managementToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data).toHaveProperty('student');
+      expect(res.body.data).toHaveProperty('summary');
+      expect(res.body.data).toHaveProperty('history');
+    });
+
+    it('PUT /api/v1/admin/attendance/record/:id allows Management to correct attendance with audit note', async () => {
+      const res = await request(app)
+        .put(`/api/v1/admin/attendance/record/${testAttendanceId}`)
+        .set('Authorization', `Bearer ${managementToken}`)
+        .send({
+          status: 'PRESENT',
+          reason: 'Parent provided verified doctor note',
+        });
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.status).toBe('PRESENT');
+      expect(res.body.data.remarks).toContain('[Admin correction]');
     });
   });
 });

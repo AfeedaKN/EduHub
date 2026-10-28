@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
-import { Plus, ArrowRight, CheckCircle2 } from 'lucide-react';
+import React from 'react';
+import { Link } from 'react-router-dom';
+import { Plus, ArrowRight, CheckCircle2, User, UserPlus } from 'lucide-react';
 import { ChildProfile } from '../../types/parent.types';
 
 interface ChildrenListSectionProps {
@@ -13,15 +14,13 @@ export const ChildrenListSection: React.FC<ChildrenListSectionProps> = ({
   onAddChild,
   onViewChildProfile,
 }) => {
-  const [selectedChildId, setSelectedChildId] = useState<string>(
-    childrenList[0]?.id || ''
-  );
-
   const getInitials = (name: string) => {
     const parts = name.trim().split(' ');
     if (parts.length >= 2) return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
     return name.slice(0, 2).toUpperCase();
   };
+
+  const hasChildren = childrenList && childrenList.length > 0;
 
   return (
     <section className="parent-dashboard-section">
@@ -29,107 +28,88 @@ export const ChildrenListSection: React.FC<ChildrenListSectionProps> = ({
         <div>
           <h3 className="parent-section-title">My Children</h3>
           <p className="parent-section-subtitle">
-            Your children&apos;s school information, all in one place.
+            Quick overview of enrolled children attending school.
           </p>
         </div>
 
-        <button
-          type="button"
-          className="btn-parent-outline-action"
-          onClick={onAddChild}
-        >
-          <Plus size={14} />
-          <span>+ Add Another Child</span>
-        </button>
+        {hasChildren ? (
+          <Link to="/parent/children" className="btn-parent-outline-action">
+            <span>View All</span>
+            <ArrowRight size={14} />
+          </Link>
+        ) : (
+          <button type="button" className="btn-parent-outline-action" onClick={onAddChild}>
+            <Plus size={14} />
+            <span>+ Add Student</span>
+          </button>
+        )}
       </div>
 
-      {/* Multiple Children Quick Tabs if more than 1 child */}
-      {childrenList.length > 1 && (
-        <div className="parent-children-tabs">
+      {!hasChildren ? (
+        <div className="parent-child-empty-compact">
+          <div className="parent-child-empty-icon-wrap">
+            <User size={22} className="text-muted-blue" />
+          </div>
+          <div className="parent-child-empty-content">
+            <h5 className="parent-child-empty-title">No children officially enrolled yet</h5>
+            <p className="parent-child-empty-text">
+              Submit a student admission request to connect your child to EduHub.
+            </p>
+          </div>
+          <button type="button" className="btn-add-student-primary" onClick={onAddChild}>
+            <UserPlus size={15} />
+            <span>+ Add Student</span>
+          </button>
+        </div>
+      ) : (
+        /* Compact Cards Grid for each approved child */
+        <div className="parent-dashboard-compact-children-grid">
           {childrenList.map((child) => (
-            <button
-              key={child.id}
-              type="button"
-              className={`parent-child-tab-btn ${selectedChildId === child.id ? 'active' : ''}`}
-              onClick={() => setSelectedChildId(child.id)}
-            >
-              <div className="child-tab-avatar">{getInitials(child.fullName)}</div>
-              <span>{child.fullName}</span>
-              <span className="child-tab-grade">{child.grade}</span>
-            </button>
+            <div key={child.id} className="parent-child-compact-card">
+              <div className="child-compact-top">
+                <div className="child-compact-avatar">
+                  {child.avatarUrl ? (
+                    <img src={child.avatarUrl} alt={child.fullName} className="child-compact-img" />
+                  ) : (
+                    <span className="child-compact-initials">{getInitials(child.fullName)}</span>
+                  )}
+                </div>
+
+                <div className="child-compact-info">
+                  <div className="child-compact-name-row">
+                    <h4 className="child-compact-name" title={child.fullName}>
+                      {child.fullName}
+                    </h4>
+                    <span className="child-compact-status-badge">
+                      <CheckCircle2 size={11} />
+                      <span>{child.status === 'ACTIVE' ? 'Enrolled' : child.status}</span>
+                    </span>
+                  </div>
+
+                  <div className="child-compact-meta-row">
+                    <span className="child-compact-class">
+                      {child.grade} · Sec {child.section}
+                    </span>
+                    <span className="child-compact-dot">·</span>
+                    <span className="child-compact-id">ID: {child.studentId}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="child-compact-footer">
+                <button
+                  type="button"
+                  className="btn-child-view-profile"
+                  onClick={() => onViewChildProfile(child.id)}
+                >
+                  <span>View Profile</span>
+                  <ArrowRight size={13} />
+                </button>
+              </div>
+            </div>
           ))}
         </div>
       )}
-
-      {/* Horizontal Child Profile Cards */}
-      <div className="parent-children-horizontal-list">
-        {childrenList.map((child) => (
-          <div
-            key={child.id}
-            className={`parent-child-horizontal-card ${
-              childrenList.length > 1 && selectedChildId === child.id ? 'is-selected' : ''
-            }`}
-          >
-            <div className="parent-child-h-main">
-              {/* Avatar Box */}
-              <div className="parent-child-h-avatar-wrap">
-                {child.avatarUrl ? (
-                  <img
-                    src={child.avatarUrl}
-                    alt={child.fullName}
-                    className="parent-child-h-avatar-img"
-                  />
-                ) : (
-                  <div className="parent-child-h-avatar-initials">
-                    {getInitials(child.fullName)}
-                  </div>
-                )}
-              </div>
-
-              {/* Information Column */}
-              <div className="parent-child-h-info">
-                <div className="parent-child-h-name-row">
-                  <h4 className="parent-child-h-name">{child.fullName}</h4>
-                  <span className="parent-child-h-status-pill">
-                    <CheckCircle2 size={12} />
-                    <span>Active</span>
-                  </span>
-                </div>
-
-                <div className="parent-child-h-meta-row">
-                  <span className="parent-child-h-grade">
-                    {child.grade} {child.section}
-                  </span>
-                  <span className="parent-child-h-dot">·</span>
-                  <span className="parent-child-h-id">
-                    Student ID {child.studentId}
-                  </span>
-                  {child.classTeacher && (
-                    <>
-                      <span className="parent-child-h-dot">·</span>
-                      <span className="parent-child-h-teacher">
-                        Class Teacher: {child.classTeacher}
-                      </span>
-                    </>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Action Area */}
-            <div className="parent-child-h-action-wrap">
-              <button
-                type="button"
-                className="btn-view-profile-primary"
-                onClick={() => onViewChildProfile(child.id)}
-              >
-                <span>View Profile</span>
-                <ArrowRight size={14} />
-              </button>
-            </div>
-          </div>
-        ))}
-      </div>
     </section>
   );
 };

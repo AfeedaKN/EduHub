@@ -8,6 +8,7 @@ import { NotFoundPage } from '../pages/NotFoundPage';
 import { MainLayout } from '../components/layout/MainLayout';
 import { ProtectedRoute } from '../components/auth/ProtectedRoute';
 import { ParentDashboardPage } from '../pages/parent/ParentDashboardPage';
+import { MyChildrenPage } from '../pages/parent/MyChildrenPage';
 import { ParentAssignmentsPage } from '../pages/parent/ParentAssignmentsPage';
 import { ParentExamsPage } from '../pages/parent/ParentExamsPage';
 import { ParentPlaceholderPage } from '../pages/parent/ParentPlaceholderPage';
@@ -18,6 +19,10 @@ import { AdminClassesPage } from '../pages/admin/AdminClassesPage';
 import { AdminTeachersPage } from '../pages/admin/AdminTeachersPage';
 import { AdminTimetablePage } from '../pages/admin/AdminTimetablePage';
 import { AdminExamsPage } from '../pages/admin/AdminExamsPage';
+import { AdminStudentsPage } from '../pages/admin/AdminStudentsPage';
+import { AdminParentsPage } from '../pages/admin/AdminParentsPage';
+import { AdminSubjectsPage } from '../pages/admin/AdminSubjectsPage';
+import { AdminAttendancePage } from '../pages/admin/AdminAttendancePage';
 import { AdminPlaceholderPage } from '../pages/admin/AdminPlaceholderPage';
 import { TeacherDashboardPage } from '../pages/teacher/TeacherDashboardPage';
 import { TeacherClassesPage } from '../pages/teacher/TeacherClassesPage';
@@ -73,7 +78,15 @@ export const AppRouter: React.FC = () => {
           path="/parent/children"
           element={
             <ProtectedRoute allowedRoles={['PARENT']}>
-              <ParentDashboardPage />
+              <MyChildrenPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/parent/children/:childId"
+          element={
+            <ProtectedRoute allowedRoles={['PARENT']}>
+              <MyChildrenPage />
             </ProtectedRoute>
           }
         />
@@ -186,12 +199,13 @@ export const AppRouter: React.FC = () => {
           path="/admin/people/students"
           element={
             <ProtectedRoute allowedRoles={['MANAGEMENT']}>
-              <AdminPlaceholderPage
-                title="Enrolled Students Management"
-                description="Manage student records, enrollment status, section allocations, and student profiles."
-              />
+              <AdminStudentsPage />
             </ProtectedRoute>
           }
+        />
+        <Route
+          path="/admin/students"
+          element={<Navigate to="/admin/people/students" replace />}
         />
         <Route
           path="/admin/people/teachers"
@@ -209,12 +223,13 @@ export const AppRouter: React.FC = () => {
           path="/admin/people/parents"
           element={
             <ProtectedRoute allowedRoles={['MANAGEMENT']}>
-              <AdminPlaceholderPage
-                title="Parent Accounts Directory"
-                description="Directory of registered parent guardians, their linked children, and contact verifications."
-              />
+              <AdminParentsPage />
             </ProtectedRoute>
           }
+        />
+        <Route
+          path="/admin/parents"
+          element={<Navigate to="/admin/people/parents" replace />}
         />
         {/* Classes & Sections Management Page */}
         <Route
@@ -233,12 +248,13 @@ export const AppRouter: React.FC = () => {
           path="/admin/academics/subjects"
           element={
             <ProtectedRoute allowedRoles={['MANAGEMENT']}>
-              <AdminPlaceholderPage
-                title="Curriculum & Subjects"
-                description="Define academic subjects, syllabus modules, elective options, and grading criteria."
-              />
+              <AdminSubjectsPage />
             </ProtectedRoute>
           }
+        />
+        <Route
+          path="/admin/subjects"
+          element={<Navigate to="/admin/academics/subjects" replace />}
         />
         <Route
           path="/admin/academics/timetable"
@@ -252,10 +268,7 @@ export const AppRouter: React.FC = () => {
           path="/admin/attendance"
           element={
             <ProtectedRoute allowedRoles={['MANAGEMENT']}>
-              <AdminPlaceholderPage
-                title="School Attendance Management"
-                description="Review daily school-wide attendance, generate monthly reports, and manage leave records."
-              />
+              <AdminAttendancePage />
             </ProtectedRoute>
           }
         />

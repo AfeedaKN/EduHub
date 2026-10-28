@@ -72,8 +72,46 @@ export interface RejectionResultDTO {
   message: string;
 }
 
+export interface ClassEnrollmentBarDTO {
+  className: string;
+  count: number;
+}
+
+export interface ExamOverviewDTO {
+  pendingReviewCount: number;
+  publishedCount: number;
+  scheduledExamsCount: number;
+  recentExams: Array<{
+    id: string;
+    name: string;
+    academicYear: string;
+    status: string;
+    startDate: string;
+    endDate: string;
+  }>;
+}
+
+export interface RecentSchoolActivityDTO {
+  id: string;
+  type:
+    | 'ADMISSION_APPROVED'
+    | 'ADMISSION_REJECTED'
+    | 'MARKS_SUBMITTED'
+    | 'MARKS_PUBLISHED'
+    | 'EXAM_SCHEDULED'
+    | 'STUDENT_ENROLLED';
+  title: string;
+  description: string;
+  timestamp: string;
+  date: string;
+  badgeText: string;
+  badgeVariant: 'success' | 'warning' | 'info' | 'danger';
+}
+
 export interface AdminDashboardSummaryDTO {
   totalStudents: number;
+  activeStudents: number;
+  inactiveStudents: number;
   totalTeachers: number;
   pendingAdmissionsCount: number;
   recentPendingAdmissions: AdminPendingAdmissionSummaryDTO[];
@@ -81,16 +119,27 @@ export interface AdminDashboardSummaryDTO {
     overallPercentage: number;
     presentCount: number;
     absentCount: number;
+    lateCount: number;
+    totalMarked: number;
+    sectionsSubmitted: number;
+    totalSections: number;
     date: string;
+    status: 'RECORDED' | 'PENDING' | 'PARTIAL';
   } | null;
   feesSummary: {
     pendingAmount: number;
     currency: string;
   } | null;
+  enrollmentByClass: ClassEnrollmentBarDTO[];
+  examOverview: ExamOverviewDTO;
+  recentActivities: RecentSchoolActivityDTO[];
   upcomingActivities: Array<{
     id: string;
     title: string;
     date: string;
+    time?: string;
     category?: string;
+    audience?: string;
+    linkUrl?: string;
   }> | null;
 }

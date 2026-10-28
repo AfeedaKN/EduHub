@@ -815,6 +815,8 @@ export class ParentService implements IParentService {
         examName: string;
         examType: string;
         academicYear: string;
+        examDate?: string;
+        publishedAt?: string | null;
         subjects: ParentSubjectResultDTO[];
       }
     >();

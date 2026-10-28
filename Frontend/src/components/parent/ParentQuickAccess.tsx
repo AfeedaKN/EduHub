@@ -1,6 +1,14 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { CalendarCheck, Calendar, CreditCard, Award, ArrowUpRight } from 'lucide-react';
+import {
+  CalendarCheck,
+  Calendar,
+  CreditCard,
+  Award,
+  FileText,
+  MessageSquare,
+  ArrowUpRight,
+} from 'lucide-react';
 
 export const ParentQuickAccess: React.FC = () => {
   const quickShortcuts = [
@@ -17,6 +25,12 @@ export const ParentQuickAccess: React.FC = () => {
       path: '/parent/timetable',
     },
     {
+      title: 'Assignments',
+      subtitle: 'Homework & tasks',
+      icon: FileText,
+      path: '/parent/assignments',
+    },
+    {
       title: 'Exams & Results',
       subtitle: 'Marks & report cards',
       icon: Award,
@@ -27,6 +41,12 @@ export const ParentQuickAccess: React.FC = () => {
       subtitle: 'Invoices & dues',
       icon: CreditCard,
       path: '/parent/fees',
+    },
+    {
+      title: 'Communication',
+      subtitle: 'Notices & messages',
+      icon: MessageSquare,
+      path: '/parent/communication/notices',
     },
   ];
 

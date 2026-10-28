@@ -93,7 +93,9 @@ export class AttendanceRepository implements IAttendanceRepository {
       if (className && section) {
         const classDoc = await ClassModel.findOne({
           name: { $regex: new RegExp(`^${className.trim()}$`, 'i') },
-        }).exec();
+        })
+          .sort({ academicYear: -1, createdAt: -1 })
+          .exec();
         if (classDoc) {
           const sec = await SectionModel.findOne({
             classId: classDoc._id,
@@ -112,26 +114,51 @@ export class AttendanceRepository implements IAttendanceRepository {
 
   /**
    * Find officially enrolled active students in a classroom section.
-   * If an academic year filter is specified, it matches students in that academic year.
-   * If a stale assignment academic year yields zero students, it safely falls back to all
-   * officially enrolled active students in that section so no students are dropped.
+   * Supports resolving Class ObjectId, grade aliases (e.g. "Grade 7", "Class 7", or "7"),
+   * and matching or falling back gracefully for academic years.
    */
   async findStudentsBySection(
     grade: string,
     section: string,
     academicYear?: string
   ): Promise<IStudentDoc[]> {
+    const trimmedGrade = grade.trim();
+    let resolvedGrade = trimmedGrade;
+
+    // 1. Resolve Class ObjectId to class name if an ID was passed
+    if (mongoose.Types.ObjectId.isValid(trimmedGrade) && trimmedGrade.length === 24) {
+      try {
+        const classDoc = await ClassModel.findById(trimmedGrade).exec();
+        if (classDoc && classDoc.name) {
+          resolvedGrade = classDoc.name.trim();
+        }
+      } catch {
+        // Fallback to literal string
+      }
+    }
+
+    // 2. Build flexible grade regex (handles "Grade 7", "Class 7", or "7")
+    const matchNumber = resolvedGrade.match(/^(?:grade|class)?\s*(\d+)$/i);
+    const gradeCondition = matchNumber
+      ? { $regex: new RegExp(`^(?:grade|class)?\\s*${matchNumber[1]}$`, 'i') }
+      : { $regex: new RegExp(`^${resolvedGrade}$`, 'i') };
+
     const baseQuery: Record<string, any> = {
-      grade: { $regex: new RegExp(`^${grade.trim()}$`, 'i') },
+      grade: gradeCondition,
       section: { $regex: new RegExp(`^${section.trim()}$`, 'i') },
       status: 'ACTIVE',
     };
 
     if (academicYear && academicYear.trim() && academicYear !== 'ALL') {
+      const normalizedYear = academicYear.trim();
+      const escapedYear = normalizedYear
+        .replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&')
+        .replace(/\s+/g, '\\s*');
+
       const yearQuery = {
         ...baseQuery,
         $or: [
-          { academicYear: academicYear.trim() },
+          { academicYear: { $regex: new RegExp(`^${escapedYear}$`, 'i') } },
           { academicYear: { $exists: false } },
           { academicYear: '' },
         ],

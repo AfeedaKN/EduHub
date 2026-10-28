@@ -1,5 +1,6 @@
 import React from 'react';
-import { Calendar, Info } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Calendar, ArrowRight, ArrowUpRight, Users2, CalendarDays } from 'lucide-react';
 import { SchoolActivity } from '../../types/admin.types';
 
 interface UpcomingActivitiesSectionProps {
@@ -16,17 +17,49 @@ export const UpcomingActivitiesSection: React.FC<UpcomingActivitiesSectionProps>
           <Calendar size={18} style={{ color: '#20354A' }} />
           <span>Upcoming Activities</span>
         </h2>
+        <Link to="/admin/exams" className="admin-section-header-link">
+          <span>Exam Calendar</span>
+          <ArrowRight size={14} />
+        </Link>
       </div>
 
       {activities && activities.length > 0 ? (
         <div className="admin-activities-list">
-          {activities.slice(0, 3).map((act) => (
+          {activities.slice(0, 5).map((act) => (
             <div key={act.id} className="admin-activity-item">
-              <span className="admin-activity-bullet" />
+              <div className="admin-activity-icon-bullet">
+                <CalendarDays size={14} />
+              </div>
               <div className="admin-activity-info">
-                <div className="admin-activity-title">{act.title}</div>
+                <div className="admin-activity-top-line">
+                  <div className="admin-activity-title">{act.title}</div>
+                  {act.linkUrl && (
+                    <Link
+                      to={act.linkUrl}
+                      className="admin-activity-link-icon"
+                      title="View details"
+                    >
+                      <ArrowUpRight size={13} />
+                    </Link>
+                  )}
+                </div>
+
                 <div className="admin-activity-date">
-                  {act.date} {act.category ? `• ${act.category}` : ''}
+                  <span>{act.time || act.date}</span>
+                </div>
+
+                <div className="admin-activity-tags">
+                  {act.category && (
+                    <span className="admin-activity-tag tag-category">
+                      {act.category}
+                    </span>
+                  )}
+                  {act.audience && (
+                    <span className="admin-activity-tag tag-audience">
+                      <Users2 size={11} style={{ marginRight: '3px' }} />
+                      {act.audience}
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
@@ -35,12 +68,13 @@ export const UpcomingActivitiesSection: React.FC<UpcomingActivitiesSectionProps>
       ) : (
         <div className="admin-activities-empty-note">
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', marginBottom: '4px' }}>
-            <Info size={15} style={{ color: '#647F99' }} />
+            <Calendar size={15} style={{ color: '#647F99' }} />
             <strong style={{ color: '#20354A' }}>No scheduled activities</strong>
           </div>
-          <span>School examinations and calendar events will appear here once published.</span>
+          <span>Active examinations and scheduled academic events will appear here once published.</span>
         </div>
       )}
     </div>
   );
 };
+

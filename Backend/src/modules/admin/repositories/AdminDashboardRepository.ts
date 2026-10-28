@@ -7,6 +7,17 @@ import {
 import { RegistrationStatus } from '../../parent/dtos/parent.dto';
 import { UserModel } from '../../auth/models/User.model';
 import { UserRole, AccountStatus } from '../../auth/dtos/auth.dto';
+import { TeacherModel } from '../models/Teacher.model';
+import { SectionModel } from '../models/Section.model';
+import { AttendanceModel } from '../../teacher/models/Attendance.model';
+import { ExamModel } from '../models/Exam.model';
+import { ExamMarksModel } from '../models/ExamMarks.model';
+import {
+  ClassEnrollmentBarDTO,
+  ExamOverviewDTO,
+  RecentSchoolActivityDTO,
+  AdminDashboardSummaryDTO,
+} from '../dtos/admin.dto';
 
 export interface AdmissionFilterOptions {
   status?: string;
@@ -17,6 +28,7 @@ export interface AdmissionFilterOptions {
 
 export interface IAdminDashboardRepository {
   countActiveStudents(): Promise<number>;
+  countStudentStatusCounts(): Promise<{ total: number; active: number; inactive: number }>;
   countActiveTeachers(): Promise<number>;
   countPendingAdmissions(): Promise<number>;
   getRecentPendingAdmissions(limit?: number): Promise<IStudentRegistrationRequestDoc[]>;
@@ -31,6 +43,11 @@ export interface IAdminDashboardRepository {
   getAdmissionById(id: string): Promise<IStudentRegistrationRequestDoc | null>;
   countClassEnrollment(grade: string, section: string): Promise<number>;
   countGradeEnrollment(grade: string): Promise<number>;
+  getEnrollmentByClass(): Promise<ClassEnrollmentBarDTO[]>;
+  getAttendanceSummary(dateStr: string): Promise<AdminDashboardSummaryDTO['attendanceSummary']>;
+  getExamOverview(): Promise<ExamOverviewDTO>;
+  getRecentActivities(): Promise<RecentSchoolActivityDTO[]>;
+  getUpcomingActivities(): Promise<AdminDashboardSummaryDTO['upcomingActivities']>;
   saveRegistrationRequest(
     doc: IStudentRegistrationRequestDoc,
     session?: ClientSession
@@ -276,5 +293,246 @@ export class AdminDashboardRepository implements IAdminDashboardRepository {
   async getNextStudentSequence(): Promise<number> {
     const totalStudents = await StudentModel.countDocuments().exec();
     return totalStudents + 1;
+  }
+
+  /**
+   * Count officially enrolled students by active and inactive status
+   */
+  async countStudentStatusCounts(): Promise<{ total: number; active: number; inactive: number }> {
+    const [active, inactive, total] = await Promise.all([
+      StudentModel.countDocuments({ status: 'ACTIVE' }).exec(),
+      StudentModel.countDocuments({ status: 'INACTIVE' }).exec(),
+      StudentModel.countDocuments().exec(),
+    ]);
+    return { total, active, inactive };
+  }
+
+  /**
+   * Get enrolled students aggregated by class/grade
+   */
+  async getEnrollmentByClass(): Promise<ClassEnrollmentBarDTO[]> {
+    const results = await StudentModel.aggregate([
+      { $match: { status: 'ACTIVE' } },
+      { $group: { _id: '$grade', count: { $sum: 1 } } },
+      { $sort: { _id: 1 } },
+    ]).exec();
+
+    return results.map((item) => ({
+      className: item._id || 'Unassigned',
+      count: item.count,
+    }));
+  }
+
+  /**
+   * Calculate school-wide attendance metrics for a specific date
+   */
+  async getAttendanceSummary(dateStr: string): Promise<AdminDashboardSummaryDTO['attendanceSummary']> {
+    const records = await AttendanceModel.find({ date: dateStr }).exec();
+    const totalActiveSections = await SectionModel.countDocuments({ status: 'ACTIVE' }).exec();
+
+    if (records.length === 0) {
+      return {
+        overallPercentage: 0,
+        presentCount: 0,
+        absentCount: 0,
+        lateCount: 0,
+        totalMarked: 0,
+        sectionsSubmitted: 0,
+        totalSections: totalActiveSections,
+        date: dateStr,
+        status: 'PENDING',
+      };
+    }
+
+    const presentCount = records.filter((r) => r.status === 'PRESENT').length;
+    const absentCount = records.filter((r) => r.status === 'ABSENT').length;
+    const lateCount = records.filter((r) => r.status === 'LATE').length;
+    const totalMarked = records.length;
+    const overallPercentage = totalMarked > 0 ? Math.round((presentCount / totalMarked) * 100) : 0;
+
+    const submittedSectionKeys = new Set(records.map((r) => `${r.className}-${r.section}`));
+    const sectionsSubmitted = submittedSectionKeys.size;
+    const totalSections = Math.max(sectionsSubmitted, totalActiveSections);
+
+    const status = sectionsSubmitted >= totalSections && totalSections > 0 ? 'RECORDED' : 'PARTIAL';
+
+    return {
+      overallPercentage,
+      presentCount,
+      absentCount,
+      lateCount,
+      totalMarked,
+      sectionsSubmitted,
+      totalSections,
+      date: dateStr,
+      status,
+    };
+  }
+
+  /**
+   * Get exam metrics: marks awaiting review, published, scheduled exams
+   */
+  async getExamOverview(): Promise<ExamOverviewDTO> {
+    const [pendingReviewCount, publishedCount, scheduledExamsCount, recentExamsDocs] =
+      await Promise.all([
+        ExamMarksModel.countDocuments({ status: 'SUBMITTED' }).exec(),
+        ExamMarksModel.countDocuments({ status: 'PUBLISHED' }).exec(),
+        ExamModel.countDocuments({ status: { $in: ['SCHEDULED', 'ONGOING'] } }).exec(),
+        ExamModel.find().sort({ startDate: -1 }).limit(5).exec(),
+      ]);
+
+    const recentExams = recentExamsDocs.map((exam) => ({
+      id: exam._id.toString(),
+      name: exam.name,
+      academicYear: exam.academicYear,
+      status: exam.status,
+      startDate: exam.startDate ? exam.startDate.toISOString().split('T')[0] : '',
+      endDate: exam.endDate ? exam.endDate.toISOString().split('T')[0] : '',
+    }));
+
+    return {
+      pendingReviewCount,
+      publishedCount,
+      scheduledExamsCount,
+      recentExams,
+    };
+  }
+
+  /**
+   * Aggregate recent school events across admissions, exams, and marks
+   */
+  async getRecentActivities(): Promise<RecentSchoolActivityDTO[]> {
+    const [approvedReqs, rejectedReqs, marksSubmitted, marksPublished, examsScheduled] =
+      await Promise.all([
+        StudentRegistrationRequestModel.find({ status: RegistrationStatus.APPROVED })
+          .sort({ reviewedAt: -1, updatedAt: -1 })
+          .limit(4)
+          .exec(),
+        StudentRegistrationRequestModel.find({ status: RegistrationStatus.REJECTED })
+          .sort({ reviewedAt: -1, updatedAt: -1 })
+          .limit(3)
+          .exec(),
+        ExamMarksModel.find({ status: 'SUBMITTED' })
+          .sort({ submittedAt: -1, updatedAt: -1 })
+          .limit(4)
+          .exec(),
+        ExamMarksModel.find({ status: 'PUBLISHED' })
+          .sort({ publishedAt: -1, updatedAt: -1 })
+          .limit(3)
+          .exec(),
+        ExamModel.find({ status: { $in: ['SCHEDULED', 'ONGOING'] } })
+          .sort({ createdAt: -1 })
+          .limit(3)
+          .exec(),
+      ]);
+
+    const activities: RecentSchoolActivityDTO[] = [];
+
+    for (const req of approvedReqs) {
+      const d = req.reviewedAt || req.updatedAt || req.createdAt || new Date();
+      activities.push({
+        id: `adm-app-${req._id.toString()}`,
+        type: 'ADMISSION_APPROVED',
+        title: `Admission Approved - ${req.studentFullName}`,
+        description: `Officially enrolled in ${req.requestedGrade}. Student record generated.`,
+        timestamp: d.toISOString(),
+        date: d.toISOString().split('T')[0],
+        badgeText: 'Approved',
+        badgeVariant: 'success',
+      });
+    }
+
+    for (const req of rejectedReqs) {
+      const d = req.reviewedAt || req.updatedAt || req.createdAt || new Date();
+      activities.push({
+        id: `adm-rej-${req._id.toString()}`,
+        type: 'ADMISSION_REJECTED',
+        title: `Admission Rejected - ${req.studentFullName}`,
+        description: req.rejectionReason
+          ? `Reason: ${req.rejectionReason}`
+          : `Application for ${req.requestedGrade} rejected by management.`,
+        timestamp: d.toISOString(),
+        date: d.toISOString().split('T')[0],
+        badgeText: 'Rejected',
+        badgeVariant: 'danger',
+      });
+    }
+
+    for (const mark of marksSubmitted) {
+      const d = mark.submittedAt || mark.updatedAt || mark.createdAt || new Date();
+      activities.push({
+        id: `marks-sub-${mark._id.toString()}`,
+        type: 'MARKS_SUBMITTED',
+        title: `Marks Submitted - ${mark.className} ${mark.section} (${mark.subject})`,
+        description: `Teacher ${mark.teacherName} submitted marks for management review (${mark.enteredCount}/${mark.totalStudents} entered).`,
+        timestamp: d.toISOString(),
+        date: d.toISOString().split('T')[0],
+        badgeText: 'Review Pending',
+        badgeVariant: 'warning',
+      });
+    }
+
+    for (const mark of marksPublished) {
+      const d = mark.publishedAt || mark.updatedAt || mark.createdAt || new Date();
+      activities.push({
+        id: `marks-pub-${mark._id.toString()}`,
+        type: 'MARKS_PUBLISHED',
+        title: `Results Published - ${mark.className} ${mark.section} (${mark.subject})`,
+        description: `Official results published and made visible to parents and students.`,
+        timestamp: d.toISOString(),
+        date: d.toISOString().split('T')[0],
+        badgeText: 'Published',
+        badgeVariant: 'info',
+      });
+    }
+
+    for (const exam of examsScheduled) {
+      const d = exam.createdAt || new Date();
+      activities.push({
+        id: `exam-sched-${exam._id.toString()}`,
+        type: 'EXAM_SCHEDULED',
+        title: `Exam Scheduled - ${exam.name}`,
+        description: `Scheduled for ${exam.applicableClasses?.map((c) => c.className).join(', ') || 'All Classes'}.`,
+        timestamp: d.toISOString(),
+        date: d.toISOString().split('T')[0],
+        badgeText: 'Scheduled',
+        badgeVariant: 'info',
+      });
+    }
+
+    activities.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+    return activities.slice(0, 6);
+  }
+
+  /**
+   * Get scheduled or ongoing upcoming activities / exams
+   */
+  async getUpcomingActivities(): Promise<AdminDashboardSummaryDTO['upcomingActivities']> {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const upcomingExams = await ExamModel.find({
+      status: { $in: ['SCHEDULED', 'ONGOING'] },
+      endDate: { $gte: today },
+    })
+      .sort({ startDate: 1 })
+      .limit(5)
+      .exec();
+
+    if (upcomingExams.length === 0) {
+      return [];
+    }
+
+    return upcomingExams.map((exam) => ({
+      id: exam._id.toString(),
+      title: exam.name,
+      date: exam.startDate ? exam.startDate.toISOString().split('T')[0] : '',
+      time: `${exam.startDate ? exam.startDate.toISOString().split('T')[0] : ''} to ${
+        exam.endDate ? exam.endDate.toISOString().split('T')[0] : ''
+      }`,
+      category: exam.examType.replace('_', ' '),
+      audience: exam.applicableClasses?.map((c) => c.className).join(', ') || 'School-wide',
+      linkUrl: '/admin/exams',
+    }));
   }
 }

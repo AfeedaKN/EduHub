@@ -125,6 +125,7 @@ describe('Teacher Exam & Marks Routes Integration Tests', () => {
     });
 
     // 3. Create Students in Grade 10-A
+    await StudentModel.deleteMany({ grade: 'Grade 10', section: 'A' });
     const parentId = new mongoose.Types.ObjectId();
     const s1 = await StudentModel.create({
       parentId,

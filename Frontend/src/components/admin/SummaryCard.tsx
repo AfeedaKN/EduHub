@@ -1,5 +1,5 @@
 import React from 'react';
-import { LucideIcon } from 'lucide-react';
+import { LucideIcon, ArrowUpRight } from 'lucide-react';
 
 interface SummaryCardProps {
   label: string;
@@ -7,10 +7,11 @@ interface SummaryCardProps {
   icon: LucideIcon;
   subtext?: string;
   indicatorText?: string;
-  indicatorVariant?: 'admissions' | 'neutral' | 'muted';
+  indicatorVariant?: 'admissions' | 'neutral' | 'muted' | 'warning';
   isClickable?: boolean;
   onClick?: () => void;
   isHighlight?: boolean;
+  shortcutLabel?: string;
 }
 
 export const SummaryCard: React.FC<SummaryCardProps> = ({
@@ -23,6 +24,7 @@ export const SummaryCard: React.FC<SummaryCardProps> = ({
   isClickable = false,
   onClick,
   isHighlight = false,
+  shortcutLabel,
 }) => {
   const isUnavailable = typeof value === 'string' && value.toLowerCase().includes('pending');
 
@@ -34,6 +36,7 @@ export const SummaryCard: React.FC<SummaryCardProps> = ({
       onClick={isClickable ? onClick : undefined}
       role={isClickable ? 'button' : undefined}
       tabIndex={isClickable ? 0 : undefined}
+      aria-label={`${label}: ${value}`}
       onKeyDown={
         isClickable
           ? (e) => {
@@ -64,7 +67,16 @@ export const SummaryCard: React.FC<SummaryCardProps> = ({
         )}
       </div>
 
-      {subtext && <div className="admin-card-subtext">{subtext}</div>}
+      <div className="admin-card-footer-row">
+        {subtext && <div className="admin-card-subtext">{subtext}</div>}
+        {isClickable && shortcutLabel && (
+          <span className="admin-card-shortcut-hint">
+            <span>{shortcutLabel}</span>
+            <ArrowUpRight size={13} />
+          </span>
+        )}
+      </div>
     </div>
   );
 };
+

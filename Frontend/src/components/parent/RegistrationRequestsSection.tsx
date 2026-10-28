@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import { Clock, AlertCircle, FileText, ArrowRight, CheckCircle2 } from 'lucide-react';
 import { StudentRegistrationRequest } from '../../types/parent.types';
 
@@ -19,9 +20,14 @@ export const RegistrationRequestsSection: React.FC<RegistrationRequestsSectionPr
         <div>
           <h3 className="parent-section-title">Registration Requests</h3>
           <p className="parent-section-subtitle">
-            Track status of student admission requests submitted to school management.
+            Track admission applications submitted to school management.
           </p>
         </div>
+
+        <Link to="/parent/children" className="btn-parent-outline-action">
+          <span>Manage Requests</span>
+          <ArrowRight size={14} />
+        </Link>
       </div>
 
       <div className="parent-requests-stack">
@@ -37,7 +43,11 @@ export const RegistrationRequestsSection: React.FC<RegistrationRequestsSectionPr
               }`}
             >
               <div className="parent-request-c-left">
-                <div className="parent-request-c-icon">
+                <div
+                  className={`parent-request-c-icon ${
+                    isRejected ? 'icon-rejected' : isApproved ? 'icon-approved' : 'icon-pending'
+                  }`}
+                >
                   {isRejected ? (
                     <AlertCircle size={18} className="text-danger" />
                   ) : isApproved ? (
@@ -51,7 +61,7 @@ export const RegistrationRequestsSection: React.FC<RegistrationRequestsSectionPr
                   <div className="parent-request-c-title-row">
                     <h4 className="parent-request-c-name">{req.studentFullName}</h4>
                     <span className="parent-request-c-grade">
-                      Requested: {req.requestedGrade}
+                      Requested: <strong>{req.requestedGrade}</strong>
                     </span>
                     <span
                       className={`parent-request-c-badge ${
@@ -66,6 +76,8 @@ export const RegistrationRequestsSection: React.FC<RegistrationRequestsSectionPr
                         ? 'Not Approved'
                         : isApproved
                         ? 'Approved & Enrolled'
+                        : req.status === 'UNDER_REVIEW'
+                        ? 'Under Review'
                         : 'Pending Review'}
                     </span>
                   </div>
@@ -78,11 +90,18 @@ export const RegistrationRequestsSection: React.FC<RegistrationRequestsSectionPr
                       : 'The school management is reviewing your registration request.'}
                   </p>
 
-                  {req.submissionDate && (
-                    <span className="parent-request-c-date">
-                      Submitted on {req.submissionDate}
-                    </span>
-                  )}
+                  <div className="parent-request-c-meta-row">
+                    {req.submissionDate && (
+                      <span className="parent-request-c-date">
+                        Submitted on {req.submissionDate}
+                      </span>
+                    )}
+                    {req.academicYear && (
+                      <span className="parent-request-c-date">
+                        · Academic Year {req.academicYear}
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -93,7 +112,7 @@ export const RegistrationRequestsSection: React.FC<RegistrationRequestsSectionPr
                   onClick={() => onViewRequest(req)}
                 >
                   <FileText size={14} />
-                  <span>{isRejected ? 'View Details' : 'View Request'}</span>
+                  <span>{isRejected ? 'View Feedback' : 'View Details'}</span>
                   <ArrowRight size={13} />
                 </button>
               </div>

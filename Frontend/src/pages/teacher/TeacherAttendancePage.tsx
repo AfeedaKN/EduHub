@@ -81,9 +81,11 @@ export const TeacherAttendancePage: React.FC = () => {
             setSelectedClass(matchedByUrl.className);
             setSelectedSection(matchedByUrl.section);
           } else {
-            // Default to first assigned class
-            setSelectedClass(res.data[0].className);
-            setSelectedSection(res.data[0].section);
+            // Default to first assigned class that has enrolled students, or fallback to first assigned class
+            const defaultClass =
+              res.data.find((c) => (c.studentCount || 0) > 0) || res.data[0];
+            setSelectedClass(defaultClass.className);
+            setSelectedSection(defaultClass.section);
           }
         } else {
           setClasses([]);
@@ -368,11 +370,16 @@ export const TeacherAttendancePage: React.FC = () => {
                 {classes.length === 0 ? (
                   <option value="">No Classes Assigned</option>
                 ) : (
-                  Array.from(new Set(classes.map((c) => c.className))).map((clsName) => (
-                    <option key={clsName} value={clsName}>
-                      {clsName}
-                    </option>
-                  ))
+                  Array.from(new Set(classes.map((c) => c.className))).map((clsName) => {
+                    const totalStudentsInClass = classes
+                      .filter((c) => c.className === clsName)
+                      .reduce((sum, c) => sum + (c.studentCount || 0), 0);
+                    return (
+                      <option key={clsName} value={clsName}>
+                        {clsName} ({totalStudentsInClass} {totalStudentsInClass === 1 ? 'enrolled' : 'enrolled'})
+                      </option>
+                    );
+                  })
                 )}
               </select>
             </div>
@@ -386,11 +393,19 @@ export const TeacherAttendancePage: React.FC = () => {
                 onChange={(e) => setSelectedSection(e.target.value)}
                 disabled={availableSections.length === 0}
               >
-                {availableSections.map((sec) => (
-                  <option key={sec} value={sec}>
-                    Section {sec}
-                  </option>
-                ))}
+                {availableSections.map((sec) => {
+                  const secItem = classes.find(
+                    (c) =>
+                      c.className.toLowerCase() === selectedClass.toLowerCase() &&
+                      c.section.toLowerCase() === sec.toLowerCase()
+                  );
+                  const count = secItem?.studentCount;
+                  return (
+                    <option key={sec} value={sec}>
+                      Section {sec} {count !== undefined ? `(${count} enrolled)` : ''}
+                    </option>
+                  );
+                })}
               </select>
             </div>
 

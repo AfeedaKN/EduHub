@@ -1,18 +1,26 @@
 import { Router, RequestHandler } from 'express';
 import { AdminController } from '../controllers/AdminController';
 import { ClassController } from '../controllers/ClassController';
+import { SubjectController } from '../controllers/SubjectController';
 import { TeacherController } from '../controllers/TeacherController';
 import { TimetableController } from '../controllers/TimetableController';
 import { ExamController } from '../controllers/ExamController';
+import { StudentDirectoryController } from '../controllers/StudentDirectoryController';
+import { ParentDirectoryController } from '../controllers/ParentDirectoryController';
+import { AdminAttendanceController } from '../controllers/AdminAttendanceController';
 import { authorizeRoles } from '../../auth/middlewares/auth.middleware';
 import { UserRole } from '../../auth/dtos/auth.dto';
 
 export interface AdminRoutesDependencies {
   adminController: AdminController;
   classController: ClassController;
+  subjectController: SubjectController;
   teacherController: TeacherController;
   timetableController: TimetableController;
   examController: ExamController;
+  studentDirectoryController: StudentDirectoryController;
+  parentDirectoryController: ParentDirectoryController;
+  adminAttendanceController: AdminAttendanceController;
   authenticateMiddleware: RequestHandler;
 }
 
@@ -21,9 +29,13 @@ export function createAdminRouter(deps: AdminRoutesDependencies): Router {
   const {
     adminController,
     classController,
+    subjectController,
     teacherController,
     timetableController,
     examController,
+    studentDirectoryController,
+    parentDirectoryController,
+    adminAttendanceController,
     authenticateMiddleware,
   } = deps;
 
@@ -60,6 +72,16 @@ export function createAdminRouter(deps: AdminRoutesDependencies): Router {
   router.put('/classes/:classId/sections/:sectionId', classController.updateSection);
   router.patch('/classes/:classId/sections/:sectionId/status', classController.changeSectionStatus);
   router.delete('/classes/:classId/sections/:sectionId', classController.deleteSection);
+
+  // Subjects Management
+  router.get('/subjects/summary', subjectController.getSummaryStats);
+  router.get('/subjects', subjectController.getSubjects);
+  router.post('/subjects', subjectController.createSubject);
+  router.get('/subjects/:id', subjectController.getSubjectById);
+  router.get('/subjects/:id/references', subjectController.getSubjectReferences);
+  router.put('/subjects/:id', subjectController.updateSubject);
+  router.patch('/subjects/:id/status', subjectController.changeSubjectStatus);
+  router.delete('/subjects/:id', subjectController.deleteSubject);
 
   // Teacher Management
   router.get('/teachers/summary', teacherController.getSummaryStats);
@@ -104,6 +126,31 @@ export function createAdminRouter(deps: AdminRoutesDependencies): Router {
   router.post('/exams/:id/schedules/:scheduleId/marks/reopen', examController.reopenScheduleMarks);
   router.put('/exams/:id/schedules/:scheduleId', examController.updateSchedule);
   router.delete('/exams/:id/schedules/:scheduleId', examController.deleteSchedule);
+
+  // Students Directory
+  router.get('/students/summary', studentDirectoryController.getSummary);
+  router.get('/students', studentDirectoryController.getStudents);
+  router.get('/students/:id', studentDirectoryController.getStudentById);
+  router.put('/students/:id', studentDirectoryController.updateStudent);
+
+  // Parents Directory
+  router.get('/parents/summary', parentDirectoryController.getSummary);
+  router.get('/parents', parentDirectoryController.getParents);
+  router.get('/parents/:id', parentDirectoryController.getParentById);
+  router.patch('/parents/:id/status', parentDirectoryController.updateStatus);
+
+  // School Attendance Management
+  router.get('/attendance/summary', adminAttendanceController.getSummary);
+  router.get('/attendance/register', adminAttendanceController.getDailyRegister);
+  router.get('/attendance/subject-wise-grid', adminAttendanceController.getSubjectWiseAttendanceGrid);
+  router.post('/attendance/subject-wise-grid', adminAttendanceController.saveSubjectWiseAttendanceBatch);
+  router.get('/attendance/classes-overview', adminAttendanceController.getClassesOverview);
+  router.get('/attendance/submissions', adminAttendanceController.getSubmissionsMonitoring);
+  router.get('/attendance/reports/monthly', adminAttendanceController.getMonthlyReport);
+  router.get('/attendance/reports/low-attendance', adminAttendanceController.getLowAttendanceReport);
+  router.get('/attendance/reports/student/:studentId', adminAttendanceController.getStudentHistory);
+  router.post('/attendance/student/:studentId', adminAttendanceController.recordSingleStudentAttendance);
+  router.put('/attendance/record/:id', adminAttendanceController.correctAttendanceRecord);
 
   return router;
 }

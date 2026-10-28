@@ -15,6 +15,7 @@ describe('AdminService Unit Tests', () => {
   beforeEach(() => {
     mockRepo = {
       countActiveStudents: vi.fn(),
+      countStudentStatusCounts: vi.fn().mockResolvedValue({ total: 150, active: 145, inactive: 5 }),
       countActiveTeachers: vi.fn(),
       countPendingAdmissions: vi.fn(),
       getRecentPendingAdmissions: vi.fn(),
@@ -24,6 +25,16 @@ describe('AdminService Unit Tests', () => {
       getAdmissionById: vi.fn(),
       countClassEnrollment: vi.fn().mockResolvedValue(15),
       countGradeEnrollment: vi.fn().mockResolvedValue(30),
+      getEnrollmentByClass: vi.fn().mockResolvedValue([{ className: 'Grade 1', count: 20 }]),
+      getAttendanceSummary: vi.fn().mockResolvedValue(null),
+      getExamOverview: vi.fn().mockResolvedValue({
+        pendingReviewCount: 1,
+        publishedCount: 2,
+        scheduledExamsCount: 3,
+        recentExams: [],
+      }),
+      getRecentActivities: vi.fn().mockResolvedValue([]),
+      getUpcomingActivities: vi.fn().mockResolvedValue(null),
       saveRegistrationRequest: vi.fn().mockImplementation(async (doc) => doc),
       createStudent: vi.fn(),
       getNextStudentSequence: vi.fn().mockResolvedValue(42),
@@ -90,6 +101,8 @@ describe('AdminService Unit Tests', () => {
       const result = await adminService.getDashboardSummary();
 
       expect(result.totalStudents).toBe(150);
+      expect(result.activeStudents).toBe(145);
+      expect(result.inactiveStudents).toBe(5);
       expect(result.totalTeachers).toBe(12);
       expect(result.pendingAdmissionsCount).toBe(3);
       expect(result.recentPendingAdmissions).toHaveLength(1);
@@ -98,9 +111,7 @@ describe('AdminService Unit Tests', () => {
       expect(result.recentPendingAdmissions[0].status).toBe('PENDING');
 
       // Unimplemented modules must be null (no fabricated numbers)
-      expect(result.attendanceSummary).toBeNull();
       expect(result.feesSummary).toBeNull();
-      expect(result.upcomingActivities).toBeNull();
     });
   });
 

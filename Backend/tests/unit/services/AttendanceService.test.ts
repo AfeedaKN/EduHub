@@ -223,6 +223,58 @@ describe('AttendanceService (Unit Tests)', () => {
       );
       expect(result.students.length).toBe(2);
     });
+
+    it('should return the student actual enrollment academic year when present', async () => {
+      vi.mocked(mockRepo.findStudentsBySection).mockResolvedValue([
+        {
+          _id: new mongoose.Types.ObjectId(student1Id),
+          studentId: 'STU-1001',
+          fullName: 'Alice Smith',
+          grade: 'Grade 10',
+          section: 'A',
+          academicYear: '2026-2027',
+          status: 'ACTIVE',
+        } as any,
+      ]);
+
+      const result = await attendanceService.getSectionAttendance(
+        validUserId,
+        'Grade 10',
+        'A',
+        '2026-10-10'
+      );
+
+      expect(result.academicYear).toBe('2026-2027');
+      expect(result.students).toHaveLength(1);
+      expect(result.students[0].fullName).toBe('Alice Smith');
+    });
+
+    it('should allow teacher authorization matching by classId in assignedClasses', async () => {
+      const classObjectId = new mongoose.Types.ObjectId();
+      vi.mocked(mockRepo.findTeacherByUserId).mockResolvedValue({
+        ...mockTeacher,
+        assignedClasses: [
+          {
+            classId: classObjectId,
+            className: 'Grade 10',
+            section: 'A',
+            subject: 'Mathematics',
+            academicYear: '2026-2027',
+          },
+        ],
+      } as any);
+
+      // Request using classId string
+      const result = await attendanceService.getSectionAttendance(
+        validUserId,
+        classObjectId.toString(),
+        'A',
+        '2026-10-10'
+      );
+
+      expect(result.className).toBe('Grade 10');
+      expect(result.section).toBe('A');
+    });
   });
 
   describe('saveSectionAttendance', () => {

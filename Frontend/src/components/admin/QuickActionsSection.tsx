@@ -2,23 +2,62 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   FileCheck2,
-  UserPlus,
+  GraduationCap,
+  UserCheck,
+  Users,
+  Layers,
+  Award,
   Send,
   Zap,
   ArrowRight,
-  Layers,
 } from 'lucide-react';
 
 interface QuickActionsSectionProps {
-  onAddTeacher?: () => void;
   onPublishNotice?: () => void;
 }
 
 export const QuickActionsSection: React.FC<QuickActionsSectionProps> = ({
-  onAddTeacher,
   onPublishNotice,
 }) => {
   const navigate = useNavigate();
+
+  const actions = [
+    {
+      label: 'Review Admissions',
+      icon: FileCheck2,
+      onClick: () => navigate('/admin/admissions'),
+    },
+    {
+      label: 'Manage Students',
+      icon: GraduationCap,
+      onClick: () => navigate('/admin/people/students'),
+    },
+    {
+      label: 'Manage Parents',
+      icon: UserCheck,
+      onClick: () => navigate('/admin/people/parents'),
+    },
+    {
+      label: 'Manage Teachers',
+      icon: Users,
+      onClick: () => navigate('/admin/people/teachers'),
+    },
+    {
+      label: 'Manage Classes',
+      icon: Layers,
+      onClick: () => navigate('/admin/academics/classes'),
+    },
+    {
+      label: 'Review Exam Results',
+      icon: Award,
+      onClick: () => navigate('/admin/exams'),
+    },
+    {
+      label: 'Publish Notice',
+      icon: Send,
+      onClick: onPublishNotice || (() => navigate('/admin/communication/notices')),
+    },
+  ];
 
   return (
     <div className="admin-section-card">
@@ -30,58 +69,25 @@ export const QuickActionsSection: React.FC<QuickActionsSectionProps> = ({
       </div>
 
       <div className="admin-quick-actions-list">
-        {/* Action 1: Review Admissions */}
-        <button
-          type="button"
-          className="admin-quick-action-btn"
-          onClick={() => navigate('/admin/admissions')}
-        >
-          <div className="admin-quick-action-left">
-            <FileCheck2 size={16} className="admin-quick-action-icon" />
-            <span>Review Admissions</span>
-          </div>
-          <ArrowRight size={14} style={{ color: '#707781' }} />
-        </button>
-
-        {/* Action 2: Add Teacher */}
-        <button
-          type="button"
-          className="admin-quick-action-btn"
-          onClick={onAddTeacher || (() => navigate('/admin/people/teachers'))}
-        >
-          <div className="admin-quick-action-left">
-            <UserPlus size={16} className="admin-quick-action-icon" />
-            <span>Add Teacher</span>
-          </div>
-          <ArrowRight size={14} style={{ color: '#707781' }} />
-        </button>
-
-        {/* Action 3: Manage Classes & Sections */}
-        <button
-          type="button"
-          className="admin-quick-action-btn"
-          onClick={() => navigate('/admin/academics/classes')}
-        >
-          <div className="admin-quick-action-left">
-            <Layers size={16} className="admin-quick-action-icon" />
-            <span>Manage Classes</span>
-          </div>
-          <ArrowRight size={14} style={{ color: '#707781' }} />
-        </button>
-
-        {/* Action 4: Publish Notice */}
-        <button
-          type="button"
-          className="admin-quick-action-btn"
-          onClick={onPublishNotice || (() => navigate('/admin/communication/notices'))}
-        >
-          <div className="admin-quick-action-left">
-            <Send size={16} className="admin-quick-action-icon" />
-            <span>Publish Notice</span>
-          </div>
-          <ArrowRight size={14} style={{ color: '#707781' }} />
-        </button>
+        {actions.map((act) => {
+          const Icon = act.icon;
+          return (
+            <button
+              key={act.label}
+              type="button"
+              className="admin-quick-action-btn"
+              onClick={act.onClick}
+            >
+              <div className="admin-quick-action-left">
+                <Icon size={16} className="admin-quick-action-icon" />
+                <span>{act.label}</span>
+              </div>
+              <ArrowRight size={14} className="admin-quick-action-arrow" />
+            </button>
+          );
+        })}
       </div>
     </div>
   );
 };
+

@@ -98,11 +98,27 @@ export class AdminService implements IAdminService {
   }
 
   async getDashboardSummary(): Promise<AdminDashboardSummaryDTO> {
-    const [totalStudents, totalTeachers, pendingCount, recentDocs] = await Promise.all([
-      this.adminDashboardRepo.countActiveStudents(),
+    const todayStr = new Date().toISOString().split('T')[0];
+    const [
+      studentCounts,
+      totalTeachers,
+      pendingCount,
+      recentDocs,
+      enrollmentByClass,
+      attendanceSummary,
+      examOverview,
+      recentActivities,
+      upcomingActivities,
+    ] = await Promise.all([
+      this.adminDashboardRepo.countStudentStatusCounts(),
       this.adminDashboardRepo.countActiveTeachers(),
       this.adminDashboardRepo.countPendingAdmissions(),
-      this.adminDashboardRepo.getRecentPendingAdmissions(3),
+      this.adminDashboardRepo.getRecentPendingAdmissions(5),
+      this.adminDashboardRepo.getEnrollmentByClass(),
+      this.adminDashboardRepo.getAttendanceSummary(todayStr),
+      this.adminDashboardRepo.getExamOverview(),
+      this.adminDashboardRepo.getRecentActivities(),
+      this.adminDashboardRepo.getUpcomingActivities(),
     ]);
 
     const recentPendingAdmissions: AdminPendingAdmissionSummaryDTO[] = recentDocs.map((doc) =>
@@ -110,13 +126,18 @@ export class AdminService implements IAdminService {
     );
 
     return {
-      totalStudents,
+      totalStudents: studentCounts.total,
+      activeStudents: studentCounts.active,
+      inactiveStudents: studentCounts.inactive,
       totalTeachers,
       pendingAdmissionsCount: pendingCount,
       recentPendingAdmissions,
-      attendanceSummary: null,
+      attendanceSummary,
       feesSummary: null,
-      upcomingActivities: null,
+      enrollmentByClass,
+      examOverview,
+      recentActivities,
+      upcomingActivities,
     };
   }
 

@@ -1128,7 +1128,7 @@
    =================================================================== */
 .parent-quick-minimal-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: 12px;
 }
 
@@ -2346,4 +2346,1290 @@
     justify-content: center;
   }
 }
+
+/* ===================================================================
+   WELCOME HEADER ENHANCEMENTS (Academic Year Badge)
+   =================================================================== */
+.parent-welcome-badges-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.parent-welcome-academic-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background: var(--parent-sage-light);
+  border: 1px solid var(--parent-sage-border);
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--parent-primary);
+}
+
+/* ===================================================================
+   DASHBOARD COMPACT CHILDREN CARDS & COMPACT EMPTY STATE
+   =================================================================== */
+.parent-dashboard-compact-children-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 14px;
+}
+
+.parent-child-compact-card {
+  background: #FFFFFF;
+  border: 1px solid var(--parent-border);
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: var(--parent-shadow);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 12px;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.parent-child-compact-card:hover {
+  transform: translateY(-2px);
+  border-color: #CBD5E1;
+  box-shadow: var(--parent-shadow-hover);
+}
+
+.child-compact-top {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.child-compact-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  background: var(--parent-sage-light);
+  border: 1px solid var(--parent-sage-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.child-compact-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.child-compact-initials {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--parent-primary);
+}
+
+.child-compact-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.child-compact-name-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.child-compact-name {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--parent-primary);
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.child-compact-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: var(--parent-sage);
+  background: var(--parent-sage-light);
+  border: 1px solid var(--parent-sage-border);
+  padding: 1px 6px;
+  border-radius: 6px;
+  flex-shrink: 0;
+}
+
+.child-compact-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 3px;
+  font-size: 0.76rem;
+  color: var(--parent-text-muted);
+}
+
+.child-compact-class {
+  font-weight: 600;
+  color: var(--parent-text-main);
+}
+
+.child-compact-dot {
+  color: #CBD5E1;
+}
+
+.child-compact-id {
+  color: var(--parent-muted-blue);
+  font-family: var(--font-mono, monospace);
+  font-size: 0.72rem;
+}
+
+.child-compact-footer {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 10px;
+  border-top: 1px solid var(--parent-border-light);
+}
+
+.btn-child-view-profile {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #FFFFFF;
+  border: 1px solid var(--parent-border);
+  color: var(--parent-primary);
+  padding: 5px 12px;
+  border-radius: 6px;
+  font-size: 0.76rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-child-view-profile:hover {
+  background-color: var(--parent-primary);
+  color: #FFFFFF;
+  border-color: var(--parent-primary);
+}
+
+/* Compact Empty state in My Children section */
+.parent-child-empty-compact {
+  background: #FFFFFF;
+  border: 1px dashed var(--parent-border);
+  border-radius: 12px;
+  padding: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  box-shadow: var(--parent-shadow);
+}
+
+.parent-child-empty-icon-wrap {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  background: var(--parent-bg-subtle);
+  border: 1px solid var(--parent-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.parent-child-empty-content {
+  flex: 1;
+}
+
+.parent-child-empty-title {
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: var(--parent-primary);
+  margin: 0 0 2px;
+}
+
+.parent-child-empty-text {
+  font-size: 0.8rem;
+  color: var(--parent-text-muted);
+  margin: 0;
+}
+
+/* ===================================================================
+   MY CHILDREN DEDICATED PAGE (/parent/children)
+   =================================================================== */
+.my-children-page-container {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  max-width: 1140px;
+  margin: 0 auto;
+}
+
+.my-children-breadcrumb-row {
+  margin-bottom: -6px;
+}
+
+.my-children-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+
+.my-children-header-titles {
+  flex: 1;
+  min-width: 260px;
+}
+
+.my-children-title {
+  font-size: 1.55rem;
+  font-weight: 800;
+  color: var(--parent-primary);
+  margin: 0 0 4px;
+  letter-spacing: -0.02em;
+}
+
+.my-children-subtitle {
+  font-size: 0.88rem;
+  color: var(--parent-text-muted);
+  margin: 0;
+  line-height: 1.45;
+}
+
+.my-children-header-actions {
+  flex-shrink: 0;
+}
+
+/* 1. Overview KPI Summary Cards */
+.my-children-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+}
+
+.my-children-kpi-card {
+  background: #FFFFFF;
+  border: 1px solid var(--parent-border);
+  border-radius: 12px;
+  padding: 16px 18px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  box-shadow: var(--parent-shadow);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.my-children-kpi-card:hover {
+  transform: translateY(-2px);
+  border-color: #CBD5E1;
+  box-shadow: var(--parent-shadow-hover);
+}
+
+.kpi-icon-wrap {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.bg-blue-subtle {
+  background-color: #EEF3F8;
+}
+
+.bg-sage-subtle {
+  background-color: var(--parent-sage-light);
+}
+
+.bg-amber-subtle {
+  background-color: #FEF3C7;
+}
+
+.bg-red-subtle {
+  background-color: #FEE2E2;
+}
+
+.text-amber {
+  color: #D97706;
+}
+
+.kpi-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.kpi-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--parent-text-muted);
+  display: block;
+}
+
+.kpi-value-row {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-top: 2px;
+}
+
+.kpi-value {
+  font-size: 1.55rem;
+  font-weight: 800;
+  color: var(--parent-primary);
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+}
+
+.kpi-subtext {
+  font-size: 0.7rem;
+  color: var(--parent-text-subtle);
+  white-space: nowrap;
+}
+
+/* 2. Search & Filter Bar */
+.my-children-filter-panel {
+  background: #FFFFFF;
+  border: 1px solid var(--parent-border);
+  border-radius: 12px;
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  box-shadow: var(--parent-shadow);
+  flex-wrap: wrap;
+}
+
+.filter-search-box {
+  position: relative;
+  flex: 1;
+  min-width: 240px;
+  display: flex;
+  align-items: center;
+}
+
+.filter-search-icon {
+  position: absolute;
+  left: 12px;
+  color: var(--parent-muted-blue);
+  pointer-events: none;
+}
+
+.filter-search-input {
+  width: 100%;
+  padding: 8px 34px 8px 36px;
+  border: 1px solid var(--parent-border);
+  border-radius: 8px;
+  font-size: 0.84rem;
+  color: var(--parent-text-main);
+  background: #FAF9F5;
+  transition: all 0.15s ease;
+}
+
+.filter-search-input:focus {
+  outline: none;
+  background: #FFFFFF;
+  border-color: var(--parent-primary);
+  box-shadow: 0 0 0 3px rgba(32, 53, 74, 0.08);
+}
+
+.filter-search-clear {
+  position: absolute;
+  right: 10px;
+  background: none;
+  border: none;
+  color: var(--parent-text-muted);
+  cursor: pointer;
+  padding: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.filter-controls-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.filter-select-wrap {
+  position: relative;
+}
+
+.filter-select {
+  padding: 8px 14px;
+  border: 1px solid var(--parent-border);
+  border-radius: 8px;
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--parent-text-main);
+  background: #FFFFFF;
+  cursor: pointer;
+  transition: border-color 0.15s ease;
+}
+
+.filter-select:focus {
+  outline: none;
+  border-color: var(--parent-primary);
+}
+
+.btn-filter-clear {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 7px 12px;
+  background: #F1F5F9;
+  border: 1px solid #E2E8F0;
+  border-radius: 8px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #475569;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-filter-clear:hover {
+  background: #E2E8F0;
+  color: #0F172A;
+}
+
+/* Filter Empty State */
+.my-children-no-results {
+  background: #FFFFFF;
+  border: 1px solid var(--parent-border);
+  border-radius: 12px;
+  padding: 38px 24px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  box-shadow: var(--parent-shadow);
+}
+
+.no-results-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--parent-primary);
+  margin: 4px 0 2px;
+}
+
+.no-results-desc {
+  font-size: 0.84rem;
+  color: var(--parent-text-muted);
+  max-width: 420px;
+  margin: 0 0 12px;
+  line-height: 1.45;
+}
+
+/* Sections Common in My Children */
+.my-children-section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.my-children-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+}
+
+.section-title-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.section-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.my-children-section-title {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--parent-primary);
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+
+.section-count-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 10px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  background-color: var(--parent-sage-light);
+  color: var(--parent-primary);
+  border: 1px solid var(--parent-sage-border);
+}
+
+.section-count-badge.warning {
+  background-color: #FEF3C7;
+  color: #B45309;
+  border-color: #FDE68A;
+}
+
+.my-children-section-subtitle {
+  font-size: 0.8rem;
+  color: var(--parent-text-muted);
+  margin: 0;
+}
+
+/* 3. Enrolled Children Cards Grid */
+.my-children-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+  gap: 18px;
+}
+
+.my-child-card {
+  background: #FFFFFF;
+  border: 1px solid var(--parent-border);
+  border-radius: 14px;
+  padding: 20px;
+  box-shadow: var(--parent-shadow);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 16px;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.my-child-card:hover {
+  transform: translateY(-2px);
+  border-color: #CBD5E1;
+  box-shadow: var(--parent-shadow-hover);
+}
+
+.my-child-card-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.my-child-avatar-wrap {
+  width: 52px;
+  height: 52px;
+  border-radius: 12px;
+  background: var(--parent-sage-light);
+  border: 1px solid var(--parent-sage-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.my-child-avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.my-child-avatar-initials {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: var(--parent-primary);
+}
+
+.my-child-header-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.my-child-name-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.my-child-name {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--parent-primary);
+  margin: 0;
+}
+
+.my-child-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: #15803D;
+  background-color: #DCFCE7;
+  border: 1px solid #BBF7D0;
+  padding: 2px 7px;
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+
+.my-child-submeta {
+  margin-top: 4px;
+}
+
+.my-child-admission-id {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 0.74rem;
+  font-family: var(--font-mono, monospace);
+  color: var(--parent-muted-blue);
+  background: var(--parent-bg-subtle);
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid var(--parent-border-light);
+}
+
+/* Academic details within card */
+.my-child-details-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px 14px;
+  padding: 12px 14px;
+  background: #FAF9F5;
+  border: 1px solid var(--parent-border-light);
+  border-radius: 10px;
+}
+
+.my-child-detail-col {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.child-meta-label {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--parent-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.child-meta-val {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--parent-text-main);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.child-meta-val.highlight {
+  color: var(--parent-primary);
+  font-weight: 700;
+}
+
+/* Card Footer */
+.my-child-card-footer {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 12px;
+  border-top: 1px solid var(--parent-border-light);
+}
+
+.btn-child-primary-profile {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 16px;
+  background: var(--parent-primary);
+  color: #FFFFFF;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.84rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-child-primary-profile:hover {
+  background: var(--parent-primary-hover);
+  transform: translateY(-1px);
+}
+
+.my-child-footer-shortcuts {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+
+.btn-child-shortcut {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 6px 4px;
+  background: #FFFFFF;
+  border: 1px solid var(--parent-border);
+  border-radius: 6px;
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: var(--parent-text-main);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.btn-child-shortcut:hover {
+  background-color: var(--parent-bg-subtle);
+  color: var(--parent-primary);
+  border-color: #CBD5E1;
+}
+
+/* 4. Admission Requests Cards Stack in My Children */
+.my-requests-cards-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.my-request-card {
+  background: #FFFFFF;
+  border: 1px solid var(--parent-border);
+  border-radius: 12px;
+  padding: 16px 20px;
+  box-shadow: var(--parent-shadow);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.my-request-card:hover {
+  border-color: #CBD5E1;
+  box-shadow: var(--parent-shadow-hover);
+}
+
+.my-request-card.is-review {
+  border-left: 4px solid var(--parent-muted-blue);
+}
+
+.my-request-card.is-declined {
+  border-left: 4px solid #EF4444;
+}
+
+.my-request-card.is-approved {
+  border-left: 4px solid #22C55E;
+}
+
+.my-request-card-left {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  flex: 1;
+  min-width: 0;
+}
+
+.my-request-icon-box {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.icon-review {
+  background-color: #EEF3F8;
+}
+
+.icon-declined {
+  background-color: #FEE2E2;
+}
+
+.icon-approved {
+  background-color: #DCFCE7;
+}
+
+.my-request-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.my-request-headline {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.my-request-name {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--parent-primary);
+  margin: 0;
+}
+
+.my-request-class-tag {
+  font-size: 0.78rem;
+  color: var(--parent-text-muted);
+}
+
+.my-request-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+  font-size: 0.75rem;
+  color: var(--parent-text-muted);
+  flex-wrap: wrap;
+}
+
+.my-request-feedback-box {
+  margin-top: 8px;
+  padding: 8px 12px;
+  background-color: #FEF2F2;
+  border: 1px solid #FECACA;
+  border-radius: 6px;
+  color: #991B1B;
+  font-size: 0.78rem;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  line-height: 1.4;
+}
+
+.my-request-note {
+  font-size: 0.76rem;
+  color: var(--parent-text-muted);
+  margin: 5px 0 0;
+  line-height: 1.4;
+}
+
+.my-request-card-right {
+  flex-shrink: 0;
+}
+
+.btn-request-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  background: #FFFFFF;
+  border: 1px solid var(--parent-border);
+  border-radius: 8px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--parent-primary);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.btn-request-action:hover {
+  background-color: var(--parent-bg-subtle);
+  border-color: #CBD5E1;
+}
+
+/* Global Empty State in My Children */
+.my-children-empty-card {
+  background: #FFFFFF;
+  border: 1px solid var(--parent-border);
+  border-radius: 14px;
+  padding: 50px 28px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  box-shadow: var(--parent-shadow);
+  position: relative;
+}
+
+.empty-icon-halo {
+  width: 76px;
+  height: 76px;
+  border-radius: 50%;
+  background: var(--parent-sage-light);
+  border: 6px solid #FAF9F5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 4px;
+}
+
+.empty-badge-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  background-color: var(--parent-sage-light);
+  border: 1px solid var(--parent-sage-border);
+  border-radius: 12px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--parent-primary);
+}
+
+.empty-title {
+  font-size: 1.35rem;
+  font-weight: 800;
+  color: var(--parent-primary);
+  margin: 0;
+}
+
+.empty-description {
+  font-size: 0.88rem;
+  color: var(--parent-text-muted);
+  max-width: 480px;
+  margin: 0 auto;
+  line-height: 1.5;
+}
+
+.empty-notice-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.76rem;
+  color: var(--parent-text-muted);
+  margin-top: 14px;
+}
+
+/* ===================================================================
+   CHILD PROFILE MODAL & REQUEST DETAIL MODAL
+   =================================================================== */
+.parent-profile-detail-modal {
+  padding: 24px;
+  border-radius: 14px;
+}
+
+.child-modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--parent-border-light);
+}
+
+.child-modal-hero {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex: 1;
+}
+
+.child-modal-avatar-box {
+  width: 56px;
+  height: 56px;
+  border-radius: 12px;
+  background: var(--parent-sage-light);
+  border: 1px solid var(--parent-sage-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.avatar-pending {
+  background-color: #EEF3F8;
+  border-color: #CBD5E1;
+}
+
+.avatar-rejected {
+  background-color: #FEE2E2;
+  border-color: #FECACA;
+}
+
+.avatar-approved {
+  background-color: #DCFCE7;
+  border-color: #BBF7D0;
+}
+
+.child-modal-avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.child-modal-avatar-initials {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: var(--parent-primary);
+}
+
+.child-modal-hero-text {
+  flex: 1;
+}
+
+.child-modal-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.child-modal-name {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: var(--parent-primary);
+  margin: 0;
+}
+
+.child-modal-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: #15803D;
+  background-color: #DCFCE7;
+  border: 1px solid #BBF7D0;
+  padding: 2px 7px;
+  border-radius: 6px;
+}
+
+.child-modal-admission-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.74rem;
+  font-family: var(--font-mono, monospace);
+  color: var(--parent-muted-blue);
+  margin-top: 4px;
+}
+
+.child-modal-body {
+  padding-top: 16px;
+}
+
+.child-modal-section-title {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: #94A3B8;
+  margin-bottom: 8px;
+}
+
+.child-details-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  padding: 14px;
+  background: #FAF9F5;
+  border: 1px solid var(--parent-border-light);
+  border-radius: 10px;
+}
+
+.child-detail-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.child-detail-item.full-width {
+  grid-column: span 2;
+}
+
+.child-detail-label {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--parent-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.child-detail-value {
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: var(--parent-text-main);
+}
+
+.child-detail-value.highlight {
+  color: var(--parent-primary);
+  font-weight: 700;
+}
+
+/* Quick shortcuts in modal */
+.child-modal-actions-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
+.child-modal-action-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: #FFFFFF;
+  border: 1px solid var(--parent-border);
+  border-radius: 8px;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.15s ease;
+}
+
+.child-modal-action-card:hover {
+  background-color: var(--parent-bg-subtle);
+  border-color: #CBD5E1;
+  transform: translateY(-1px);
+}
+
+.child-modal-action-texts {
+  flex: 1;
+  min-width: 0;
+}
+
+.child-modal-action-title {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--parent-primary);
+  display: block;
+}
+
+.child-modal-action-sub {
+  font-size: 0.68rem;
+  color: var(--parent-text-muted);
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.child-modal-action-arr {
+  color: #94A3B8;
+  flex-shrink: 0;
+}
+
+/* Request Banner in modal */
+.req-status-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  margin-bottom: 12px;
+}
+
+.req-status-banner.info {
+  background-color: #EEF3F8;
+  border: 1px solid #D5DFE8;
+  color: var(--parent-primary);
+}
+
+.req-status-banner.error {
+  background-color: #FEF2F2;
+  border: 1px solid #FECACA;
+  color: #991B1B;
+}
+
+.req-status-banner.success {
+  background-color: #DCFCE7;
+  border: 1px solid #BBF7D0;
+  color: #14532D;
+}
+
+/* ===================================================================
+   RESPONSIVENESS FOR MY CHILDREN & DASHBOARD
+   =================================================================== */
+@media (max-width: 1024px) {
+  .my-children-kpi-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .parent-quick-minimal-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .my-children-header-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+  .my-children-header-actions {
+    width: 100%;
+  }
+  .my-children-header-actions .btn-add-student-primary {
+    width: 100%;
+    justify-content: center;
+  }
+  .my-children-kpi-grid {
+    grid-template-columns: 1fr;
+  }
+  .my-children-cards-grid {
+    grid-template-columns: 1fr;
+  }
+  .my-children-filter-panel {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .filter-controls-group {
+    width: 100%;
+  }
+  .filter-select-wrap {
+    flex: 1;
+  }
+  .filter-select {
+    width: 100%;
+  }
+  .my-request-card {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+  .my-request-card-right {
+    width: 100%;
+  }
+  .my-request-card-right button {
+    width: 100%;
+    justify-content: center;
+  }
+  .parent-child-empty-compact {
+    flex-direction: column;
+    align-items: stretch;
+    text-align: center;
+  }
+  .parent-child-empty-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  .parent-child-empty-compact button {
+    width: 100%;
+    justify-content: center;
+  }
+  .parent-welcome-top-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+  .parent-quick-minimal-grid {
+    grid-template-columns: 1fr;
+  }
+  .child-modal-actions-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 

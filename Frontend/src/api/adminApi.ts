@@ -586,5 +586,313 @@ export const adminApi = {
     >(`/admin/exams/${examId}/schedules/${scheduleId}/marks-review`);
     return res.data;
   },
+
+  // ==========================================
+  // Student Directory Endpoints
+  // ==========================================
+  getStudentSummaryStats: async (): Promise<ApiResponse<import('../types/admin.types').StudentSummaryStats>> => {
+    const res = await axiosClient.get<ApiResponse<import('../types/admin.types').StudentSummaryStats>>(
+      '/admin/students/summary'
+    );
+    return res.data;
+  },
+
+  getStudents: async (params?: {
+    search?: string;
+    academicYear?: string;
+    grade?: string;
+    section?: string;
+    status?: string;
+    page?: number;
+    limit?: number;
+  }): Promise<ApiResponse<import('../types/admin.types').StudentDirectoryResponse>> => {
+    const res = await axiosClient.get<ApiResponse<import('../types/admin.types').StudentDirectoryResponse>>(
+      '/admin/students',
+      { params }
+    );
+    return res.data;
+  },
+
+  getStudentById: async (
+    id: string
+  ): Promise<ApiResponse<import('../types/admin.types').StudentDetail>> => {
+    const res = await axiosClient.get<ApiResponse<import('../types/admin.types').StudentDetail>>(
+      `/admin/students/${id}`
+    );
+    return res.data;
+  },
+
+  updateStudent: async (
+    id: string,
+    payload: import('../types/admin.types').UpdateStudentPayload
+  ): Promise<ApiResponse<import('../types/admin.types').StudentDetail>> => {
+    const res = await axiosClient.put<ApiResponse<import('../types/admin.types').StudentDetail>>(
+      `/admin/students/${id}`,
+      payload
+    );
+    return res.data;
+  },
+
+  // ==========================================
+  // Parent Directory Endpoints
+  // ==========================================
+  getParentSummaryStats: async (): Promise<ApiResponse<import('../types/admin.types').ParentSummaryStats>> => {
+    const res = await axiosClient.get<ApiResponse<import('../types/admin.types').ParentSummaryStats>>(
+      '/admin/parents/summary'
+    );
+    return res.data;
+  },
+
+  getParents: async (params?: {
+    search?: string;
+    studentStatus?: 'ALL' | 'WITH_CHILDREN' | 'WITHOUT_CHILDREN';
+    status?: string;
+    page?: number;
+    limit?: number;
+  }): Promise<ApiResponse<import('../types/admin.types').ParentDirectoryResponse>> => {
+    const res = await axiosClient.get<ApiResponse<import('../types/admin.types').ParentDirectoryResponse>>(
+      '/admin/parents',
+      { params }
+    );
+    return res.data;
+  },
+
+  getParentById: async (
+    id: string
+  ): Promise<ApiResponse<import('../types/admin.types').ParentDetail>> => {
+    const res = await axiosClient.get<ApiResponse<import('../types/admin.types').ParentDetail>>(
+      `/admin/parents/${id}`
+    );
+    return res.data;
+  },
+
+  updateParentStatus: async (
+    id: string,
+    status: 'ACTIVE' | 'DISABLED' | 'PENDING_VERIFICATION'
+  ): Promise<ApiResponse<import('../types/admin.types').ParentDetail>> => {
+    const res = await axiosClient.patch<ApiResponse<import('../types/admin.types').ParentDetail>>(
+      `/admin/parents/${id}/status`,
+      { status }
+    );
+    return res.data;
+  },
+
+  // ==========================================
+  // Subjects Management Endpoints
+  // ==========================================
+  getSubjectSummaryStats: async (
+    academicYear?: string
+  ): Promise<ApiResponse<import('../types/admin.types').SubjectSummaryStats>> => {
+    const res = await axiosClient.get<ApiResponse<import('../types/admin.types').SubjectSummaryStats>>(
+      '/admin/subjects/summary',
+      { params: academicYear ? { academicYear } : undefined }
+    );
+    return res.data;
+  },
+
+  getSubjects: async (
+    params?: import('../types/admin.types').SubjectFilterParams
+  ): Promise<ApiResponse<import('../types/admin.types').SubjectListResponse>> => {
+    const res = await axiosClient.get<ApiResponse<import('../types/admin.types').SubjectListResponse>>(
+      '/admin/subjects',
+      { params }
+    );
+    return res.data;
+  },
+
+  getSubjectById: async (
+    id: string
+  ): Promise<ApiResponse<import('../types/admin.types').SubjectItem>> => {
+    const res = await axiosClient.get<ApiResponse<import('../types/admin.types').SubjectItem>>(
+      `/admin/subjects/${id}`
+    );
+    return res.data;
+  },
+
+  getSubjectReferences: async (
+    id: string
+  ): Promise<ApiResponse<import('../types/admin.types').SubjectReferencesInfo>> => {
+    const res = await axiosClient.get<ApiResponse<import('../types/admin.types').SubjectReferencesInfo>>(
+      `/admin/subjects/${id}/references`
+    );
+    return res.data;
+  },
+
+  createSubject: async (
+    payload: import('../types/admin.types').CreateSubjectPayload
+  ): Promise<ApiResponse<import('../types/admin.types').SubjectItem>> => {
+    const res = await axiosClient.post<ApiResponse<import('../types/admin.types').SubjectItem>>(
+      '/admin/subjects',
+      payload
+    );
+    return res.data;
+  },
+
+  updateSubject: async (
+    id: string,
+    payload: import('../types/admin.types').UpdateSubjectPayload
+  ): Promise<ApiResponse<import('../types/admin.types').SubjectItem>> => {
+    const res = await axiosClient.put<ApiResponse<import('../types/admin.types').SubjectItem>>(
+      `/admin/subjects/${id}`,
+      payload
+    );
+    return res.data;
+  },
+
+  updateSubjectStatus: async (
+    id: string,
+    status: import('../types/admin.types').SubjectStatus
+  ): Promise<ApiResponse<import('../types/admin.types').SubjectItem>> => {
+    const res = await axiosClient.patch<ApiResponse<import('../types/admin.types').SubjectItem>>(
+      `/admin/subjects/${id}/status`,
+      { status }
+    );
+    return res.data;
+  },
+
+  deleteSubject: async (
+    id: string
+  ): Promise<ApiResponse<{ success: boolean; message: string }>> => {
+    const res = await axiosClient.delete<ApiResponse<{ success: boolean; message: string }>>(
+      `/admin/subjects/${id}`
+    );
+    return res.data;
+  },
+
+  // ==========================================
+  // School Attendance Management API
+  // ==========================================
+
+  getAttendanceSummary: async (
+    date?: string,
+    academicYear?: string
+  ): Promise<ApiResponse<import('../types/admin.types').AdminAttendanceSummary>> => {
+    const res = await axiosClient.get<ApiResponse<import('../types/admin.types').AdminAttendanceSummary>>(
+      '/admin/attendance/summary',
+      { params: { date, academicYear } }
+    );
+    return res.data;
+  },
+
+  getDailyAttendanceRegister: async (
+    params: import('../types/admin.types').AdminDailyRegisterFilterParams
+  ): Promise<ApiResponse<import('../types/admin.types').AdminDailyRegisterResponse>> => {
+    const res = await axiosClient.get<ApiResponse<import('../types/admin.types').AdminDailyRegisterResponse>>(
+      '/admin/attendance/register',
+      { params }
+    );
+    return res.data;
+  },
+
+  getClassesAttendanceOverview: async (
+    date?: string,
+    academicYear?: string
+  ): Promise<ApiResponse<import('../types/admin.types').AdminClassOverviewItem[]>> => {
+    const res = await axiosClient.get<ApiResponse<import('../types/admin.types').AdminClassOverviewItem[]>>(
+      '/admin/attendance/classes-overview',
+      { params: { date, academicYear } }
+    );
+    return res.data;
+  },
+
+  getAttendanceSubmissionsMonitoring: async (
+    date?: string,
+    academicYear?: string
+  ): Promise<ApiResponse<import('../types/admin.types').AdminSubmissionMonitoringItem[]>> => {
+    const res = await axiosClient.get<ApiResponse<import('../types/admin.types').AdminSubmissionMonitoringItem[]>>(
+      '/admin/attendance/submissions',
+      { params: { date, academicYear } }
+    );
+    return res.data;
+  },
+
+  getMonthlyAttendanceReport: async (params?: {
+    month?: string;
+    className?: string;
+    section?: string;
+    academicYear?: string;
+  }): Promise<ApiResponse<import('../types/admin.types').AdminMonthlyReportResponse>> => {
+    const res = await axiosClient.get<ApiResponse<import('../types/admin.types').AdminMonthlyReportResponse>>(
+      '/admin/attendance/reports/monthly',
+      { params }
+    );
+    return res.data;
+  },
+
+  getLowAttendanceReport: async (params?: {
+    threshold?: number;
+    className?: string;
+    section?: string;
+    academicYear?: string;
+    startDate?: string;
+    endDate?: string;
+  }): Promise<ApiResponse<import('../types/admin.types').AdminLowAttendanceItem[]>> => {
+    const res = await axiosClient.get<ApiResponse<import('../types/admin.types').AdminLowAttendanceItem[]>>(
+      '/admin/attendance/reports/low-attendance',
+      { params }
+    );
+    return res.data;
+  },
+
+  getStudentAttendanceHistory: async (
+    studentId: string,
+    startDate?: string,
+    endDate?: string
+  ): Promise<ApiResponse<import('../types/admin.types').AdminStudentAttendanceHistory>> => {
+    const res = await axiosClient.get<ApiResponse<import('../types/admin.types').AdminStudentAttendanceHistory>>(
+      `/admin/attendance/reports/student/${studentId}`,
+      { params: { startDate, endDate } }
+    );
+    return res.data;
+  },
+
+  correctAttendanceRecord: async (
+    id: string,
+    payload: import('../types/admin.types').AdminAttendanceCorrectionPayload
+  ): Promise<ApiResponse<unknown>> => {
+    const res = await axiosClient.put<ApiResponse<unknown>>(
+      `/admin/attendance/record/${id}`,
+      payload
+    );
+    return res.data;
+  },
+
+  recordSingleStudentAttendance: async (
+    studentId: string,
+    payload: {
+      date: string;
+      status: 'PRESENT' | 'ABSENT' | 'LATE';
+      remarks?: string;
+      reason?: string;
+    }
+  ): Promise<ApiResponse<unknown>> => {
+    const res = await axiosClient.post<ApiResponse<unknown>>(
+      `/admin/attendance/student/${studentId}`,
+      payload
+    );
+    return res.data;
+  },
+
+  getSubjectWiseAttendanceGrid: async (
+    params: import('../types/admin.types').AdminSubjectGridFilterParams
+  ): Promise<ApiResponse<import('../types/admin.types').AdminSubjectGridResponse>> => {
+    const res = await axiosClient.get<ApiResponse<import('../types/admin.types').AdminSubjectGridResponse>>(
+      '/admin/attendance/subject-wise-grid',
+      { params }
+    );
+    return res.data;
+  },
+
+  saveSubjectWiseAttendanceBatch: async (
+    payload: import('../types/admin.types').AdminSaveSubjectAttendancePayload
+  ): Promise<ApiResponse<null>> => {
+    const res = await axiosClient.post<ApiResponse<null>>(
+      '/admin/attendance/subject-wise-grid',
+      payload
+    );
+    return res.data;
+  },
 };
+
+
 

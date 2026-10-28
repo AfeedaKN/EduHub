@@ -8,6 +8,7 @@ import { UserRole } from '../../src/modules/auth/dtos/auth.dto';
 import { TeacherModel } from '../../src/modules/admin/models/Teacher.model';
 import { UserModel } from '../../src/modules/auth/models/User.model';
 import { StudentModel } from '../../src/modules/parent/models/Student.model';
+import { StudentRegistrationRequestModel, RegistrationStatus } from '../../src/modules/parent/models/StudentRegistrationRequest.model';
 import { AttendanceModel } from '../../src/modules/teacher/models/Attendance.model';
 import { AssignmentModel } from '../../src/modules/teacher/models/Assignment.model';
 import { SubmissionModel } from '../../src/modules/teacher/models/Submission.model';
@@ -488,6 +489,60 @@ describe('Teacher Routes Integration Tests', () => {
         expect(res.status).toBe(403);
         expect(res.body.success).toBe(false);
         expect(res.body.error.code).toBe('FORBIDDEN_SECTION');
+      });
+
+      it('Pending admission registration requests are excluded from attendance roster', async () => {
+        if (!anjaliToken) return;
+
+        // Create a dummy pending admission request for UKG
+        const pendingReq = await StudentRegistrationRequestModel.create({
+          parentId: new mongoose.Types.ObjectId(),
+          studentFullName: 'Unapproved Pending Child',
+          dateOfBirth: new Date('2020-05-15'),
+          gender: 'MALE',
+          requestedGrade: 'UKG',
+          academicYear: '2026-2027',
+          parentRelationship: 'FATHER',
+          status: RegistrationStatus.PENDING,
+        });
+
+        try {
+          const res = await request(app)
+            .get('/api/v1/teacher/attendance?className=UKG&section=A&date=2026-10-13')
+            .set('Authorization', `Bearer ${anjaliToken}`);
+
+          expect(res.status).toBe(200);
+          const studentNames = res.body.data.students.map((s: any) => s.fullName.toLowerCase());
+          expect(studentNames).not.toContain('unapproved pending child');
+        } finally {
+          await StudentRegistrationRequestModel.findByIdAndDelete(pendingReq._id);
+        }
+      });
+
+      it('Inactive or graduated students are excluded from attendance roster', async () => {
+        if (!anjaliToken) return;
+
+        const inactiveStudent = await StudentModel.create({
+          fullName: 'Inactive Graduated Student',
+          studentId: 'STU-INACTIVE-001',
+          grade: 'UKG',
+          section: 'A',
+          parentId: new mongoose.Types.ObjectId(),
+          status: 'INACTIVE',
+          academicYear: '2026-2027',
+        });
+
+        try {
+          const res = await request(app)
+            .get('/api/v1/teacher/attendance?className=UKG&section=A&date=2026-10-13')
+            .set('Authorization', `Bearer ${anjaliToken}`);
+
+          expect(res.status).toBe(200);
+          const studentNames = res.body.data.students.map((s: any) => s.fullName.toLowerCase());
+          expect(studentNames).not.toContain('inactive graduated student');
+        } finally {
+          await StudentModel.findByIdAndDelete(inactiveStudent._id);
+        }
       });
     });
 

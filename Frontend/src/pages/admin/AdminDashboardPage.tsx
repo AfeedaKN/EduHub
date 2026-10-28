@@ -12,8 +12,10 @@ import {
 } from 'lucide-react';
 import { AdminLayout } from '../../components/admin/AdminLayout';
 import { SummaryCard } from '../../components/admin/SummaryCard';
+import { SchoolOverviewSection } from '../../components/admin/SchoolOverviewSection';
 import { PendingAdmissionsSection } from '../../components/admin/PendingAdmissionsSection';
 import { AttendanceSummarySection } from '../../components/admin/AttendanceSummarySection';
+import { RecentSchoolActivitySection } from '../../components/admin/RecentSchoolActivitySection';
 import { UpcomingActivitiesSection } from '../../components/admin/UpcomingActivitiesSection';
 import { QuickActionsSection } from '../../components/admin/QuickActionsSection';
 import { adminApi } from '../../api/adminApi';
@@ -28,11 +30,21 @@ export const AdminDashboardPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [dashboardData, setDashboardData] = useState<AdminDashboardData>({
     totalStudents: 0,
+    activeStudents: 0,
+    inactiveStudents: 0,
     totalTeachers: 0,
     pendingAdmissionsCount: 0,
     recentPendingAdmissions: [],
     attendanceSummary: null,
     feesSummary: null,
+    enrollmentByClass: [],
+    examOverview: {
+      pendingReviewCount: 0,
+      publishedCount: 0,
+      scheduledExamsCount: 0,
+      recentExams: [],
+    },
+    recentActivities: [],
     upcomingActivities: null,
   });
 
@@ -95,6 +107,10 @@ export const AdminDashboardPage: React.FC = () => {
           </div>
           <div
             className="admin-skeleton-pulse"
+            style={{ height: '220px', borderRadius: '10px' }}
+          />
+          <div
+            className="admin-skeleton-pulse"
             style={{ height: '280px', borderRadius: '10px' }}
           />
         </div>
@@ -133,7 +149,7 @@ export const AdminDashboardPage: React.FC = () => {
                 Welcome back, {adminName}
               </h1>
               <p className="admin-welcome-subtitle">
-                Here's an overview of your school's activities.
+                Here's an overview of your school's activities and operations.
               </p>
             </div>
             <div className="admin-welcome-date">{formattedDate}</div>
@@ -146,9 +162,20 @@ export const AdminDashboardPage: React.FC = () => {
               label="Total Students"
               value={dashboardData.totalStudents}
               icon={GraduationCap}
-              subtext="Officially enrolled active students"
+              subtext={
+                dashboardData.totalStudents > 0
+                  ? `${dashboardData.activeStudents} Active${
+                      dashboardData.inactiveStudents > 0
+                        ? ` • ${dashboardData.inactiveStudents} Inactive`
+                        : ''
+                    }`
+                  : 'Officially enrolled students'
+              }
               indicatorText="Enrolled"
               indicatorVariant="neutral"
+              isClickable={true}
+              onClick={() => navigate('/admin/people/students')}
+              shortcutLabel="Directory"
             />
 
             {/* Card 2: Total Teachers */}
@@ -159,6 +186,9 @@ export const AdminDashboardPage: React.FC = () => {
               subtext="Active teaching faculty accounts"
               indicatorText="Faculty"
               indicatorVariant="neutral"
+              isClickable={true}
+              onClick={() => navigate('/admin/people/teachers')}
+              shortcutLabel="Teachers"
             />
 
             {/* Card 3: Pending Admissions (Most Important - Clickable) */}
@@ -172,6 +202,7 @@ export const AdminDashboardPage: React.FC = () => {
               isClickable={true}
               onClick={() => navigate('/admin/admissions')}
               isHighlight={true}
+              shortcutLabel="Admissions"
             />
 
             {/* Card 4: Pending Fees (Restrained Unavailable State without fabricated data) */}
@@ -186,8 +217,18 @@ export const AdminDashboardPage: React.FC = () => {
               indicatorText="Module Setup"
               indicatorVariant="muted"
               subtext="Fee management will activate with the upcoming module"
+              isClickable={true}
+              onClick={() => navigate('/admin/fees')}
+              shortcutLabel="Fee Module"
             />
           </section>
+
+          {/* School Overview Section: Enrollment by Class & Exam Overview */}
+          <SchoolOverviewSection
+            enrollmentByClass={dashboardData.enrollmentByClass}
+            examOverview={dashboardData.examOverview}
+            totalStudents={dashboardData.totalStudents}
+          />
 
           {/* Main Content Grid: Two Column Layout */}
           <div className="admin-dashboard-grid">
@@ -205,24 +246,22 @@ export const AdminDashboardPage: React.FC = () => {
               <AttendanceSummarySection
                 attendanceData={dashboardData.attendanceSummary}
               />
+
+              {/* Recent School Activity Section */}
+              <RecentSchoolActivitySection
+                activities={dashboardData.recentActivities}
+              />
             </div>
 
             {/* Secondary Side Column */}
             <div className="admin-dashboard-side-col">
-              {/* Quick Actions (Restrained: 3 actions) */}
+              {/* Quick Actions (All 7 actions) */}
               <QuickActionsSection
-                onAddTeacher={() =>
-                  setQuickActionModal({
-                    title: 'Teacher Account Provisioning',
-                    message:
-                      'Teacher creation interface is being implemented in the Faculty Management module. School administrators will be able to invite and configure teachers with assigned classes.',
-                  })
-                }
                 onPublishNotice={() =>
                   setQuickActionModal({
                     title: 'School Circulars & Notices',
                     message:
-                      'Communication center is being finalized in the Announcements module. School management will be able to broadcast notices to parents and teachers.',
+                      'The notice publication tool allows school management to broadcast official circulars to parents, teachers, and students. Head to Communications > Notices to manage circulars.',
                   })
                 }
               />

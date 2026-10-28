@@ -36,6 +36,21 @@ export const PendingAdmissionsSection: React.FC<PendingAdmissionsSectionProps> =
     return name.slice(0, 2).toUpperCase();
   };
 
+  const renderStatusBadge = (status: string) => {
+    switch (status) {
+      case 'PENDING':
+        return <span className="admin-status-badge status-pending">Pending Review</span>;
+      case 'UNDER_REVIEW':
+        return <span className="admin-status-badge status-under-review">Under Review</span>;
+      case 'APPROVED':
+        return <span className="admin-status-badge status-approved">Approved</span>;
+      case 'REJECTED':
+        return <span className="admin-status-badge status-rejected">Rejected</span>;
+      default:
+        return <span className="admin-status-badge status-pending">{status}</span>;
+    }
+  };
+
   return (
     <div className="admin-section-card">
       <div className="admin-section-header">
@@ -78,31 +93,31 @@ export const PendingAdmissionsSection: React.FC<PendingAdmissionsSectionProps> =
         </div>
       )}
 
-      {/* Empty State: You're all caught up */}
+      {/* Empty State: Compact and professional */}
       {!isLoading && !error && requests.length === 0 && (
-        <div className="admin-empty-state-card">
-          <div className="admin-empty-icon-box">
-            <CheckCircle2 size={24} />
+        <div className="admin-empty-state-compact">
+          <div className="admin-empty-compact-icon">
+            <CheckCircle2 size={18} />
           </div>
-          <h3 className="admin-empty-title">You're all caught up.</h3>
-          <p className="admin-empty-desc">
-            There are no student registration requests awaiting review.
-          </p>
+          <div className="admin-empty-compact-text">
+            <strong>No admission requests awaiting review</strong>
+            <span>All parent registration submissions have been processed.</span>
+          </div>
           <button
             type="button"
-            className="admin-btn-action-primary"
+            className="admin-btn-view-request"
             onClick={() => navigate('/admin/admissions')}
           >
-            <span>View All Admissions</span>
-            <ArrowRight size={14} />
+            <span>View Admissions Directory</span>
+            <ArrowRight size={13} />
           </button>
         </div>
       )}
 
-      {/* Real Recent Pending Requests List */}
+      {/* Real Recent Pending Requests List (Max 5) */}
       {!isLoading && !error && requests.length > 0 && (
         <div className="admin-requests-list">
-          {requests.slice(0, 3).map((req) => (
+          {requests.slice(0, 5).map((req) => (
             <div key={req.id} className="admin-request-row">
               <div className="admin-request-left">
                 <div className="admin-request-avatar">
@@ -129,9 +144,7 @@ export const PendingAdmissionsSection: React.FC<PendingAdmissionsSectionProps> =
               </div>
 
               <div className="admin-request-right">
-                <span className="admin-status-badge status-pending">
-                  Pending Review
-                </span>
+                {renderStatusBadge(req.status)}
                 <button
                   type="button"
                   className="admin-btn-view-request"

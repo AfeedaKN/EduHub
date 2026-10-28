@@ -326,9 +326,9 @@ export const AddStudentPage: React.FC = () => {
               <button
                 type="button"
                 className="btn-add-student-primary"
-                onClick={() => navigate('/parent/dashboard')}
+                onClick={() => navigate('/parent/children')}
               >
-                <span>View Registration Status</span>
+                <span>View in My Children</span>
                 <ArrowRight size={16} />
               </button>
               <button
