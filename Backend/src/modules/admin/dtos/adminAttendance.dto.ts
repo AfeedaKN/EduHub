@@ -299,3 +299,20 @@ export interface AdminSaveSubjectAttendancePayloadDTO {
   records: AdminSaveSubjectAttendanceRecordDTO[];
 }
 
+export interface AdminAttendanceClassMetadataItemDTO {
+  id: string;
+  name: string;
+  academicYear: string;
+  sections: string[];
+  studentCount: number;
+}
+
+export interface AdminAttendanceFiltersMetadataDTO {
+  academicYears: string[];
+  classes: AdminAttendanceClassMetadataItemDTO[];
+  defaultAcademicYear: string;
+  defaultClass: string;
+  defaultSection: string;
+}
+
+

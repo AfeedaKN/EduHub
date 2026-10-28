@@ -140,6 +140,7 @@ export function createAdminRouter(deps: AdminRoutesDependencies): Router {
   router.patch('/parents/:id/status', parentDirectoryController.updateStatus);
 
   // School Attendance Management
+  router.get('/attendance/metadata', adminAttendanceController.getAttendanceFiltersMetadata);
   router.get('/attendance/summary', adminAttendanceController.getSummary);
   router.get('/attendance/register', adminAttendanceController.getDailyRegister);
   router.get('/attendance/subject-wise-grid', adminAttendanceController.getSubjectWiseAttendanceGrid);

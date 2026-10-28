@@ -818,6 +818,23 @@ export interface AdminSaveSubjectAttendancePayload {
   records: AdminSaveSubjectAttendanceRecord[];
 }
 
+export interface AdminAttendanceClassMetadataItem {
+  id: string;
+  name: string;
+  academicYear: string;
+  sections: string[];
+  studentCount: number;
+}
+
+export interface AdminAttendanceFiltersMetadata {
+  academicYears: string[];
+  classes: AdminAttendanceClassMetadataItem[];
+  defaultAcademicYear: string;
+  defaultClass: string;
+  defaultSection: string;
+}
+
+
 
 
 

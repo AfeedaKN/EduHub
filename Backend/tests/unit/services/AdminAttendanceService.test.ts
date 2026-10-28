@@ -24,6 +24,7 @@ describe('AdminAttendanceService Unit Tests', () => {
       createAttendanceRecord: vi.fn(),
       getSubjectWiseAttendanceGrid: vi.fn(),
       saveSubjectWiseAttendanceBatch: vi.fn(),
+      getAttendanceFiltersMetadata: vi.fn(),
     };
 
     attendanceService = new AdminAttendanceService(mockRepo);
@@ -325,6 +326,21 @@ describe('AdminAttendanceService Unit Tests', () => {
         'admin-1',
         'Administrator'
       );
+    });
+
+    it('delegates getAttendanceFiltersMetadata to repository', async () => {
+      const mockMeta = {
+        academicYears: ['2026-2027', '2025-2026'],
+        classes: [{ id: 'c-1', name: 'Grade 4', academicYear: '2026-2027', sections: ['A'], studentCount: 2 }],
+        defaultAcademicYear: '2026-2027',
+        defaultClass: 'Grade 4',
+        defaultSection: 'A',
+      };
+      vi.mocked(mockRepo.getAttendanceFiltersMetadata).mockResolvedValue(mockMeta);
+
+      const res = await attendanceService.getAttendanceFiltersMetadata();
+      expect(res).toEqual(mockMeta);
+      expect(mockRepo.getAttendanceFiltersMetadata).toHaveBeenCalled();
     });
   });
 });

@@ -53,7 +53,8 @@ export interface IAdminDashboardRepository {
     session?: ClientSession
   ): Promise<IStudentRegistrationRequestDoc>;
   createStudent(data: Partial<IStudentDoc>, session?: ClientSession): Promise<IStudentDoc>;
-  getNextStudentSequence(): Promise<number>;
+  getNextStudentSequence(yearPrefix?: string): Promise<number>;
+  deleteStudentById(id: string): Promise<boolean>;
   startSession(): Promise<ClientSession | null>;
 }
 
@@ -288,11 +289,56 @@ export class AdminDashboardRepository implements IAdminDashboardRepository {
   }
 
   /**
+   * Delete student by ID for rollback compensation
+   */
+  async deleteStudentById(id: string): Promise<boolean> {
+    const res = await StudentModel.findByIdAndDelete(id).exec();
+    return !!res;
+  }
+
+  /**
    * Get next student sequence number for unique admission number generation
    */
-  async getNextStudentSequence(): Promise<number> {
-    const totalStudents = await StudentModel.countDocuments().exec();
-    return totalStudents + 1;
+  async getNextStudentSequence(yearPrefix?: string): Promise<number> {
+    const prefix = yearPrefix ? yearPrefix.replace(/[^0-9]/g, '') : '';
+    const pattern = prefix ? `^STU-${prefix}-\\d+$` : '^STU-.*-\\d+$';
+
+    // 1. Query existing students matching prefix to determine the true maximum sequence
+    const existingStudents = await StudentModel.find(
+      { studentId: { $regex: new RegExp(pattern, 'i') } },
+      { studentId: 1 }
+    )
+      .lean()
+      .exec();
+
+    let maxSequence = 0;
+    for (const st of existingStudents) {
+      if (st.studentId) {
+        const parts = st.studentId.split('-');
+        const lastPart = parts[parts.length - 1];
+        const num = parseInt(lastPart, 10);
+        if (!isNaN(num) && num > maxSequence) {
+          maxSequence = num;
+        }
+      }
+    }
+
+    // 2. Ensure sequence is at least total document count to prevent overlaps
+    const totalCount = await StudentModel.countDocuments().exec();
+    const candidateSeq = Math.max(maxSequence, totalCount) + 1;
+
+    // 3. Verify candidate sequence does not collide with any existing studentId
+    let verifiedSeq = candidateSeq;
+    const targetPrefix = prefix || new Date().getFullYear().toString();
+    while (
+      await StudentModel.exists({
+        studentId: `STU-${targetPrefix}-${String(verifiedSeq).padStart(4, '0')}`,
+      })
+    ) {
+      verifiedSeq++;
+    }
+
+    return verifiedSeq;
   }
 
   /**

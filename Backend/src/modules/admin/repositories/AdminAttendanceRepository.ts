@@ -29,6 +29,8 @@ import {
   AdminAttentionStudentDTO,
   AdminAttentionStudentIssueDTO,
   ExtendedAttendanceStatus,
+  AdminAttendanceFiltersMetadataDTO,
+  AdminAttendanceClassMetadataItemDTO,
 } from '../dtos/adminAttendance.dto';
 
 export interface IAdminAttendanceRepository {
@@ -58,6 +60,7 @@ export interface IAdminAttendanceRepository {
     adminUserId: string,
     adminUserName: string
   ): Promise<void>;
+  getAttendanceFiltersMetadata(): Promise<AdminAttendanceFiltersMetadataDTO>;
 }
 
 export class AdminAttendanceRepository implements IAdminAttendanceRepository {
@@ -867,6 +870,87 @@ export class AdminAttendanceRepository implements IAdminAttendanceRepository {
     return await newRecord.save();
   }
 
+  async getAttendanceFiltersMetadata(): Promise<AdminAttendanceFiltersMetadataDTO> {
+    // 1. Fetch active classes and sections
+    const classes = await ClassModel.find({ status: 'ACTIVE' }).sort({ name: 1 }).lean().exec();
+    const sections = await SectionModel.find({ status: 'ACTIVE' }).sort({ name: 1 }).lean().exec();
+
+    // Group sections by classId
+    const sectionsByClassId = new Map<string, string[]>();
+    sections.forEach((sec) => {
+      const cId = sec.classId.toString();
+      if (!sectionsByClassId.has(cId)) {
+        sectionsByClassId.set(cId, []);
+      }
+      sectionsByClassId.get(cId)!.push(sec.name);
+    });
+
+    // 2. Count active students per grade and section
+    const students = await StudentModel.find({ status: 'ACTIVE' })
+      .select('grade section academicYear')
+      .lean()
+      .exec();
+
+    const studentCountByGrade = new Map<string, number>();
+    const distinctAcademicYears = new Set<string>();
+
+    students.forEach((s) => {
+      const g = (s.grade || '').trim().toLowerCase();
+      studentCountByGrade.set(g, (studentCountByGrade.get(g) || 0) + 1);
+      if (s.academicYear && s.academicYear.trim()) {
+        distinctAcademicYears.add(s.academicYear.trim());
+      }
+    });
+
+    classes.forEach((c) => {
+      if (c.academicYear && c.academicYear.trim()) {
+        distinctAcademicYears.add(c.academicYear.trim());
+      }
+    });
+
+    // Ensure common years are available
+    ['2026-2027', '2025-2026'].forEach((y) => distinctAcademicYears.add(y));
+    const sortedYears = Array.from(distinctAcademicYears).sort().reverse();
+
+    const classMetadataList: AdminAttendanceClassMetadataItemDTO[] = classes.map((c) => {
+      const cId = c._id.toString();
+      const secList = sectionsByClassId.get(cId) || [];
+      const cleanGrade = (c.name || '').trim().toLowerCase();
+      const numOnly = cleanGrade.replace(/^(class|grade)\s*/i, '');
+      const studentCount =
+        studentCountByGrade.get(cleanGrade) ||
+        (numOnly
+          ? studentCountByGrade.get(numOnly) ||
+            studentCountByGrade.get(`grade ${numOnly}`) ||
+            studentCountByGrade.get(`class ${numOnly}`)
+          : 0) ||
+        0;
+
+      return {
+        id: cId,
+        name: c.name,
+        academicYear: c.academicYear || '2026-2027',
+        sections: secList.length > 0 ? secList : ['A'],
+        studentCount,
+      };
+    });
+
+    // Find default class: preference to one with students (e.g. Grade 4)
+    const classWithStudents = classMetadataList.find((c) => c.studentCount > 0);
+    const defaultClass = classWithStudents ? classWithStudents.name : (classMetadataList[0]?.name || 'Grade 4');
+    const defaultAcademicYear = classWithStudents ? classWithStudents.academicYear : (sortedYears[0] || '2026-2027');
+    const matchedClass = classMetadataList.find((c) => c.name === defaultClass);
+    const defaultSection = matchedClass?.sections[0] || 'A';
+
+    return {
+      academicYears: sortedYears,
+      classes: classMetadataList,
+      defaultAcademicYear,
+      defaultClass,
+      defaultSection,
+    };
+  }
+
   async getSubjectWiseAttendanceGrid(
     filter: AdminSubjectGridFilterDTO
   ): Promise<AdminSubjectGridResponseDTO> {
@@ -897,24 +981,32 @@ export class AdminAttendanceRepository implements IAdminAttendanceRepository {
       applicableSubjects = allActiveSubjects;
     }
 
-    // Also check teacher assignedClasses to catch any additional subjects
+    // Also check teacher assignedClasses to catch any additional subjects and map teachers
     const teachers = await TeacherModel.find({ status: 'ACTIVE' })
-      .select('fullName assignedClasses email phone')
+      .select('fullName assignedClasses email phone userId')
       .lean()
       .exec();
 
-    const teacherMap = new Map<string, string>();
+    const teacherMap = new Map<string, string>(); // subLower -> teacherFullName
+    const teacherIdToSubjectMap = new Map<string, string>(); // teacherUserId_or_docId_class_sec -> subject
+
     teachers.forEach((t) => {
       (t.assignedClasses || []).forEach((ac) => {
-        const acClass = (ac.className || '').toLowerCase();
+        const acClass = (ac.className || '').toLowerCase().trim();
         const acClassNum = acClass.replace(/^(class|grade)\s*/i, '');
-        const acSec = (ac.section || '').toUpperCase();
+        const acSec = (ac.section || '').toUpperCase().trim();
         if (
           (acClass === classLower || (acClassNum.length > 0 && acClassNum === classNum)) &&
           acSec === section &&
           ac.subject
         ) {
-          teacherMap.set(ac.subject.trim().toLowerCase(), t.fullName);
+          const subName = ac.subject.trim();
+          teacherMap.set(subName.toLowerCase(), t.fullName);
+          const classSecKey = `${classLower}_${section}`;
+          teacherIdToSubjectMap.set(`${t._id.toString()}_${classSecKey}`, subName);
+          if (t.userId) {
+            teacherIdToSubjectMap.set(`${t.userId.toString()}_${classSecKey}`, subName);
+          }
         }
       });
     });
@@ -952,14 +1044,37 @@ export class AdminAttendanceRepository implements IAdminAttendanceRepository {
       },
       status: 'ACTIVE',
     };
+
     if (academicYear) {
-      studentQuery.academicYear = academicYear;
+      const normYear = academicYear.replace(/\s+/g, '');
+      const escapedYear = normYear
+        .replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&')
+        .replace(/-/g, '\\s*-\\s*');
+
+      studentQuery.$or = [
+        { academicYear: { $regex: new RegExp(`^${escapedYear}$`, 'i') } },
+        { academicYear: { $exists: false } },
+        { academicYear: '' },
+      ];
     }
 
-    const studentDocs = await StudentModel.find(studentQuery)
+    let studentDocs = await StudentModel.find(studentQuery)
       .sort({ rollNumber: 1, studentId: 1, fullName: 1 })
       .lean()
       .exec();
+
+    // Fallback: If no students matched the specific academic year filter, fallback to all enrolled in this grade/sec
+    if (studentDocs.length === 0 && studentQuery.$or) {
+      const fallbackQuery = {
+        grade: studentQuery.grade,
+        section: studentQuery.section,
+        status: 'ACTIVE',
+      };
+      studentDocs = await StudentModel.find(fallbackQuery)
+        .sort({ rollNumber: 1, studentId: 1, fullName: 1 })
+        .lean()
+        .exec();
+    }
 
     // 3. Fetch recorded subject attendances
     const subAttQuery: Record<string, any> = {
@@ -984,14 +1099,35 @@ export class AdminAttendanceRepository implements IAdminAttendanceRepository {
     });
 
     // Also check daily homeroom attendance
-    const dailyRecords = await AttendanceModel.find(subAttQuery)
+    const dailyRecordsQuery: Record<string, any> = {
+      className: subAttQuery.className,
+      $or: [
+        { section: { $regex: new RegExp(`^${section.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') } },
+        { section: { $exists: false } },
+        { section: '' },
+      ],
+      date: dateStr,
+    };
+
+    const dailyRecords = await AttendanceModel.find(dailyRecordsQuery)
       .populate('markedBy', 'fullName email')
       .lean()
       .exec();
 
-    const dailyAttendanceMap = new Map<string, any>();
+    const dailyAttendanceByStudentAndSub = new Map<string, any>();
     dailyRecords.forEach((dr) => {
-      dailyAttendanceMap.set(dr.studentId.toString(), dr);
+      const stId = dr.studentId.toString();
+      const markedById = (dr.markedBy?._id || dr.markedBy)?.toString();
+      let resolvedSubject = (dr as any).subjectName;
+      if (!resolvedSubject && markedById) {
+        resolvedSubject = teacherIdToSubjectMap.get(`${markedById}_${classLower}_${section}`);
+      }
+      if (resolvedSubject) {
+        const key = `${stId}_${resolvedSubject.toLowerCase()}`;
+        dailyAttendanceByStudentAndSub.set(key, dr);
+      } else {
+        dailyAttendanceByStudentAndSub.set(`${stId}_general`, dr);
+      }
     });
 
     // 4. Build Student Rows
@@ -1017,6 +1153,7 @@ export class AdminAttendanceRepository implements IAdminAttendanceRepository {
       subjectList.forEach((subName) => {
         const key = `${stId}_${subName.toLowerCase()}`;
         const subRec = subjectAttendanceMap.get(key);
+        const dailyRec = dailyAttendanceByStudentAndSub.get(key) || dailyAttendanceByStudentAndSub.get(`${stId}_general`);
 
         let status: ExtendedAttendanceStatus = 'UNMARKED';
         let remarks: string | undefined = undefined;
@@ -1028,14 +1165,11 @@ export class AdminAttendanceRepository implements IAdminAttendanceRepository {
           remarks = subRec.remarks;
           markedByName = subRec.markedByName;
           updatedAt = subRec.updatedAt ? new Date(subRec.updatedAt).toISOString() : undefined;
-        } else if (dailyAttendanceMap.has(stId)) {
-          const dr = dailyAttendanceMap.get(stId);
-          if ((dr as any).subjectName && (dr as any).subjectName.toLowerCase() === subName.toLowerCase()) {
-            status = dr.status;
-            remarks = dr.remarks;
-            markedByName = (dr.markedBy as any)?.fullName;
-            updatedAt = dr.updatedAt ? new Date(dr.updatedAt).toISOString() : undefined;
-          }
+        } else if (dailyRec) {
+          status = dailyRec.status as ExtendedAttendanceStatus;
+          remarks = dailyRec.remarks;
+          markedByName = (dailyRec.markedBy as any)?.fullName;
+          updatedAt = dailyRec.updatedAt ? new Date(dailyRec.updatedAt).toISOString() : undefined;
         }
 
         if (status === 'PRESENT') {
@@ -1076,7 +1210,7 @@ export class AdminAttendanceRepository implements IAdminAttendanceRepository {
 
       const row: AdminSubjectGridStudentRowDTO = {
         studentId: stId,
-        admissionNumber: st.studentId || '',
+        admissionNumber: st.studentId || (st as any).admissionNumber || '',
         rollNumber: st.rollNumber || '',
         fullName: st.fullName,
         avatarUrl: st.avatarUrl,
@@ -1100,7 +1234,7 @@ export class AdminAttendanceRepository implements IAdminAttendanceRepository {
             : `Late in ${primary.subjectName}`;
         attentionList.push({
           studentId: stId,
-          admissionNumber: st.studentId || '',
+          admissionNumber: st.studentId || (st as any).admissionNumber || '',
           fullName: st.fullName,
           avatarUrl: st.avatarUrl,
           className,

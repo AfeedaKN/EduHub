@@ -17,7 +17,7 @@ import {
 import {
   IStudentRegistrationRequestDoc,
 } from '../../parent/models/StudentRegistrationRequest.model';
-import { StudentModel, IStudentDoc } from '../../parent/models/Student.model';
+import { IStudentDoc } from '../../parent/models/Student.model';
 import { RegistrationStatus } from '../../parent/dtos/parent.dto';
 import {
   NotFoundError,
@@ -229,6 +229,13 @@ export class AdminService implements IAdminService {
       );
     }
 
+    if (doc.createdStudentId) {
+      throw new ConflictError(
+        `This admission request has already created an enrolled student record. Repeat approval is not permitted.`,
+        'REQUEST_ALREADY_REVIEWED'
+      );
+    }
+
     const targetSection = dto?.section?.trim().toUpperCase() || 'A';
 
     let maxCapacity = MAX_SECTION_CAPACITY;
@@ -239,6 +246,29 @@ export class AdminService implements IAdminService {
           `Cannot approve admission for class "${doc.requestedGrade}". This class is currently INACTIVE and not accepting student admissions.`,
           'CLASS_INACTIVE'
         );
+      }
+
+      if (classDoc) {
+        const availableSections = await this.classRepo.findSectionsByClassId(classDoc._id.toString());
+        if (availableSections && availableSections.length > 0) {
+          const match = availableSections.find(
+            (s) => s.name.trim().toUpperCase() === targetSection
+          );
+          if (!match) {
+            throw new ValidationError(
+              `Section "${targetSection}" does not exist for class "${doc.requestedGrade}". Available sections: ${availableSections.map((s) => s.name).join(', ')}.`
+            );
+          }
+          if (match.status === 'INACTIVE') {
+            throw new ConflictError(
+              `Cannot enroll student in Section "${targetSection}" of class "${doc.requestedGrade}". This section is currently INACTIVE.`,
+              'SECTION_INACTIVE'
+            );
+          }
+          if (match.capacity) {
+            maxCapacity = match.capacity;
+          }
+        }
       }
 
       const configuredSection = await this.classRepo.findSectionByGradeAndName(
@@ -273,11 +303,10 @@ export class AdminService implements IAdminService {
     }
 
     // Generate unique Admission Number / Student ID
-    const sequenceNumber = await this.adminDashboardRepo.getNextStudentSequence();
     const yearPrefix = (doc.academicYear || '2026').split('-')[0].replace(/[^0-9]/g, '') || '2026';
-    const studentId = `STU-${yearPrefix}-${String(sequenceNumber).padStart(4, '0')}`;
+    const sequenceNumber = await this.adminDashboardRepo.getNextStudentSequence(yearPrefix);
+    let studentId = `STU-${yearPrefix}-${String(sequenceNumber).padStart(4, '0')}`;
 
-    // Execute atomic creation and update
     // Execute atomic creation and update (MongoDB transactions on replica set, safe compensation on standalone)
     let session: mongoose.ClientSession | null = null;
     let createdStudentDoc: IStudentDoc | null = null;
@@ -294,21 +323,40 @@ export class AdminService implements IAdminService {
     try {
       const parentObjId = (doc.parentId as any)?._id || doc.parentId;
 
-      // 1. Create official student record
-      const createdStudent = await this.adminDashboardRepo.createStudent(
-        {
-          parentId: parentObjId,
-          fullName: doc.studentFullName,
-          studentId,
-          grade: doc.requestedGrade,
-          section: targetSection,
-          classTeacher: '',
-          status: 'ACTIVE',
-          academicYear: doc.academicYear,
-          avatarUrl: '',
-        },
-        session || undefined
-      );
+      // 1. Create official student record with duplicate key retry protection
+      let createdStudent: IStudentDoc | null = null;
+      let attempts = 0;
+      while (!createdStudent && attempts < 3) {
+        attempts++;
+        try {
+          createdStudent = await this.adminDashboardRepo.createStudent(
+            {
+              parentId: parentObjId,
+              fullName: doc.studentFullName,
+              studentId,
+              grade: doc.requestedGrade,
+              section: targetSection,
+              classTeacher: '',
+              status: 'ACTIVE',
+              academicYear: doc.academicYear,
+              avatarUrl: '',
+            },
+            session || undefined
+          );
+        } catch (err: any) {
+          if (err.code === 11000 && attempts < 3) {
+            const nextSeq = await this.adminDashboardRepo.getNextStudentSequence(yearPrefix);
+            studentId = `STU-${yearPrefix}-${String(nextSeq).padStart(4, '0')}`;
+            continue;
+          }
+          throw err;
+        }
+      }
+
+      if (!createdStudent) {
+        throw new AppError('Failed to create student record.', 500, 'STUDENT_CREATION_FAILED');
+      }
+
       createdStudentDoc = createdStudent;
 
       // 2. Update registration request
@@ -353,7 +401,9 @@ export class AdminService implements IAdminService {
       } else if (createdStudentDoc?._id) {
         // Safe rollback compensation on standalone MongoDB: delete the partially created student
         try {
-          await StudentModel.deleteOne({ _id: createdStudentDoc._id });
+          if (typeof this.adminDashboardRepo.deleteStudentById === 'function') {
+            await this.adminDashboardRepo.deleteStudentById(createdStudentDoc._id.toString());
+          }
         } catch {
           // ignore cleanup error
         }
@@ -361,7 +411,11 @@ export class AdminService implements IAdminService {
       throw error;
     } finally {
       if (session) {
-        await session.endSession();
+        try {
+          await session.endSession();
+        } catch {
+          // ignore end session error
+        }
       }
     }
   }

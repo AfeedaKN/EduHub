@@ -271,5 +271,25 @@ export class AdminAttendanceController {
       next(error);
     }
   };
+
+  getAttendanceFiltersMetadata = async (
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> => {
+    try {
+      if (!req.user || !req.user.sub) {
+        throw new UnauthorizedError('Authenticated management session required.', 'UNAUTHORIZED');
+      }
+
+      const metadata = await this.attendanceService.getAttendanceFiltersMetadata();
+
+      res.status(HttpStatusCode.OK).json(
+        ApiResponse.success(metadata, 'Attendance filters metadata retrieved successfully.')
+      );
+    } catch (error) {
+      next(error);
+    }
+  };
 }
 

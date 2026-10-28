@@ -38,6 +38,7 @@ describe('AdminService Unit Tests', () => {
       saveRegistrationRequest: vi.fn().mockImplementation(async (doc) => doc),
       createStudent: vi.fn(),
       getNextStudentSequence: vi.fn().mockResolvedValue(42),
+      deleteStudentById: vi.fn().mockResolvedValue(true),
       startSession: vi.fn().mockResolvedValue(null),
     };
 
@@ -401,6 +402,94 @@ describe('AdminService Unit Tests', () => {
       await expect(
         adminService.approveAdmission('invalid-id', adminId)
       ).rejects.toThrow(ValidationError);
+    });
+
+    it('should retry and generate next sequence if a duplicate studentId collision occurs', async () => {
+      const requestId = new mongoose.Types.ObjectId().toString();
+      const fakeDoc: any = {
+        _id: new mongoose.Types.ObjectId(requestId),
+        studentFullName: 'Retry Child',
+        requestedGrade: 'Grade 7',
+        academicYear: '2026-2027',
+        parentId,
+        status: RegistrationStatus.PENDING,
+      };
+
+      vi.mocked(mockRepo.getAdmissionById).mockResolvedValue(fakeDoc);
+      vi.mocked(mockRepo.countClassEnrollment).mockResolvedValue(10);
+      vi.mocked(mockRepo.getNextStudentSequence)
+        .mockResolvedValueOnce(7)
+        .mockResolvedValueOnce(8);
+
+      const fakeStudentId = new mongoose.Types.ObjectId();
+      const duplicateErr = new Error('Duplicate studentId') as any;
+      duplicateErr.code = 11000;
+
+      vi.mocked(mockRepo.createStudent)
+        .mockRejectedValueOnce(duplicateErr)
+        .mockResolvedValueOnce({
+          _id: fakeStudentId,
+          parentId,
+          fullName: 'Retry Child',
+          studentId: 'STU-2026-0008',
+          grade: 'Grade 7',
+          section: 'A',
+          status: 'ACTIVE',
+        } as any);
+
+      const result = await adminService.approveAdmission(requestId, adminId, { section: 'A' });
+
+      expect(mockRepo.createStudent).toHaveBeenCalledTimes(2);
+      expect(result.student.studentId).toBe('STU-2026-0008');
+      expect(result.request.status).toBe(RegistrationStatus.APPROVED);
+    });
+
+    it('should throw ConflictError if request already has createdStudentId', async () => {
+      const requestId = new mongoose.Types.ObjectId().toString();
+      const fakeDoc: any = {
+        _id: new mongoose.Types.ObjectId(requestId),
+        studentFullName: 'Already Enrolled Child',
+        requestedGrade: 'Grade 7',
+        status: RegistrationStatus.PENDING,
+        createdStudentId: new mongoose.Types.ObjectId(),
+      };
+
+      vi.mocked(mockRepo.getAdmissionById).mockResolvedValue(fakeDoc);
+
+      await expect(
+        adminService.approveAdmission(requestId, adminId)
+      ).rejects.toThrow(ConflictError);
+
+      expect(mockRepo.createStudent).not.toHaveBeenCalled();
+    });
+
+    it('should throw ValidationError if selected section does not exist in class', async () => {
+      const requestId = new mongoose.Types.ObjectId().toString();
+      const fakeDoc: any = {
+        _id: new mongoose.Types.ObjectId(requestId),
+        studentFullName: 'Invalid Section Child',
+        requestedGrade: 'Grade 7',
+        academicYear: '2026-2027',
+        parentId,
+        status: RegistrationStatus.PENDING,
+      };
+
+      vi.mocked(mockRepo.getAdmissionById).mockResolvedValue(fakeDoc);
+      vi.mocked(mockClassRepo.findClassByName).mockResolvedValue({
+        _id: new mongoose.Types.ObjectId(),
+        name: 'Grade 7',
+        status: 'ACTIVE',
+      } as any);
+      vi.mocked(mockClassRepo.findSectionsByClassId).mockResolvedValue([
+        { name: 'A', status: 'ACTIVE' },
+        { name: 'B', status: 'ACTIVE' },
+      ] as any);
+
+      await expect(
+        adminService.approveAdmission(requestId, adminId, { section: 'Z' })
+      ).rejects.toThrow(ValidationError);
+
+      expect(mockRepo.createStudent).not.toHaveBeenCalled();
     });
   });
 

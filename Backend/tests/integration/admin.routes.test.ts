@@ -230,6 +230,30 @@ describe('Admin Routes Integration Tests', () => {
       expect(res.body.error.code).toBe('REQUEST_ALREADY_REVIEWED');
     });
 
+    it('Cannot approve admission if selected section does not exist in class (400 ValidationError)', async () => {
+      const tempReq = await StudentRegistrationRequestModel.create({
+        parentId: testParentId,
+        studentFullName: 'Section Test Child',
+        dateOfBirth: new Date('2015-01-01'),
+        gender: 'MALE',
+        requestedGrade: 'Grade 4',
+        academicYear: '2026-2027',
+        parentRelationship: 'FATHER',
+        status: RegistrationStatus.PENDING,
+      });
+
+      const res = await request(app)
+        .post(`/api/v1/admin/admissions/${tempReq._id}/approve`)
+        .set('Authorization', `Bearer ${managementToken}`)
+        .send({ section: 'NONEXISTENT_SECTION' });
+
+      expect(res.status).toBe(400);
+      expect(res.body.success).toBe(false);
+      expect(res.body.error.message).toContain('does not exist for class');
+
+      await StudentRegistrationRequestModel.findByIdAndDelete(tempReq._id);
+    });
+
     it('Reject request without reason returns 400 ValidationError', async () => {
       const res = await request(app)
         .post(`/api/v1/admin/admissions/${pendingReq2Id}/reject`)
@@ -1193,6 +1217,20 @@ describe('Admin Routes Integration Tests', () => {
       expect(res.body.success).toBe(true);
       expect(res.body.data.status).toBe('PRESENT');
       expect(res.body.data.remarks).toContain('[Admin correction]');
+    });
+
+    it('GET /api/v1/admin/attendance/metadata returns attendance filters metadata', async () => {
+      const res = await request(app)
+        .get('/api/v1/admin/attendance/metadata')
+        .set('Authorization', `Bearer ${managementToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(Array.isArray(res.body.data.academicYears)).toBe(true);
+      expect(Array.isArray(res.body.data.classes)).toBe(true);
+      expect(res.body.data).toHaveProperty('defaultAcademicYear');
+      expect(res.body.data).toHaveProperty('defaultClass');
+      expect(res.body.data).toHaveProperty('defaultSection');
     });
   });
 });

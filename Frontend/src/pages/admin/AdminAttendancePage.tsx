@@ -22,14 +22,13 @@ import {
 import { AdminLayout } from '../../components/admin/AdminLayout';
 import { adminApi } from '../../api/adminApi';
 import {
-  ClassDetail,
   AdminSubjectGridResponse,
   AdminSubjectGridStudentRow,
   AdminAttentionStudent,
   ExtendedAttendanceStatus,
+  AdminAttendanceFiltersMetadata,
+  AdminAttendanceClassMetadataItem,
 } from '../../types/admin.types';
-
-const ACADEMIC_YEAR_OPTIONS = ['2026-2027', '2025-2026', '2027-2028'];
 
 export const AdminAttendancePage: React.FC = () => {
   // Today's local date in YYYY-MM-DD
@@ -41,9 +40,9 @@ export const AdminAttendancePage: React.FC = () => {
   const [selectedSection, setSelectedSection] = useState<string>('A');
   const [selectedDate, setSelectedDate] = useState<string>(todayDateStr);
 
-  // Common Metadata
-  const [availableClasses, setAvailableClasses] = useState<ClassDetail[]>([]);
-  const [availableSections, setAvailableSections] = useState<string[]>(['A']);
+  // Dynamic Metadata from Database
+  const [metadata, setMetadata] = useState<AdminAttendanceFiltersMetadata | null>(null);
+  const [metadataLoading, setMetadataLoading] = useState<boolean>(true);
 
   // Grid Data State
   const [loading, setLoading] = useState<boolean>(false);
@@ -82,36 +81,101 @@ export const AdminAttendancePage: React.FC = () => {
     setTimeout(() => setToastError(null), 5000);
   };
 
-  // 1. Fetch Classes on mount
+  // 1. Fetch Dynamic Metadata from Database on mount
   useEffect(() => {
-    const fetchClasses = async () => {
+    let isMounted = true;
+    const fetchMetadata = async () => {
       try {
-        const res = await adminApi.getClasses();
-        if (res.success && res.data && res.data.length > 0) {
-          setAvailableClasses(res.data);
-          // Default to the first available class
-          setSelectedClass(res.data[0].name);
-          const sections = (res.data[0].sections || []).map((s) => s.name);
-          setAvailableSections(sections.length > 0 ? sections : ['A']);
-          setSelectedSection(sections.length > 0 ? sections[0] : 'A');
+        setMetadataLoading(true);
+        const res = await adminApi.getAttendanceFiltersMetadata();
+        if (isMounted && res.success && res.data) {
+          setMetadata(res.data);
+          const defaultYear = res.data.defaultAcademicYear || res.data.academicYears[0] || '2026-2027';
+          setSelectedAcademicYear(defaultYear);
+
+          // Find classes applicable for default academic year
+          const yearClasses = res.data.classes.filter(
+            (c) => c.academicYear === defaultYear
+          );
+          const targetClasses = yearClasses.length > 0 ? yearClasses : res.data.classes;
+          const defaultCls =
+            targetClasses.find((c) => c.name === res.data.defaultClass) ||
+            targetClasses.find((c) => c.studentCount > 0) ||
+            targetClasses[0];
+
+          if (defaultCls) {
+            setSelectedClass(defaultCls.name);
+            setSelectedSection(defaultCls.sections[0] || 'A');
+          }
         }
-      } catch {
-        // Fallback or ignore
+      } catch (err: any) {
+        if (isMounted) {
+          console.error('Failed to load attendance filter metadata:', err);
+          showError(err?.message || 'Failed to load filter metadata.');
+        }
+      } finally {
+        if (isMounted) setMetadataLoading(false);
       }
     };
-    fetchClasses();
+
+    fetchMetadata();
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
-  // Update sections when class changes
+  // Derived Academic Years list
+  const academicYearsList = useMemo(() => {
+    if (metadata && metadata.academicYears && metadata.academicYears.length > 0) {
+      return metadata.academicYears;
+    }
+    return ['2026-2027', '2025-2026'];
+  }, [metadata]);
+
+  // Derived Classes for currently selected academic year
+  const availableClassesForYear: AdminAttendanceClassMetadataItem[] = useMemo(() => {
+    if (!metadata || !metadata.classes) {
+      return [];
+    }
+    const filtered = metadata.classes.filter(
+      (c) => !selectedAcademicYear || selectedAcademicYear === 'ALL' || c.academicYear === selectedAcademicYear
+    );
+    return filtered.length > 0 ? filtered : metadata.classes;
+  }, [metadata, selectedAcademicYear]);
+
+  // Derived Sections for currently selected class
+  const availableSectionsForClass: string[] = useMemo(() => {
+    if (!selectedClass) return ['A'];
+    const cls = availableClassesForYear.find(
+      (c) => c.name.toLowerCase() === selectedClass.toLowerCase()
+    );
+    if (cls && cls.sections && cls.sections.length > 0) {
+      return cls.sections;
+    }
+    return ['A'];
+  }, [availableClassesForYear, selectedClass]);
+
+  // Handle changing Academic Year
+  const handleAcademicYearChange = (year: string) => {
+    setSelectedAcademicYear(year);
+    if (!metadata) return;
+
+    const yearClasses = metadata.classes.filter((c) => c.academicYear === year);
+    const targetClasses = yearClasses.length > 0 ? yearClasses : metadata.classes;
+    const nextClass = targetClasses.find((c) => c.studentCount > 0) || targetClasses[0];
+    if (nextClass) {
+      setSelectedClass(nextClass.name);
+      setSelectedSection(nextClass.sections[0] || 'A');
+    }
+  };
+
+  // Handle changing Class
   const handleClassChange = (className: string) => {
     setSelectedClass(className);
-    const cls = availableClasses.find((c) => c.name === className);
+    const cls = availableClassesForYear.find((c) => c.name === className);
     if (cls && cls.sections && cls.sections.length > 0) {
-      const secNames = cls.sections.map((s) => s.name);
-      setAvailableSections(secNames);
-      setSelectedSection(secNames[0]);
+      setSelectedSection(cls.sections[0]);
     } else {
-      setAvailableSections(['A']);
       setSelectedSection('A');
     }
   };
@@ -133,18 +197,18 @@ export const AdminAttendancePage: React.FC = () => {
         setCurrentPage(1);
       }
     } catch (err: any) {
-      showError(err.response?.data?.message || 'Failed to load subject-wise attendance.');
+      showError(err?.message || 'Failed to load subject-wise attendance.');
     } finally {
       setLoading(false);
     }
   }, [selectedAcademicYear, selectedClass, selectedSection, selectedDate]);
 
-  // Load attendance whenever class is initialized or Load button clicked
+  // Automatically load attendance when class/section/date/year changes
   useEffect(() => {
     if (selectedClass) {
       fetchAttendanceGrid();
     }
-  }, [selectedClass, selectedSection, selectedAcademicYear, fetchAttendanceGrid]);
+  }, [selectedClass, selectedSection, selectedAcademicYear, selectedDate, fetchAttendanceGrid]);
 
   // 3. Filter Students in Table
   const filteredStudents = useMemo(() => {
@@ -447,9 +511,10 @@ export const AdminAttendancePage: React.FC = () => {
             <select
               className="sub-att-filter-select"
               value={selectedAcademicYear}
-              onChange={(e) => setSelectedAcademicYear(e.target.value)}
+              onChange={(e) => handleAcademicYearChange(e.target.value)}
+              disabled={metadataLoading}
             >
-              {ACADEMIC_YEAR_OPTIONS.map((yr) => (
+              {academicYearsList.map((yr) => (
                 <option key={yr} value={yr}>
                   {yr}
                 </option>
@@ -464,10 +529,14 @@ export const AdminAttendancePage: React.FC = () => {
               className="sub-att-filter-select"
               value={selectedClass}
               onChange={(e) => handleClassChange(e.target.value)}
+              disabled={metadataLoading || availableClassesForYear.length === 0}
             >
-              {availableClasses.map((c) => (
+              {availableClassesForYear.length === 0 && (
+                <option value="">{metadataLoading ? 'Loading classes...' : 'No classes found'}</option>
+              )}
+              {availableClassesForYear.map((c) => (
                 <option key={c.id || c.name} value={c.name}>
-                  {c.name}
+                  {c.name} {c.studentCount > 0 ? `(${c.studentCount} enrolled)` : ''}
                 </option>
               ))}
             </select>
@@ -480,8 +549,9 @@ export const AdminAttendancePage: React.FC = () => {
               className="sub-att-filter-select"
               value={selectedSection}
               onChange={(e) => setSelectedSection(e.target.value)}
+              disabled={availableSectionsForClass.length === 0}
             >
-              {availableSections.map((s) => (
+              {availableSectionsForClass.map((s) => (
                 <option key={s} value={s}>
                   {s}
                 </option>
@@ -582,15 +652,48 @@ export const AdminAttendancePage: React.FC = () => {
         <div className="sub-att-main-grid">
           {/* LEFT 2/3 COLUMN: SUBJECT-WISE ATTENDANCE TABLE */}
           <div className="sub-att-table-container">
-            {/* Header with Title and Actions */}
+            {/* Header with Classroom Info */}
             <div className="sub-att-table-header">
               <div>
                 <h2 className="sub-att-table-title">
                   {selectedClass || 'Class'} - {selectedSection} | Subject-wise Attendance
                 </h2>
                 <p className="sub-att-table-sub">
-                  {gridData?.dayName || selectedDate} | {filteredStudents.length} Students
+                  {gridData?.dayName || selectedDate} • {filteredStudents.length} Students
                 </p>
+              </div>
+            </div>
+
+            {/* Action Toolbar: Search on left, Action buttons on right */}
+            <div className="sub-att-table-toolbar">
+              <div className="sub-att-search-group">
+                <div className="sub-att-search-box">
+                  <Search
+                    size={15}
+                    color="#9CA3AF"
+                    className="sub-att-search-icon"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Search by student name or admission ID..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="sub-att-search-input"
+                  />
+                </div>
+
+                {highlightedSubject && (
+                  <div className="sub-att-focus-pill">
+                    <span>Focusing on: {highlightedSubject}</span>
+                    <button
+                      type="button"
+                      onClick={() => setHighlightedSubject(null)}
+                      title="Clear subject focus"
+                    >
+                      <X size={13} />
+                    </button>
+                  </div>
+                )}
               </div>
 
               <div className="sub-att-table-actions">
@@ -613,67 +716,6 @@ export const AdminAttendancePage: React.FC = () => {
                   <span>Print</span>
                 </button>
               </div>
-            </div>
-
-            {/* Search Input Bar */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-              <div
-                style={{
-                  position: 'relative',
-                  flex: 1,
-                  minWidth: 220,
-                  maxWidth: 360,
-                }}
-              >
-                <Search
-                  size={15}
-                  color="#9CA3AF"
-                  style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)' }}
-                />
-                <input
-                  type="text"
-                  placeholder="Search students..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  style={{
-                    width: '100%',
-                    height: 34,
-                    paddingLeft: 32,
-                    paddingRight: 10,
-                    borderRadius: 6,
-                    border: '1px solid #D1D5DB',
-                    fontSize: '0.8rem',
-                    outline: 'none',
-                    boxSizing: 'border-box',
-                  }}
-                />
-              </div>
-
-              {highlightedSubject && (
-                <div
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 6,
-                    backgroundColor: '#FEF3C7',
-                    border: '1px solid #FCD34D',
-                    borderRadius: 6,
-                    padding: '4px 10px',
-                    fontSize: '0.75rem',
-                    color: '#92400E',
-                    fontWeight: 600,
-                  }}
-                >
-                  <span>Focusing on: {highlightedSubject}</span>
-                  <button
-                    type="button"
-                    onClick={() => setHighlightedSubject(null)}
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
-                  >
-                    <X size={13} />
-                  </button>
-                </div>
-              )}
             </div>
 
             {/* Matrix Table */}
@@ -706,7 +748,7 @@ export const AdminAttendancePage: React.FC = () => {
                     <tr>
                       <td
                         colSpan={(gridData?.subjects?.length || 4) + 5}
-                        style={{ textAlign: 'center', padding: '36px 0', color: '#6B7280' }}
+                        style={{ textAlign: 'center', padding: '120px 0', color: '#6B7280' }}
                       >
                         <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
                           <RotateCw size={18} className="animate-spin" />
@@ -718,7 +760,7 @@ export const AdminAttendancePage: React.FC = () => {
                     <tr>
                       <td
                         colSpan={(gridData?.subjects?.length || 4) + 5}
-                        style={{ textAlign: 'center', padding: '40px 0', color: '#6B7280' }}
+                        style={{ textAlign: 'center', padding: '120px 0', color: '#6B7280' }}
                       >
                         {showOnlyAbsent
                           ? 'No absent students found for this class and date.'
@@ -858,20 +900,14 @@ export const AdminAttendancePage: React.FC = () => {
             </div>
 
             {/* Pagination Controls */}
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                paddingTop: 8,
-                flexWrap: 'wrap',
-                gap: 8,
-              }}
-            >
+            <div className="sub-att-pagination-bar">
               <div style={{ fontSize: '0.78rem', color: '#6B7280' }}>
-                Showing {(currentPage - 1) * pageSize + 1} to{' '}
-                {Math.min(currentPage * pageSize, filteredStudents.length)} of{' '}
-                {filteredStudents.length} students
+                {filteredStudents.length === 0
+                  ? 'No students to display'
+                  : `Showing ${(currentPage - 1) * pageSize + 1} to ${Math.min(
+                      currentPage * pageSize,
+                      filteredStudents.length
+                    )} of ${filteredStudents.length} students`}
               </div>
 
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>

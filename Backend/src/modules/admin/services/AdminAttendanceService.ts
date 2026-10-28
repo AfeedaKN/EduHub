@@ -14,6 +14,7 @@ import {
   AdminSubjectGridFilterDTO,
   AdminSubjectGridResponseDTO,
   AdminSaveSubjectAttendancePayloadDTO,
+  AdminAttendanceFiltersMetadataDTO,
 } from '../dtos/adminAttendance.dto';
 import {
   ValidationError,
@@ -47,6 +48,7 @@ export interface IAdminAttendanceService {
     adminUserId: string,
     adminUserName: string
   ): Promise<void>;
+  getAttendanceFiltersMetadata(): Promise<AdminAttendanceFiltersMetadataDTO>;
 }
 
 export class AdminAttendanceService implements IAdminAttendanceService {
@@ -289,5 +291,9 @@ export class AdminAttendanceService implements IAdminAttendanceService {
       adminUserId,
       adminUserName
     );
+  }
+
+  async getAttendanceFiltersMetadata(): Promise<AdminAttendanceFiltersMetadataDTO> {
+    return await this.attendanceRepo.getAttendanceFiltersMetadata();
   }
 }

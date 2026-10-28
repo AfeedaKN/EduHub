@@ -892,6 +892,13 @@ export const adminApi = {
     );
     return res.data;
   },
+
+  getAttendanceFiltersMetadata: async (): Promise<ApiResponse<import('../types/admin.types').AdminAttendanceFiltersMetadata>> => {
+    const res = await axiosClient.get<ApiResponse<import('../types/admin.types').AdminAttendanceFiltersMetadata>>(
+      '/admin/attendance/metadata'
+    );
+    return res.data;
+  },
 };
 
 

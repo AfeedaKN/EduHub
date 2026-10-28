@@ -186,7 +186,9 @@ export const AdminAdmissionsPage: React.FC = () => {
       // Clear success alert after 5s
       setTimeout(() => setSuccessMessage(null), 5000);
     } catch (err: any) {
-      setApprovalError(err.message || 'Failed to approve registration request.');
+      setApprovalError(
+        err.message || err.response?.data?.message || 'Failed to approve registration request.'
+      );
     } finally {
       setIsApproving(false);
     }
