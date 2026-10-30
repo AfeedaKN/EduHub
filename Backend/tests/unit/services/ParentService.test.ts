@@ -297,7 +297,14 @@ describe('ParentService Unit Tests', () => {
       expect(res.children).toHaveLength(0);
       expect(res.selectedChild).toBeNull();
       expect(res.assignments).toHaveLength(0);
-      expect(res.summary).toEqual({ total: 0, upcoming: 0, dueToday: 0, overdue: 0 });
+      expect(res.summary).toEqual({
+        total: 0,
+        pending: 0,
+        submitted: 0,
+        upcoming: 0,
+        dueToday: 0,
+        overdue: 0,
+      });
     });
 
     it('should get single assignment details if matching child enrolled class', async () => {

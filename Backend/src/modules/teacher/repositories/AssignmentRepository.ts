@@ -21,6 +21,10 @@ export interface IAssignmentRepository {
     academicYear?: string,
     filter?: { subject?: string; search?: string; status?: string }
   ): Promise<IAssignmentDoc[]>;
+  findPublishedAssignmentsForClasses?(
+    classFilters: Array<{ className: string; section: string; academicYear?: string }>,
+    filter?: { subject?: string; search?: string; status?: string }
+  ): Promise<IAssignmentDoc[]>;
   countPublishedAssignmentsByClass(
     className: string,
     section: string,
@@ -31,6 +35,9 @@ export interface IAssignmentRepository {
     className: string,
     section: string,
     academicYear?: string
+  ): Promise<string[]>;
+  findDistinctPublishedSubjectsForClasses?(
+    classFilters: Array<{ className: string; section: string; academicYear?: string }>
   ): Promise<string[]>;
   findById(id: string): Promise<IAssignmentDoc | null>;
   create(data: Partial<IAssignmentDoc>): Promise<IAssignmentDoc>;
@@ -147,7 +154,8 @@ export class AssignmentRepository implements IAssignmentRepository {
     };
 
     if (academicYear && academicYear.trim() && academicYear !== 'ALL') {
-      query.academicYear = academicYear.trim();
+      const normalizedYear = academicYear.trim().replace(/[-–—]/g, '[-–—]');
+      query.academicYear = { $regex: new RegExp(`^${normalizedYear}$`, 'i') };
     }
 
     if (filter?.subject && filter.subject.trim() && filter.subject !== 'ALL') {
@@ -179,6 +187,63 @@ export class AssignmentRepository implements IAssignmentRepository {
     return await AssignmentModel.find(query).sort({ dueDate: 1, createdAt: -1 }).exec();
   }
 
+  async findPublishedAssignmentsForClasses(
+    classFilters: Array<{ className: string; section: string; academicYear?: string }>,
+    filter?: { subject?: string; search?: string; status?: string }
+  ): Promise<IAssignmentDoc[]> {
+    if (!classFilters || classFilters.length === 0) return [];
+
+    const orConditions = classFilters.map((cf) => {
+      const condition: Record<string, any> = {
+        className: { $regex: new RegExp(`^${cf.className.trim()}$`, 'i') },
+        section: { $regex: new RegExp(`^${cf.section.trim()}$`, 'i') },
+      };
+      if (cf.academicYear && cf.academicYear.trim() && cf.academicYear !== 'ALL') {
+        const normalizedYear = cf.academicYear.trim().replace(/[-–—]/g, '[-–—]');
+        condition.academicYear = { $regex: new RegExp(`^${normalizedYear}$`, 'i') };
+      }
+      return condition;
+    });
+
+    const query: Record<string, any> = {
+      status: 'PUBLISHED',
+      $or: orConditions,
+    };
+
+    if (filter?.subject && filter.subject.trim() && filter.subject !== 'ALL') {
+      query.subject = { $regex: new RegExp(`^${filter.subject.trim()}$`, 'i') };
+    }
+
+    const todayStr = new Date().toISOString().split('T')[0];
+
+    if (filter?.status && filter.status.trim() && filter.status !== 'ALL') {
+      const s = filter.status.trim().toUpperCase();
+      if (s === 'OVERDUE') {
+        query.dueDate = { $lt: todayStr };
+      } else if (s === 'DUE_TODAY') {
+        query.dueDate = todayStr;
+      } else if (s === 'UPCOMING') {
+        query.dueDate = { $gt: todayStr };
+      }
+    }
+
+    if (filter?.search && filter.search.trim()) {
+      const searchRegex = new RegExp(filter.search.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+      query.$and = [
+        ...(query.$and || []),
+        {
+          $or: [
+            { title: { $regex: searchRegex } },
+            { description: { $regex: searchRegex } },
+            { subject: { $regex: searchRegex } },
+          ],
+        },
+      ];
+    }
+
+    return await AssignmentModel.find(query).sort({ dueDate: 1, createdAt: -1 }).exec();
+  }
+
   async countPublishedAssignmentsByClass(
     className: string,
     section: string,
@@ -191,7 +256,8 @@ export class AssignmentRepository implements IAssignmentRepository {
     };
 
     if (academicYear && academicYear.trim() && academicYear !== 'ALL') {
-      baseQuery.academicYear = academicYear.trim();
+      const normalizedYear = academicYear.trim().replace(/[-–—]/g, '[-–—]');
+      baseQuery.academicYear = { $regex: new RegExp(`^${normalizedYear}$`, 'i') };
     }
 
     const todayStr = new Date().toISOString().split('T')[0];
@@ -223,8 +289,35 @@ export class AssignmentRepository implements IAssignmentRepository {
     };
 
     if (academicYear && academicYear.trim() && academicYear !== 'ALL') {
-      query.academicYear = academicYear.trim();
+      const normalizedYear = academicYear.trim().replace(/[-–—]/g, '[-–—]');
+      query.academicYear = { $regex: new RegExp(`^${normalizedYear}$`, 'i') };
     }
+
+    const subjects = await AssignmentModel.distinct('subject', query).exec();
+    return subjects.filter(Boolean).map(String);
+  }
+
+  async findDistinctPublishedSubjectsForClasses(
+    classFilters: Array<{ className: string; section: string; academicYear?: string }>
+  ): Promise<string[]> {
+    if (!classFilters || classFilters.length === 0) return [];
+
+    const orConditions = classFilters.map((cf) => {
+      const condition: Record<string, any> = {
+        className: { $regex: new RegExp(`^${cf.className.trim()}$`, 'i') },
+        section: { $regex: new RegExp(`^${cf.section.trim()}$`, 'i') },
+      };
+      if (cf.academicYear && cf.academicYear.trim() && cf.academicYear !== 'ALL') {
+        const normalizedYear = cf.academicYear.trim().replace(/[-–—]/g, '[-–—]');
+        condition.academicYear = { $regex: new RegExp(`^${normalizedYear}$`, 'i') };
+      }
+      return condition;
+    });
+
+    const query: Record<string, any> = {
+      status: 'PUBLISHED',
+      $or: orConditions,
+    };
 
     const subjects = await AssignmentModel.distinct('subject', query).exec();
     return subjects.filter(Boolean).map(String);

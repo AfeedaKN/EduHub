@@ -243,6 +243,16 @@
   color: var(--parent-sage, #879B82);
 }
 
+.parent-stat-icon-wrap.pending {
+  background-color: #FEF3C7;
+  color: #D97706;
+}
+
+.parent-stat-icon-wrap.submitted {
+  background-color: #ECFDF5;
+  color: #059669;
+}
+
 .parent-stat-icon-wrap.upcoming {
   background-color: #EBF3FA;
   color: #3182CE;

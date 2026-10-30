@@ -67,6 +67,7 @@ export const createApp = (): Application => {
   // Business Modules Routing
   app.use('/api/v1/auth', dependencies.authModule.router);
   app.use('/api/v1/parent', dependencies.parentModule.router);
+  app.use('/api/v1/student', dependencies.parentModule.router);
   app.use('/api/v1/admin', dependencies.adminModule.router);
   app.use('/api/v1/teacher', dependencies.teacherModule.router);
 

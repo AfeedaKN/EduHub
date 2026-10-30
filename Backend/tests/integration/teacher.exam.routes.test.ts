@@ -62,6 +62,20 @@ describe('Teacher Exam & Marks Routes Integration Tests', () => {
   beforeAll(async () => {
     await connectDatabase();
 
+    // Clean up potential leftovers from interrupted previous runs
+    await UserModel.deleteMany({
+      email: { $in: ['teacher.examtest@eduhub.school', 'stranger.teacher@eduhub.school'] },
+    });
+    await TeacherModel.deleteMany({
+      employeeId: { $in: ['EMP-EXAM-01', 'EMP-EXAM-02'] },
+    });
+    await StudentModel.deleteMany({
+      studentId: { $in: ['STU-EXAM-01', 'STU-EXAM-02'] },
+    });
+    await ExamModel.deleteMany({
+      name: 'Mid-Term Institutional Examination 2026',
+    });
+
     testClassId = new mongoose.Types.ObjectId();
 
     // 1. Create Teacher 1 (assigned to Grade 10-A Math)

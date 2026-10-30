@@ -112,7 +112,7 @@ export const ChildProfileModal: React.FC<ChildProfileModalProps> = ({ child, isO
             <button
               type="button"
               className="child-modal-action-card"
-              onClick={() => handleNavigate('/parent/assignments')}
+              onClick={() => handleNavigate(`/parent/assignments?studentId=${child.id}`)}
             >
               <FileText size={16} className="text-primary" />
               <div className="child-modal-action-texts">
@@ -125,7 +125,7 @@ export const ChildProfileModal: React.FC<ChildProfileModalProps> = ({ child, isO
             <button
               type="button"
               className="child-modal-action-card"
-              onClick={() => handleNavigate('/parent/exams')}
+              onClick={() => handleNavigate(`/parent/exams?studentId=${child.id}`)}
             >
               <Award size={16} className="text-primary" />
               <div className="child-modal-action-texts">

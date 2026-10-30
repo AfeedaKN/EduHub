@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
 import { IRegistrationRequestRepository } from '../repositories/RegistrationRequestRepository';
 import { IStudentRepository } from '../repositories/StudentRepository';
+import { IStudentDoc } from '../models/Student.model';
 import {
   IAssignmentRepository,
   AssignmentRepository,
@@ -266,7 +267,31 @@ export class ParentService implements IParentService {
   }
 
   /**
-   * Get published assignments for a parent's enrolled child
+   * Helper: compute remaining time days & human label
+   */
+  private computeRemainingInfo(dueDate: string): { remainingDays: number; remainingText: string } {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const due = new Date(dueDate);
+    due.setHours(0, 0, 0, 0);
+    const diffTime = due.getTime() - today.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+    if (diffDays === 0) {
+      return { remainingDays: 0, remainingText: 'Due today' };
+    } else if (diffDays === 1) {
+      return { remainingDays: 1, remainingText: 'Due tomorrow (1 day left)' };
+    } else if (diffDays > 1) {
+      return { remainingDays: diffDays, remainingText: `${diffDays} days remaining` };
+    } else if (diffDays === -1) {
+      return { remainingDays: -1, remainingText: 'Overdue by 1 day' };
+    } else {
+      return { remainingDays: diffDays, remainingText: `Overdue by ${Math.abs(diffDays)} days` };
+    }
+  }
+
+  /**
+   * Get published assignments for a parent's enrolled child or all children
    */
   async getParentAssignments(
     parentId: string,
@@ -284,13 +309,15 @@ export class ParentService implements IParentService {
         children: [],
         selectedChild: null,
         assignments: [],
-        summary: { total: 0, upcoming: 0, dueToday: 0, overdue: 0 },
+        summary: { total: 0, pending: 0, submitted: 0, overdue: 0, upcoming: 0, dueToday: 0 },
         subjects: [],
       };
     }
 
-    let selectedChild = activeChildren[0];
-    if (query?.studentId && query.studentId.trim() && query.studentId !== 'ALL') {
+    const isAll = query?.studentId === 'ALL';
+    let selectedChild: any = null;
+
+    if (!isAll && query?.studentId && query.studentId.trim()) {
       const match = activeChildren.find(
         (c) => c._id.toString() === query.studentId || c.studentId === query.studentId
       );
@@ -298,37 +325,97 @@ export class ParentService implements IParentService {
         throw new ForbiddenError('You are not authorized to view assignments for this student.');
       }
       selectedChild = match;
+    } else if (!isAll) {
+      selectedChild = activeChildren[0];
     }
 
-    const [assignmentDocs, summary, subjects] = await Promise.all([
-      this.assignmentRepo.findPublishedAssignmentsByClass(
-        selectedChild.grade,
-        selectedChild.section,
-        selectedChild.academicYear,
-        {
+    let assignmentDocs: any[] = [];
+    let subjects: string[] = [];
+    let existingSubmissions: any[] = [];
+
+    // Filter params for backend repo query (filter by deadline status if UPCOMING/DUE_TODAY/OVERDUE)
+    const effectiveStatus = query?.dueDate || (query?.status && ['UPCOMING', 'DUE_TODAY', 'OVERDUE'].includes(query.status.toUpperCase()) ? query.status : undefined);
+
+    if (selectedChild) {
+      const [docs, distinctSubjects] = await Promise.all([
+        this.assignmentRepo.findPublishedAssignmentsByClass(
+          selectedChild.grade,
+          selectedChild.section,
+          selectedChild.academicYear,
+          {
+            subject: query?.subject,
+            search: query?.search,
+            status: effectiveStatus,
+          }
+        ),
+        this.assignmentRepo.findDistinctPublishedSubjects(
+          selectedChild.grade,
+          selectedChild.section,
+          selectedChild.academicYear
+        ),
+      ]);
+      assignmentDocs = docs;
+      subjects = distinctSubjects;
+
+      const assignmentIds = assignmentDocs.map((d) => d._id ? d._id.toString() : (d as any).id || '');
+      existingSubmissions = await this.submissionRepo.findByStudentAndAssignmentIds(
+        selectedChild._id.toString(),
+        assignmentIds
+      );
+    } else {
+      // isAll === true: Query published assignments across all active children of the parent
+      const classFilters = activeChildren.map((c) => ({
+        className: c.grade,
+        section: c.section,
+        academicYear: c.academicYear,
+      }));
+
+      if (this.assignmentRepo.findPublishedAssignmentsForClasses) {
+        assignmentDocs = await this.assignmentRepo.findPublishedAssignmentsForClasses(classFilters, {
           subject: query?.subject,
           search: query?.search,
-          status: query?.status,
-        }
-      ),
-      this.assignmentRepo.countPublishedAssignmentsByClass(
-        selectedChild.grade,
-        selectedChild.section,
-        selectedChild.academicYear
-      ),
-      this.assignmentRepo.findDistinctPublishedSubjects(
-        selectedChild.grade,
-        selectedChild.section,
-        selectedChild.academicYear
-      ),
-    ]);
+          status: effectiveStatus,
+        });
+      } else {
+        const allDocsArrays = await Promise.all(
+          activeChildren.map((c) =>
+            this.assignmentRepo.findPublishedAssignmentsByClass(c.grade, c.section, c.academicYear, {
+              subject: query?.subject,
+              search: query?.search,
+              status: effectiveStatus,
+            })
+          )
+        );
+        const map = new Map<string, any>();
+        allDocsArrays.flat().forEach((d) => map.set(d._id.toString(), d));
+        assignmentDocs = Array.from(map.values());
+      }
 
-    // Collect assignment IDs to query submissions efficiently in bulk
-    const assignmentIds = assignmentDocs.map((d) => d._id.toString());
-    const existingSubmissions = await this.submissionRepo.findByStudentAndAssignmentIds(
-      selectedChild._id.toString(),
-      assignmentIds
-    );
+      if (this.assignmentRepo.findDistinctPublishedSubjectsForClasses) {
+        subjects = await this.assignmentRepo.findDistinctPublishedSubjectsForClasses(classFilters);
+      } else {
+        const allSubs = await Promise.all(
+          activeChildren.map((c) =>
+            this.assignmentRepo.findDistinctPublishedSubjects(c.grade, c.section, c.academicYear)
+          )
+        );
+        subjects = Array.from(new Set(allSubs.flat())).filter(Boolean);
+      }
+
+      const assignmentIds = assignmentDocs.map((d) => d._id ? d._id.toString() : (d as any).id || '');
+      const studentIds = activeChildren.map((c) => c._id.toString());
+      if (this.submissionRepo.findByStudentIdsAndAssignmentIds) {
+        existingSubmissions = await this.submissionRepo.findByStudentIdsAndAssignmentIds(
+          studentIds,
+          assignmentIds
+        );
+      } else {
+        const subsArrays = await Promise.all(
+          studentIds.map((sid) => this.submissionRepo.findByStudentAndAssignmentIds(sid, assignmentIds))
+        );
+        existingSubmissions = subsArrays.flat();
+      }
+    }
 
     const submissionMap = new Map<string, ISubmissionDoc>();
     existingSubmissions.forEach((sub) => {
@@ -337,10 +424,25 @@ export class ParentService implements IParentService {
 
     const todayStr = new Date().toISOString().split('T')[0];
 
-    const assignments: ParentAssignmentDTO[] = assignmentDocs.map((doc) => {
+    // Helper map from class+section to child for labeling
+    const childByClassSection = new Map<string, any>();
+    activeChildren.forEach((c) => {
+      const key = `${c.grade.trim().toLowerCase()}_${c.section.trim().toLowerCase()}`;
+      childByClassSection.set(key, c);
+    });
+
+    let total = 0;
+    let submitted = 0;
+    let pending = 0;
+    let overdue = 0;
+    let upcoming = 0;
+    let dueToday = 0;
+
+    const allMappedAssignments: ParentAssignmentDTO[] = assignmentDocs.map((doc) => {
       const docId = doc._id ? doc._id.toString() : (doc as any).id || '';
       const sub = submissionMap.get(docId);
       const isPastDue = doc.dueDate < todayStr;
+      const isToday = doc.dueDate === todayStr;
       const allowLate = !!doc.allowLateSubmissions;
       const isGradedAndPublished = sub ? !!sub.isPublished && sub.gradingStatus === 'GRADED' : false;
       const canSubmit = !isGradedAndPublished && (!isPastDue || allowLate);
@@ -355,6 +457,32 @@ export class ParentService implements IParentService {
             : 'SUBMITTED'
           : sub.status
         : 'NOT_SUBMITTED';
+
+      const hasSubmitted = sub && submissionStatus !== 'NOT_SUBMITTED';
+
+      total++;
+      if (hasSubmitted) {
+        submitted++;
+      } else if (isPastDue) {
+        overdue++;
+      } else {
+        pending++;
+      }
+
+      if (isToday) {
+        dueToday++;
+      } else if (!isPastDue) {
+        upcoming++;
+      }
+
+      const assignedChild =
+        selectedChild ||
+        childByClassSection.get(
+          `${doc.className.trim().toLowerCase()}_${doc.section.trim().toLowerCase()}`
+        ) ||
+        activeChildren[0];
+
+      const remainingInfo = this.computeRemainingInfo(doc.dueDate);
 
       return {
         id: docId,
@@ -374,14 +502,48 @@ export class ParentService implements IParentService {
         submissionTrackingAvailable: true,
         allowLateSubmissions: allowLate,
         canSubmit,
+        studentName: assignedChild?.fullName,
+        studentId: assignedChild ? (assignedChild._id ? assignedChild._id.toString() : (assignedChild as any).id) : undefined,
+        remainingDays: remainingInfo.remainingDays,
+        remainingText: remainingInfo.remainingText,
         submission: sub
-          ? this.mapSubmissionDocToDTO(sub, selectedChild.fullName, isPastDue, allowLate)
+          ? this.mapSubmissionDocToDTO(sub, assignedChild?.fullName || '', isPastDue, allowLate)
           : null,
         attachmentUrl: doc.attachmentUrl || '',
         attachmentName: doc.attachmentName || '',
         createdAt: doc.createdAt ? doc.createdAt.toISOString() : new Date().toISOString(),
       };
     });
+
+    // Filtering by submission / deadline status if requested
+    let filteredAssignments = allMappedAssignments;
+    if (query?.status && query.status.trim() && query.status !== 'ALL') {
+      const s = query.status.trim().toUpperCase();
+      if (s === 'SUBMITTED') {
+        filteredAssignments = allMappedAssignments.filter((a) => a.submissionStatus !== 'NOT_SUBMITTED');
+      } else if (s === 'PENDING') {
+        filteredAssignments = allMappedAssignments.filter(
+          (a) => a.submissionStatus === 'NOT_SUBMITTED' && a.dueStatus !== 'OVERDUE'
+        );
+      } else if (s === 'OVERDUE') {
+        filteredAssignments = allMappedAssignments.filter((a) => a.dueStatus === 'OVERDUE');
+      } else if (s === 'UPCOMING') {
+        filteredAssignments = allMappedAssignments.filter((a) => a.dueStatus === 'UPCOMING');
+      } else if (s === 'DUE_TODAY') {
+        filteredAssignments = allMappedAssignments.filter((a) => a.dueStatus === 'DUE_TODAY');
+      }
+    }
+
+    if (query?.dueDate && query.dueDate.trim() && query.dueDate !== 'ALL') {
+      const d = query.dueDate.trim().toUpperCase();
+      if (d === 'UPCOMING') {
+        filteredAssignments = filteredAssignments.filter((a) => a.dueStatus === 'UPCOMING');
+      } else if (d === 'DUE_TODAY') {
+        filteredAssignments = filteredAssignments.filter((a) => a.dueStatus === 'DUE_TODAY');
+      } else if (d === 'OVERDUE') {
+        filteredAssignments = filteredAssignments.filter((a) => a.dueStatus === 'OVERDUE');
+      }
+    }
 
     return {
       children: activeChildren.map((c) => ({
@@ -396,20 +558,29 @@ export class ParentService implements IParentService {
         rollNumber: c.rollNumber,
         academicYear: c.academicYear,
       })),
-      selectedChild: {
-        id: selectedChild._id.toString(),
-        fullName: selectedChild.fullName,
-        studentId: selectedChild.studentId,
-        grade: selectedChild.grade,
-        section: selectedChild.section,
-        classTeacher: selectedChild.classTeacher,
-        status: selectedChild.status,
-        avatarUrl: selectedChild.avatarUrl,
-        rollNumber: selectedChild.rollNumber,
-        academicYear: selectedChild.academicYear,
+      selectedChild: selectedChild
+        ? {
+            id: selectedChild._id.toString(),
+            fullName: selectedChild.fullName,
+            studentId: selectedChild.studentId,
+            grade: selectedChild.grade,
+            section: selectedChild.section,
+            classTeacher: selectedChild.classTeacher,
+            status: selectedChild.status,
+            avatarUrl: selectedChild.avatarUrl,
+            rollNumber: selectedChild.rollNumber,
+            academicYear: selectedChild.academicYear,
+          }
+        : null,
+      assignments: filteredAssignments,
+      summary: {
+        total,
+        pending,
+        submitted,
+        overdue,
+        upcoming,
+        dueToday,
       },
-      assignments,
-      summary,
       subjects,
     };
   }
@@ -440,7 +611,11 @@ export class ParentService implements IParentService {
     const matchingChild = activeChildren.find(
       (child) =>
         child.grade.trim().toLowerCase() === assignmentDoc.className.trim().toLowerCase() &&
-        child.section.trim().toLowerCase() === assignmentDoc.section.trim().toLowerCase()
+        child.section.trim().toLowerCase() === assignmentDoc.section.trim().toLowerCase() &&
+        (!child.academicYear ||
+          !assignmentDoc.academicYear ||
+          child.academicYear.trim().replace(/[-–—]/g, '-') ===
+            assignmentDoc.academicYear.trim().replace(/[-–—]/g, '-'))
     );
 
     if (!matchingChild) {
@@ -469,6 +644,8 @@ export class ParentService implements IParentService {
         : sub.status
       : 'NOT_SUBMITTED';
 
+    const remainingInfo = this.computeRemainingInfo(assignmentDoc.dueDate);
+
     return {
       id: assignmentDoc._id ? assignmentDoc._id.toString() : (assignmentDoc as any).id || '',
       title: assignmentDoc.title,
@@ -487,6 +664,10 @@ export class ParentService implements IParentService {
       submissionTrackingAvailable: true,
       allowLateSubmissions: allowLate,
       canSubmit,
+      studentName: matchingChild.fullName,
+      studentId: matchingChild._id ? matchingChild._id.toString() : (matchingChild as any).id,
+      remainingDays: remainingInfo.remainingDays,
+      remainingText: remainingInfo.remainingText,
       submission: sub
         ? this.mapSubmissionDocToDTO(sub, matchingChild.fullName, isPastDue, allowLate)
         : null,
@@ -510,20 +691,54 @@ export class ParentService implements IParentService {
     if (!assignmentId || !mongoose.Types.ObjectId.isValid(assignmentId)) {
       throw new ValidationError('Invalid assignment ID format.');
     }
-    if (!dto.studentId || !mongoose.Types.ObjectId.isValid(dto.studentId)) {
-      throw new ValidationError('Invalid student ID format.');
-    }
 
-    // 1. Verify parent-child relationship & active enrollment
-    const student = await this.studentRepo.findById(dto.studentId);
-    if (!student || student.parentId.toString() !== parentId || student.status !== 'ACTIVE') {
-      throw new ForbiddenError('You are not authorized to submit assignments on behalf of this student.');
-    }
-
-    // 2. Verify assignment exists and is published
+    // 1. Verify assignment exists and is published
     const assignment = await this.assignmentRepo.findPublishedById(assignmentId);
     if (!assignment) {
       throw new NotFoundError('Assignment not found or is no longer published.');
+    }
+
+    // 2. Resolve and verify the target student
+    let student: IStudentDoc | null = null;
+
+    if (dto.studentId && dto.studentId.trim() && dto.studentId.trim() !== 'ALL') {
+      const cleanStudentId = dto.studentId.trim();
+
+      if (mongoose.Types.ObjectId.isValid(cleanStudentId)) {
+        student = await this.studentRepo.findById(cleanStudentId);
+      } else {
+        const parentChildren = await this.studentRepo.findByParentId(parentId);
+        student = parentChildren?.find((c) => c.studentId === cleanStudentId) || null;
+        if (!student) {
+          throw new ValidationError('Invalid student ID format.');
+        }
+      }
+
+      if (!student || student.parentId.toString() !== parentId || student.status !== 'ACTIVE') {
+        throw new ForbiddenError('You are not authorized to submit assignments on behalf of this student.');
+      }
+    } else {
+      // If studentId was omitted or is 'ALL', automatically resolve via enrolled child matching class & section
+      const parentChildren = await this.studentRepo.findByParentId(parentId);
+      const activeChildren = (parentChildren || []).filter((c) => c.status === 'ACTIVE');
+      const matchingChildren = activeChildren.filter(
+        (c) =>
+          c.grade.trim().toLowerCase() === assignment.className.trim().toLowerCase() &&
+          c.section.trim().toLowerCase() === assignment.section.trim().toLowerCase()
+      );
+
+      if (matchingChildren.length === 0) {
+        throw new ForbiddenError('This assignment is not assigned to your child’s class and section.');
+      }
+      if (matchingChildren.length > 1) {
+        throw new ValidationError('Multiple enrolled children found in this class. Please specify student ID.');
+      }
+
+      student = matchingChildren[0];
+    }
+
+    if (!student || student.parentId.toString() !== parentId || student.status !== 'ACTIVE') {
+      throw new ForbiddenError('You are not authorized to submit assignments on behalf of this student.');
     }
 
     // 3. Verify assignment matches student's enrolled class and section
@@ -575,7 +790,7 @@ export class ParentService implements IParentService {
     const isLate = isPastDue;
 
     // 6. Check existing submission & resubmission rules
-    const existing = await this.submissionRepo.findByAssignmentAndStudent(assignmentId, dto.studentId);
+    const existing = await this.submissionRepo.findByAssignmentAndStudent(assignmentId, student._id.toString());
 
     if (existing) {
       if (existing.gradingStatus === 'GRADED') {

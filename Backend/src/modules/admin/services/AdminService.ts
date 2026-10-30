@@ -20,6 +20,7 @@ import {
 import { IStudentDoc } from '../../parent/models/Student.model';
 import { RegistrationStatus } from '../../parent/dtos/parent.dto';
 import {
+  AppError,
   NotFoundError,
   ConflictError,
   ValidationError,

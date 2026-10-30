@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo, useCallback, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   BookOpen,
   Clock,
@@ -30,6 +30,7 @@ import {
 
 import { ParentLayout } from '../../components/parent/ParentLayout';
 import { parentApi } from '../../api/parentApi';
+import { getApiErrorMessage } from '../../api/axiosClient';
 import type {
   ParentAssignment,
   ParentAssignmentsSummary,
@@ -39,19 +40,22 @@ import './ParentAssignments.css';
 
 export const ParentAssignmentsPage: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const urlStudentId = searchParams.get('studentId') || searchParams.get('childId') || '';
 
   // Primary data states
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
   const [children, setChildren] = useState<ChildProfile[]>([]);
-  const [selectedChildId, setSelectedChildId] = useState<string>('');
+  const [selectedChildId, setSelectedChildId] = useState<string>(urlStudentId || 'ALL');
   const [assignments, setAssignments] = useState<ParentAssignment[]>([]);
   const [summary, setSummary] = useState<ParentAssignmentsSummary>({
     total: 0,
-    upcoming: 0,
-    dueToday: 0,
+    pending: 0,
+    submitted: 0,
     overdue: 0,
   });
   const [subjects, setSubjects] = useState<string[]>([]);
@@ -60,6 +64,7 @@ export const ParentAssignmentsPage: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedSubject, setSelectedSubject] = useState<string>('ALL');
   const [selectedStatus, setSelectedStatus] = useState<string>('ALL');
+  const [selectedDueDate, setSelectedDueDate] = useState<string>('ALL');
 
   // Modals & Action states
   const [viewingAssignment, setViewingAssignment] = useState<ParentAssignment | null>(null);
@@ -78,18 +83,22 @@ export const ParentAssignmentsPage: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [submitFormError, setSubmitFormError] = useState<string | null>(null);
   const [showConfirmationStep, setShowConfirmationStep] = useState<boolean>(false);
+  const [modalStudentId, setModalStudentId] = useState<string>('');
 
   // Fetch assignments with current filters and child selection
   const fetchAssignments = useCallback(
-    async (childId?: string) => {
+    async (childIdToUse?: string) => {
       try {
         setLoading(true);
         setError(null);
 
+        const targetStudentId = childIdToUse !== undefined ? childIdToUse : selectedChildId;
+
         const res = await parentApi.getAssignments({
-          studentId: childId || (selectedChildId ? selectedChildId : undefined),
+          studentId: targetStudentId ? targetStudentId : undefined,
           subject: selectedSubject !== 'ALL' ? selectedSubject : undefined,
           status: selectedStatus !== 'ALL' ? selectedStatus : undefined,
+          dueDate: selectedDueDate !== 'ALL' ? selectedDueDate : undefined,
           search: searchQuery.trim() ? searchQuery.trim() : undefined,
         });
 
@@ -99,17 +108,19 @@ export const ParentAssignmentsPage: React.FC = () => {
           setSummary(
             res.data.summary || {
               total: 0,
-              upcoming: 0,
-              dueToday: 0,
+              pending: 0,
+              submitted: 0,
               overdue: 0,
             }
           );
           setSubjects(res.data.subjects || []);
 
-          // Keep selected child in sync
-          if (res.data.selectedChild) {
+          // If URL student ID was provided and matches child, keep it
+          if (urlStudentId && res.data.children.some((c) => c.id === urlStudentId)) {
+            setSelectedChildId(urlStudentId);
+          } else if (res.data.selectedChild && targetStudentId !== 'ALL') {
             setSelectedChildId(res.data.selectedChild.id);
-          } else if (res.data.children && res.data.children.length > 0 && !selectedChildId) {
+          } else if (res.data.children && res.data.children.length === 1 && (!targetStudentId || targetStudentId === 'ALL')) {
             setSelectedChildId(res.data.children[0].id);
           }
         }
@@ -123,7 +134,7 @@ export const ParentAssignmentsPage: React.FC = () => {
         setLoading(false);
       }
     },
-    [selectedChildId, selectedSubject, selectedStatus, searchQuery]
+    [selectedChildId, selectedSubject, selectedStatus, selectedDueDate, searchQuery, urlStudentId]
   );
 
   // Initial load
@@ -135,23 +146,67 @@ export const ParentAssignmentsPage: React.FC = () => {
   const handleSelectChild = (childId: string) => {
     if (childId === selectedChildId) return;
     setSelectedChildId(childId);
+    if (childId === 'ALL') {
+      const nextParams = new URLSearchParams(searchParams);
+      nextParams.delete('studentId');
+      nextParams.delete('childId');
+      setSearchParams(nextParams);
+    } else {
+      const nextParams = new URLSearchParams(searchParams);
+      nextParams.set('studentId', childId);
+      setSearchParams(nextParams);
+    }
     setSelectedSubject('ALL');
     setSelectedStatus('ALL');
+    setSelectedDueDate('ALL');
     setSearchQuery('');
   };
 
   // Currently selected child object
   const currentChild = useMemo(() => {
+    if (selectedChildId === 'ALL') return null;
     return children.find((c) => c.id === selectedChildId) || children[0] || null;
   }, [children, selectedChildId]);
 
+  // Enrolled children matching the class & section of the assignment being submitted
+  const modalMatchingChildren = useMemo(() => {
+    if (!submittingAssignment) return [];
+    return children.filter(
+      (c) =>
+        c.grade.trim().toLowerCase() === submittingAssignment.className.trim().toLowerCase() &&
+        c.section.trim().toLowerCase() === submittingAssignment.section.trim().toLowerCase()
+    );
+  }, [submittingAssignment, children]);
+
+  // The child for whom the assignment is being submitted
+  const modalChild = useMemo(() => {
+    if (!submittingAssignment) return null;
+    if (modalStudentId) {
+      const found = children.find((c) => c.id === modalStudentId);
+      if (found) return found;
+    }
+    if (modalMatchingChildren.length > 0) {
+      return modalMatchingChildren[0];
+    }
+    if (selectedChildId && selectedChildId !== 'ALL') {
+      const found = children.find((c) => c.id === selectedChildId);
+      if (found) return found;
+    }
+    return currentChild || children[0] || null;
+  }, [submittingAssignment, modalStudentId, children, modalMatchingChildren, selectedChildId, currentChild]);
+
   // Check if any filters are active
-  const hasActiveFilters = searchQuery.trim() !== '' || selectedSubject !== 'ALL' || selectedStatus !== 'ALL';
+  const hasActiveFilters =
+    searchQuery.trim() !== '' ||
+    selectedSubject !== 'ALL' ||
+    selectedStatus !== 'ALL' ||
+    selectedDueDate !== 'ALL';
 
   const handleResetFilters = () => {
     setSearchQuery('');
     setSelectedSubject('ALL');
     setSelectedStatus('ALL');
+    setSelectedDueDate('ALL');
   };
 
   // Helper to format dates
@@ -195,6 +250,24 @@ export const ParentAssignmentsPage: React.FC = () => {
     setSubmittingAssignment(assignment);
     setSubmitFormError(null);
     setShowConfirmationStep(false);
+
+    // Identify target child for this assignment
+    let targetChildId = assignment.studentId || assignment.submission?.studentId || '';
+    if (!targetChildId || !children.some((c) => c.id === targetChildId)) {
+      const match = children.find(
+        (c) =>
+          c.grade.trim().toLowerCase() === assignment.className.trim().toLowerCase() &&
+          c.section.trim().toLowerCase() === assignment.section.trim().toLowerCase()
+      );
+      if (match) {
+        targetChildId = match.id;
+      } else if (selectedChildId && selectedChildId !== 'ALL' && children.some((c) => c.id === selectedChildId)) {
+        targetChildId = selectedChildId;
+      } else if (children.length > 0) {
+        targetChildId = children[0].id;
+      }
+    }
+    setModalStudentId(targetChildId);
 
     // If assignment was previously submitted, prefill fields for editing/resubmitting
     if (assignment.submission) {
@@ -281,14 +354,17 @@ export const ParentAssignmentsPage: React.FC = () => {
 
   // Submit Homework to Backend
   const handleFinalSubmit = async () => {
-    if (!submittingAssignment || !selectedChildId) return;
+    if (!submittingAssignment) return;
+    if (isSubmitting) return;
+
+    const studentIdToSubmit = modalStudentId || modalChild?.id;
 
     try {
       setIsSubmitting(true);
       setSubmitFormError(null);
 
       const res = await parentApi.submitAssignment(submittingAssignment.id, {
-        studentId: selectedChildId,
+        studentId: studentIdToSubmit || undefined,
         answerText: submitAnswerText.trim(),
         attachmentUrl: attachedFile?.dataUrl || undefined,
         attachmentName: attachedFile?.name || undefined,
@@ -299,7 +375,7 @@ export const ParentAssignmentsPage: React.FC = () => {
       if (res.success && res.data) {
         const actionWord = res.data.version > 1 ? 'resubmitted' : 'submitted';
         setSubmissionSuccessMessage(
-          `Assignment successfully ${actionWord} for ${currentChild?.fullName || 'your child'}! (Version ${res.data.version})`
+          `Assignment successfully ${actionWord} for ${modalChild?.fullName || submittingAssignment.studentName || 'your child'}! (Version ${res.data.version})`
         );
         setTimeout(() => setSubmissionSuccessMessage(null), 5000);
 
@@ -324,10 +400,11 @@ export const ParentAssignmentsPage: React.FC = () => {
       }
     } catch (err: any) {
       console.error('Submission failed:', err);
-      setSubmitFormError(
-        err?.response?.data?.message ||
-          'Failed to submit assignment. Please verify your connection and try again.'
+      const errorMsg = getApiErrorMessage(
+        err,
+        err?.message || 'Failed to submit assignment. Please verify your connection and try again.'
       );
+      setSubmitFormError(errorMsg);
       setShowConfirmationStep(false);
     } finally {
       setIsSubmitting(false);
@@ -335,14 +412,14 @@ export const ParentAssignmentsPage: React.FC = () => {
   };
 
   return (
-    <ParentLayout pageTitle="Assignments">
+    <ParentLayout pageTitle="My Assignments">
       <div className="parent-assignments-container">
         {/* Page Header */}
         <div className="parent-assignments-header">
           <div className="parent-assignments-title-group">
-            <h1>Assignments</h1>
+            <h1>My Assignments</h1>
             <p className="parent-assignments-subtitle">
-              View schoolwork assigned to your children, monitor deadlines, and submit homework directly from the parent portal.
+              View schoolwork assigned to your children, monitor deadlines, and submit homework directly from the portal.
             </p>
           </div>
 
@@ -488,6 +565,29 @@ export const ParentAssignmentsPage: React.FC = () => {
               <span>Select Child</span>
             </div>
             <div className="parent-child-selector-pills">
+              <button
+                type="button"
+                className={`parent-child-pill-btn ${selectedChildId === 'ALL' ? 'active' : ''}`}
+                onClick={() => handleSelectChild('ALL')}
+              >
+                <div
+                  className="parent-child-pill-avatar"
+                  style={{
+                    backgroundColor: selectedChildId === 'ALL' ? 'var(--parent-primary, #20354A)' : '#EFF6FF',
+                    color: selectedChildId === 'ALL' ? '#FFFFFF' : '#1D4ED8',
+                    border: '1px solid #BFDBFE',
+                    fontWeight: 700,
+                  }}
+                >
+                  ALL
+                </div>
+                <div className="parent-child-pill-text">
+                  <span className="parent-child-pill-name">All Children</span>
+                  <span className="parent-child-pill-desc">
+                    {children.length} enrolled students
+                  </span>
+                </div>
+              </button>
               {children.map((child) => {
                 const isSelected = child.id === selectedChildId;
                 return (
@@ -516,7 +616,7 @@ export const ParentAssignmentsPage: React.FC = () => {
         {/* When children exist: render Stats, Filters & Table */}
         {(loading || children.length > 0) && (
           <>
-            {/* 4 Summary Stat Cards */}
+            {/* 4 Summary Stat Cards: Total, Pending, Submitted, Overdue */}
             <div className="parent-stats-grid">
               {/* Total Assignments */}
               <div className="parent-stat-card">
@@ -530,36 +630,40 @@ export const ParentAssignmentsPage: React.FC = () => {
                   {loading ? '—' : summary.total}
                 </div>
                 <div className="parent-stat-footer">
-                  Published for {currentChild ? `${currentChild.grade}-${currentChild.section}` : 'child'}
+                  {selectedChildId === 'ALL'
+                    ? 'Published across all children'
+                    : currentChild
+                    ? `Published for ${currentChild.grade}-${currentChild.section}`
+                    : 'Active coursework'}
                 </div>
               </div>
 
-              {/* Upcoming */}
+              {/* Pending */}
               <div className="parent-stat-card">
                 <div className="parent-stat-top">
-                  <span className="parent-stat-label">Upcoming</span>
-                  <div className="parent-stat-icon-wrap upcoming">
+                  <span className="parent-stat-label">Pending</span>
+                  <div className="parent-stat-icon-wrap pending">
                     <Clock size={18} />
                   </div>
                 </div>
-                <div className="parent-stat-value">
-                  {loading ? '—' : summary.upcoming}
+                <div className="parent-stat-value" style={{ color: '#D97706' }}>
+                  {loading ? '—' : summary.pending}
                 </div>
-                <div className="parent-stat-footer">Due in upcoming days</div>
+                <div className="parent-stat-footer">Awaiting submission</div>
               </div>
 
-              {/* Due Today */}
+              {/* Submitted */}
               <div className="parent-stat-card">
                 <div className="parent-stat-top">
-                  <span className="parent-stat-label">Due Today</span>
-                  <div className="parent-stat-icon-wrap due-today">
-                    <AlertCircle size={18} />
+                  <span className="parent-stat-label">Submitted</span>
+                  <div className="parent-stat-icon-wrap submitted">
+                    <CheckCircle2 size={18} />
                   </div>
                 </div>
-                <div className="parent-stat-value" style={{ color: '#D97706' }}>
-                  {loading ? '—' : summary.dueToday}
+                <div className="parent-stat-value" style={{ color: '#059669' }}>
+                  {loading ? '—' : summary.submitted}
                 </div>
-                <div className="parent-stat-footer">Requires submission today</div>
+                <div className="parent-stat-footer">Completed coursework</div>
               </div>
 
               {/* Overdue */}
@@ -620,17 +724,31 @@ export const ParentAssignmentsPage: React.FC = () => {
                   </select>
                 </div>
 
-                {/* Due status filter */}
+                {/* Submission status filter */}
                 <div className="parent-select-wrap">
                   <select
                     className="parent-select"
                     value={selectedStatus}
                     onChange={(e) => setSelectedStatus(e.target.value)}
                   >
-                    <option value="ALL">All Deadlines</option>
+                    <option value="ALL">All Statuses</option>
+                    <option value="PENDING">Pending</option>
+                    <option value="SUBMITTED">Submitted</option>
+                    <option value="OVERDUE">Overdue</option>
+                  </select>
+                </div>
+
+                {/* Due date filter */}
+                <div className="parent-select-wrap">
+                  <select
+                    className="parent-select"
+                    value={selectedDueDate}
+                    onChange={(e) => setSelectedDueDate(e.target.value)}
+                  >
+                    <option value="ALL">All Due Dates</option>
                     <option value="UPCOMING">Upcoming</option>
                     <option value="DUE_TODAY">Due Today</option>
-                    <option value="OVERDUE">Overdue</option>
+                    <option value="OVERDUE">Past Due</option>
                   </select>
                 </div>
 
@@ -739,6 +857,16 @@ export const ParentAssignmentsPage: React.FC = () => {
                             <div className="parent-assignment-desc-snippet" title={assignment.description}>
                               {assignment.description}
                             </div>
+                            <div style={{ marginTop: 4, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                              <span className="parent-meta-pill" style={{ background: '#F1F5F9', color: '#475569' }}>
+                                {assignment.className} - Section {assignment.section}
+                              </span>
+                              {assignment.studentName && (
+                                <span className="parent-meta-pill" style={{ background: '#EFF6FF', color: '#1D4ED8', fontWeight: 600 }}>
+                                  {assignment.studentName}
+                                </span>
+                              )}
+                            </div>
                           </td>
 
                           {/* Teacher */}
@@ -754,6 +882,11 @@ export const ParentAssignmentsPage: React.FC = () => {
                             <div className="parent-date-cell">
                               <span className="parent-due-date">Due: {formatDate(assignment.dueDate)}</span>
                               <span className="parent-assigned-date">Assigned: {formatDate(assignment.assignedDate)}</span>
+                              {assignment.remainingText && (
+                                <span style={{ fontSize: '0.72rem', color: assignment.dueStatus === 'OVERDUE' ? '#DC2626' : '#2563EB', fontWeight: 600, marginTop: 2 }}>
+                                  {assignment.remainingText}
+                                </span>
+                              )}
                             </div>
                           </td>
 
@@ -913,32 +1046,36 @@ export const ParentAssignmentsPage: React.FC = () => {
                       {viewingAssignment.className} - {viewingAssignment.section}
                     </span>
                   </div>
+                  {viewingAssignment.studentName && (
+                    <div className="parent-modal-meta-item">
+                      <span className="parent-modal-meta-label">Enrolled Student</span>
+                      <span className="parent-modal-meta-val" style={{ color: '#1D4ED8', fontWeight: 700 }}>
+                        {viewingAssignment.studentName}
+                      </span>
+                    </div>
+                  )}
                   <div className="parent-modal-meta-item">
                     <span className="parent-modal-meta-label">Academic Year</span>
                     <span className="parent-modal-meta-val">{viewingAssignment.academicYear}</span>
                   </div>
                   <div className="parent-modal-meta-item">
-                    <span className="parent-modal-meta-label">Assigned Date</span>
+                    <span className="parent-modal-meta-label">Published Date</span>
                     <span className="parent-modal-meta-val">{formatDate(viewingAssignment.assignedDate)}</span>
                   </div>
                   <div className="parent-modal-meta-item">
                     <span className="parent-modal-meta-label">Due Date</span>
-                    <span className="parent-modal-meta-val" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span className="parent-modal-meta-val" style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                       {formatDate(viewingAssignment.dueDate)}
-                      {viewingAssignment.dueStatus === 'UPCOMING' && (
-                        <span className="parent-due-status-badge upcoming" style={{ fontSize: '0.65rem', padding: '1px 6px' }}>
-                          Upcoming
+                      {viewingAssignment.remainingText ? (
+                        <span className={`parent-due-status-badge ${viewingAssignment.dueStatus === 'OVERDUE' ? 'overdue' : viewingAssignment.dueStatus === 'DUE_TODAY' ? 'due-today' : 'upcoming'}`} style={{ fontSize: '0.68rem', padding: '2px 8px' }}>
+                          {viewingAssignment.remainingText}
                         </span>
-                      )}
-                      {viewingAssignment.dueStatus === 'DUE_TODAY' && (
-                        <span className="parent-due-status-badge due-today" style={{ fontSize: '0.65rem', padding: '1px 6px' }}>
-                          Due Today
-                        </span>
-                      )}
-                      {viewingAssignment.dueStatus === 'OVERDUE' && (
-                        <span className="parent-due-status-badge overdue" style={{ fontSize: '0.65rem', padding: '1px 6px' }}>
-                          Overdue
-                        </span>
+                      ) : (
+                        viewingAssignment.dueStatus === 'UPCOMING' && (
+                          <span className="parent-due-status-badge upcoming" style={{ fontSize: '0.65rem', padding: '1px 6px' }}>
+                            Upcoming
+                          </span>
+                        )
                       )}
                     </span>
                   </div>
@@ -1199,10 +1336,10 @@ export const ParentAssignmentsPage: React.FC = () => {
                   <div>
                     <span style={{ color: 'var(--parent-text-muted, #707781)' }}>Submitting for: </span>
                     <strong style={{ color: 'var(--parent-primary, #20354A)' }}>
-                      {currentChild?.fullName || 'Child'}
+                      {modalChild?.fullName || submittingAssignment.studentName || 'Child'}
                     </strong>{' '}
                     <span style={{ color: 'var(--parent-muted-blue, #647F99)' }}>
-                      ({currentChild?.grade} - {currentChild?.section})
+                      ({modalChild?.grade || submittingAssignment.className} - {modalChild?.section || submittingAssignment.section})
                     </span>
                   </div>
                   <div>
@@ -1251,6 +1388,27 @@ export const ParentAssignmentsPage: React.FC = () => {
                 {/* STEP 1: Form Input */}
                 {!showConfirmationStep ? (
                   <form onSubmit={handleProceedToConfirmation} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                    {/* If multiple children enrolled in the same class/section, let parent select child */}
+                    {modalMatchingChildren.length > 1 && (
+                      <div className="parent-form-group">
+                        <label className="parent-form-label">
+                          <span>Select Enrolled Child</span>
+                        </label>
+                        <select
+                          className="parent-filter-select"
+                          value={modalStudentId}
+                          onChange={(e) => setModalStudentId(e.target.value)}
+                          style={{ width: '100%', height: 38, padding: '0 12px' }}
+                        >
+                          {modalMatchingChildren.map((c) => (
+                            <option key={c.id} value={c.id}>
+                              {c.fullName} ({c.studentId || c.rollNumber || `${c.grade} - ${c.section}`})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+
                     {/* Text Answer */}
                     <div className="parent-form-group">
                       <label htmlFor="submit-text" className="parent-form-label">
@@ -1371,7 +1529,7 @@ export const ParentAssignmentsPage: React.FC = () => {
                         <div className="parent-conf-item">
                           <span className="parent-conf-label">Student:</span>
                           <span className="parent-conf-val">
-                            {currentChild?.fullName} ({currentChild?.grade} - {currentChild?.section})
+                            {modalChild?.fullName || submittingAssignment.studentName || 'Student'} ({modalChild?.grade || submittingAssignment.className} - {modalChild?.section || submittingAssignment.section})
                           </span>
                         </div>
                         <div className="parent-conf-item">

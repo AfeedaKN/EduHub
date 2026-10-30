@@ -10,6 +10,10 @@ export interface ISubmissionRepository {
     studentId: string,
     assignmentIds: string[]
   ): Promise<ISubmissionDoc[]>;
+  findByStudentIdsAndAssignmentIds?(
+    studentIds: string[],
+    assignmentIds: string[]
+  ): Promise<ISubmissionDoc[]>;
   findByAssignmentId(assignmentId: string): Promise<ISubmissionDoc[]>;
   findByAssignmentAndId(assignmentId: string, submissionId: string): Promise<ISubmissionDoc | null>;
   findById(id: string): Promise<ISubmissionDoc | null>;
@@ -52,6 +56,30 @@ export class SubmissionRepository implements ISubmissionRepository {
     return await SubmissionModel.find({
       studentId: new mongoose.Types.ObjectId(studentId),
       assignmentId: { $in: validIds },
+    }).exec();
+  }
+
+  async findByStudentIdsAndAssignmentIds(
+    studentIds: string[],
+    assignmentIds: string[]
+  ): Promise<ISubmissionDoc[]> {
+    if (!studentIds || studentIds.length === 0 || !assignmentIds || assignmentIds.length === 0) {
+      return [];
+    }
+
+    const validStudentIds = studentIds
+      .filter((id) => mongoose.Types.ObjectId.isValid(id))
+      .map((id) => new mongoose.Types.ObjectId(id));
+
+    const validAssignmentIds = assignmentIds
+      .filter((id) => mongoose.Types.ObjectId.isValid(id))
+      .map((id) => new mongoose.Types.ObjectId(id));
+
+    if (validStudentIds.length === 0 || validAssignmentIds.length === 0) return [];
+
+    return await SubmissionModel.find({
+      studentId: { $in: validStudentIds },
+      assignmentId: { $in: validAssignmentIds },
     }).exec();
   }
 

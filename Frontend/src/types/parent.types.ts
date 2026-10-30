@@ -113,10 +113,14 @@ export interface ParentAssignment {
   attachmentUrl?: string;
   attachmentName?: string;
   createdAt: string;
+  studentName?: string;
+  studentId?: string;
+  remainingDays?: number;
+  remainingText?: string;
 }
 
 export interface SubmitAssignmentPayload {
-  studentId: string;
+  studentId?: string;
   answerText?: string;
   attachmentUrl?: string;
   attachmentName?: string;
@@ -126,15 +130,18 @@ export interface SubmitAssignmentPayload {
 
 export interface ParentAssignmentsSummary {
   total: number;
-  upcoming: number;
-  dueToday: number;
+  pending: number;
+  submitted: number;
   overdue: number;
+  upcoming?: number;
+  dueToday?: number;
 }
 
 export interface ParentAssignmentsQueryParams {
   studentId?: string;
   subject?: string;
   status?: string;
+  dueDate?: string;
   search?: string;
 }
 

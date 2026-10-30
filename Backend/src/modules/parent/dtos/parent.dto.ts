@@ -94,6 +94,10 @@ export interface ParentAssignmentDTO {
   attachmentUrl?: string;
   attachmentName?: string;
   createdAt: string;
+  studentName?: string;
+  studentId?: string;
+  remainingDays?: number;
+  remainingText?: string;
 }
 
 export type ParentSubmissionStatus = 'NOT_SUBMITTED' | 'SUBMITTED' | 'LATE' | 'RESUBMITTED' | 'UNDER_REVIEW' | 'GRADED';
@@ -122,7 +126,7 @@ export interface SubmissionDetailsDTO {
 }
 
 export interface SubmitAssignmentDTO {
-  studentId: string;
+  studentId?: string;
   answerText?: string;
   attachmentUrl?: string;
   attachmentName?: string;
@@ -132,15 +136,18 @@ export interface SubmitAssignmentDTO {
 
 export interface ParentAssignmentsSummaryDTO {
   total: number;
-  upcoming: number;
-  dueToday: number;
+  pending: number;
+  submitted: number;
   overdue: number;
+  upcoming?: number;
+  dueToday?: number;
 }
 
 export interface ParentAssignmentsQueryDTO {
   studentId?: string;
   subject?: string;
   status?: string;
+  dueDate?: string;
   search?: string;
 }
 

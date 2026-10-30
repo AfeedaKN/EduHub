@@ -83,12 +83,13 @@ export class ParentController {
         throw new UnauthorizedError('Authenticated parent session required.', 'UNAUTHORIZED');
       }
 
-      const { studentId, subject, status, search } = req.query;
+      const { studentId, subject, status, dueDate, search } = req.query;
 
       const result = await this.parentService.getParentAssignments(req.user.sub, {
         studentId: studentId ? String(studentId) : undefined,
         subject: subject ? String(subject) : undefined,
         status: status ? String(status) : undefined,
+        dueDate: dueDate ? String(dueDate) : undefined,
         search: search ? String(search) : undefined,
       });
 

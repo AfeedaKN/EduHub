@@ -64,6 +64,66 @@ describe('Parent Routes Integration Tests — Assignments', () => {
   let assignmentGrade10Id: string;
 
   beforeAll(async () => {
+    // Clean up potential leftovers from interrupted previous runs
+    await UserModel.deleteMany({
+      $or: [
+        { _id: { $in: [parent1UserId, parent2UserId, teacherUserId] } },
+        {
+          email: {
+            $in: [
+              'teacher.parenttest@eduhub.school',
+              'parent1.assignments@eduhub.school',
+              'parent2.assignments@eduhub.school',
+            ],
+          },
+        },
+      ],
+    });
+    await StudentModel.deleteMany({ studentId: { $in: ['STU-P-01', 'STU-P-02', 'STU-P-03'] } });
+    await AssignmentModel.deleteMany({
+      title: {
+        $in: [
+          'Grade 5 Science Nature Journal',
+          'Secret Draft Science Test',
+          'Grade 11 Calculus Matrix Equations',
+        ],
+      },
+    });
+    await TeacherModel.deleteMany({
+      $or: [
+        { userId: teacherUserId },
+        { email: 'teacher.parenttest@eduhub.school' },
+        { employeeId: 'EMP-PTEST-01' },
+      ],
+    });
+
+    // 0. Create teacher user and teacher profile
+    await UserModel.create({
+      _id: new mongoose.Types.ObjectId(teacherUserId),
+      fullName: 'Prof. Test Teacher',
+      email: 'teacher.parenttest@eduhub.school',
+      phone: '+1 555-3333',
+      passwordHash: 'dummy',
+      role: UserRole.TEACHER,
+      status: 'ACTIVE',
+    });
+
+    await TeacherModel.create({
+      userId: new mongoose.Types.ObjectId(teacherUserId),
+      employeeId: 'EMP-PTEST-01',
+      fullName: 'Prof. Test Teacher',
+      email: 'teacher.parenttest@eduhub.school',
+      phone: '+1 555-3333',
+      qualification: 'M.Sc.',
+      designation: 'Senior Teacher',
+      department: 'Science',
+      status: 'ACTIVE',
+      assignedClasses: [
+        { className: 'Grade 5', section: 'A', subject: 'Science', academicYear: '2026-2027' },
+      ],
+      joiningDate: new Date(),
+    });
+
     // 1. Create parent 1 user and their 2 children (Child 1 in Grade 5-A, Child 2 in Grade 8-B)
     await UserModel.create({
       _id: new mongoose.Types.ObjectId(parent1UserId),
@@ -178,11 +238,12 @@ describe('Parent Routes Integration Tests — Assignments', () => {
   });
 
   afterAll(async () => {
+    await TeacherModel.deleteMany({ userId: teacherUserId });
     await StudentModel.deleteMany({
       _id: { $in: [child1Id, child2Id, strangerChildId] },
     });
     await UserModel.deleteMany({
-      _id: { $in: [parent1UserId, parent2UserId] },
+      _id: { $in: [parent1UserId, parent2UserId, teacherUserId] },
     });
     await AssignmentModel.deleteMany({
       _id: {
@@ -361,6 +422,97 @@ describe('Parent Routes Integration Tests — Assignments', () => {
       expect(res.body.data[0].studentName).toBe('Emily Jenkins');
       expect(res.body.data[0].version).toBe(2);
       expect(res.body.data[0].answerText).toBe('Updated revised report with extra observations.');
+    });
+
+    it('fails with 403 when trying to submit for an enrolled child who is in a different class/section', async () => {
+      // Lucas Jenkins is parent1's child, but is in Grade 8-B, whereas assignment is for Grade 5-A
+      const res = await request(app)
+        .post(`/api/v1/parent/assignments/${publishedAssignmentGrade5Id}/submit`)
+        .set('Authorization', `Bearer ${parent1Token}`)
+        .send({
+          studentId: child2Id,
+          answerText: 'Submission attempt from wrong class.',
+        });
+
+      expect(res.status).toBe(403);
+      expect(res.body.success).toBe(false);
+      expect(res.body.error.message).toContain('not assigned to your child');
+    });
+
+    it('fails with 404 when trying to submit an unpublished (DRAFT) assignment', async () => {
+      const res = await request(app)
+        .post(`/api/v1/parent/assignments/${draftAssignmentGrade5Id}/submit`)
+        .set('Authorization', `Bearer ${parent1Token}`)
+        .send({
+          studentId: child1Id,
+          answerText: 'Attempting to submit draft assignment.',
+        });
+
+      expect(res.status).toBe(404);
+      expect(res.body.success).toBe(false);
+    });
+
+    it('fails with 400 when submitting after deadline and late submissions are disallowed', async () => {
+      // assignmentGrade10Id is dueDate: '2026-10-20' (past due), allowLateSubmissions: false, for strangerChildId (Mateo Garcia, Grade 11-A, parent2)
+      const res = await request(app)
+        .post(`/api/v1/parent/assignments/${assignmentGrade10Id}/submit`)
+        .set('Authorization', `Bearer ${parent2Token}`)
+        .send({
+          studentId: strangerChildId,
+          answerText: 'Late submission attempt.',
+        });
+
+      expect(res.status).toBe(400);
+      expect(res.body.success).toBe(false);
+      expect(res.body.error.message).toContain('deadline for this assignment has passed');
+    });
+
+    it('successfully submits when studentId is "ALL" or omitted by resolving matching enrolled child', async () => {
+      // Parent 1 submits with studentId: 'ALL'
+      const res = await request(app)
+        .post(`/api/v1/parent/assignments/${publishedAssignmentGrade5Id}/submit`)
+        .set('Authorization', `Bearer ${parent1Token}`)
+        .send({
+          studentId: 'ALL',
+          answerText: 'Submission with studentId ALL resolved to Emily Jenkins.',
+        });
+
+      expect(res.status).toBe(201);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.studentId).toBe(child1Id);
+      expect(res.body.data.studentName).toBe('Emily Jenkins');
+      expect(res.body.data.version).toBe(3);
+    });
+
+    it('prevents resubmission when assignment has already been evaluated and GRADED by teacher', async () => {
+      // 1. Teacher grades the submission
+      const teacherListRes = await request(app)
+        .get(`/api/v1/teacher/assignments/${publishedAssignmentGrade5Id}/submissions`)
+        .set('Authorization', `Bearer ${teacherToken}`);
+      const submissionId = teacherListRes.body.data[0].id;
+
+      const gradeRes = await request(app)
+        .put(`/api/v1/teacher/assignments/${publishedAssignmentGrade5Id}/submissions/${submissionId}/grade`)
+        .set('Authorization', `Bearer ${teacherToken}`)
+        .send({
+          marksObtained: 38,
+          feedback: 'Outstanding journal entry and observations.',
+          publishResult: true,
+        });
+      expect(gradeRes.status).toBe(200);
+
+      // 2. Parent attempts to submit again
+      const res = await request(app)
+        .post(`/api/v1/parent/assignments/${publishedAssignmentGrade5Id}/submit`)
+        .set('Authorization', `Bearer ${parent1Token}`)
+        .send({
+          studentId: child1Id,
+          answerText: 'Attempting to resubmit after teacher graded it.',
+        });
+
+      expect(res.status).toBe(400);
+      expect(res.body.success).toBe(false);
+      expect(res.body.error.message).toContain('already been evaluated and graded');
     });
   });
 

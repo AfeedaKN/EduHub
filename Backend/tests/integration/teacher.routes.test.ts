@@ -81,6 +81,12 @@ describe('Teacher Routes Integration Tests', () => {
 
   describe('Authenticated Teacher Flow', () => {
     beforeAll(async () => {
+      // Clean up potential leftovers
+      await UserModel.deleteMany({ email: 'teacher.dashboard@eduhub.school' });
+      await TeacherModel.deleteMany({
+        $or: [{ userId: teacherUserId }, { employeeId: 'TCH-TEST-01' }],
+      });
+
       // Create user & teacher doc in DB for testing
       await UserModel.create({
         _id: new mongoose.Types.ObjectId(teacherUserId),

@@ -123,6 +123,18 @@ export const AppRouter: React.FC = () => {
           }
         />
         <Route
+          path="/student/assignments"
+          element={
+            <ProtectedRoute allowedRoles={['PARENT']}>
+              <ParentAssignmentsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/student"
+          element={<Navigate to="/parent/assignments" replace />}
+        />
+        <Route
           path="/parent/exams"
           element={
             <ProtectedRoute allowedRoles={['PARENT']}>
