@@ -44,6 +44,9 @@ export function createParentRouter(deps: ParentRoutesDependencies): Router {
   // Examination Results (Published Only)
   router.get('/exams', parentController.getExamResults);
 
+  // Study Materials (Published Only)
+  router.get('/study-materials', parentController.getStudyMaterials);
+
   return router;
 }
 

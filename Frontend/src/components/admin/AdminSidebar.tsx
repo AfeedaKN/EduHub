@@ -21,6 +21,8 @@ import {
   Layers,
   Bell,
   Video,
+  ClipboardList,
+  FileText,
 } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { logout } from '../../store/slices/authSlice';
@@ -47,7 +49,9 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
     location.pathname.startsWith('/admin/people') || location.pathname.startsWith('/admin/teachers')
   );
   const [academicsOpen, setAcademicsOpen] = useState(
-    location.pathname.startsWith('/admin/academics') || location.pathname.startsWith('/admin/classes')
+    location.pathname.startsWith('/admin/academics') ||
+      location.pathname.startsWith('/admin/classes') ||
+      location.pathname.startsWith('/admin/assignments')
   );
   const [communicationOpen, setCommunicationOpen] = useState(
     location.pathname.startsWith('/admin/communication')
@@ -251,6 +255,30 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
                     >
                       <Calendar size={14} />
                       <span>Timetable</span>
+                    </NavLink>
+                  </li>
+                  <li>
+                    <NavLink
+                      to="/admin/assignments"
+                      onClick={onCloseMobile}
+                      className={({ isActive }) =>
+                        `admin-nav-sublink ${isActive || location.pathname.startsWith('/admin/assignments') ? 'active' : ''}`
+                      }
+                    >
+                      <ClipboardList size={14} />
+                      <span>Assignments</span>
+                    </NavLink>
+                  </li>
+                  <li>
+                    <NavLink
+                      to="/admin/study-materials"
+                      onClick={onCloseMobile}
+                      className={({ isActive }) =>
+                        `admin-nav-sublink ${isActive || location.pathname.startsWith('/admin/study-materials') ? 'active' : ''}`
+                      }
+                    >
+                      <FileText size={14} />
+                      <span>Study Materials</span>
                     </NavLink>
                   </li>
                 </ul>

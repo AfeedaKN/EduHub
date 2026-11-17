@@ -191,7 +191,7 @@ describe('Student & Parent Assignment Visibility Workflow Verification (Step 6)'
         subject: 'Computer',
         academicYear: '2026-2027',
         assignedDate: '2026-10-30',
-        dueDate: '2026-11-05',
+        dueDate: '2026-11-30',
         maxMarks: 50,
         status: 'DRAFT',
       });
@@ -213,7 +213,7 @@ describe('Student & Parent Assignment Visibility Workflow Verification (Step 6)'
         subject: 'Computer',
         academicYear: '2026-2027',
         assignedDate: '2026-10-30',
-        dueDate: '2026-11-05',
+        dueDate: '2026-11-30',
         maxMarks: 50,
       });
 

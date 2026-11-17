@@ -34,4 +34,8 @@ export const AdminMessages = {
   EXAM_SCHEDULE_UPDATED: 'Subject exam schedule updated successfully',
   EXAM_SCHEDULE_DELETED: 'Subject schedule removed successfully',
   VALID_SUBJECTS_FETCHED: 'Valid subjects retrieved successfully',
+  ADMIN_ASSIGNMENT_SUMMARY_FETCHED: 'Assignment summary statistics retrieved successfully.',
+  ADMIN_ASSIGNMENTS_FETCHED: 'Assignments retrieved successfully.',
+  ADMIN_ASSIGNMENT_DETAILS_FETCHED: 'Assignment details retrieved successfully.',
+  ADMIN_TEACHER_MONITORING_FETCHED: 'Teacher assignment monitoring data retrieved successfully.',
 } as const;

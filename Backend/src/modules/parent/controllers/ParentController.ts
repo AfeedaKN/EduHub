@@ -160,4 +160,27 @@ export class ParentController {
       next(error);
     }
   };
+
+  getStudyMaterials = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      if (!req.user || !req.user.sub) {
+        throw new UnauthorizedError('Authenticated parent session required.', 'UNAUTHORIZED');
+      }
+
+      const { studentId, subject, academicYear, materialType, search } = req.query;
+      const result = await this.parentService.getParentStudyMaterials(req.user.sub, {
+        studentId: studentId ? String(studentId) : undefined,
+        subject: subject ? String(subject) : undefined,
+        academicYear: academicYear ? String(academicYear) : undefined,
+        materialType: materialType ? String(materialType) : undefined,
+        search: search ? String(search) : undefined,
+      });
+
+      return res
+        .status(HttpStatusCode.OK)
+        .json(ApiResponse.success(result, 'Study materials retrieved successfully.'));
+    } catch (error) {
+      next(error);
+    }
+  };
 }

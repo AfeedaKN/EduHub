@@ -10,6 +10,7 @@ import { ProtectedRoute } from '../components/auth/ProtectedRoute';
 import { ParentDashboardPage } from '../pages/parent/ParentDashboardPage';
 import { MyChildrenPage } from '../pages/parent/MyChildrenPage';
 import { ParentAssignmentsPage } from '../pages/parent/ParentAssignmentsPage';
+import { ParentStudyMaterialsPage } from '../pages/parent/ParentStudyMaterialsPage';
 import { ParentExamsPage } from '../pages/parent/ParentExamsPage';
 import { ParentPlaceholderPage } from '../pages/parent/ParentPlaceholderPage';
 import { AddStudentPage } from '../pages/parent/AddStudentPage';
@@ -23,6 +24,8 @@ import { AdminStudentsPage } from '../pages/admin/AdminStudentsPage';
 import { AdminParentsPage } from '../pages/admin/AdminParentsPage';
 import { AdminSubjectsPage } from '../pages/admin/AdminSubjectsPage';
 import { AdminAttendancePage } from '../pages/admin/AdminAttendancePage';
+import { AdminAssignmentsPage } from '../pages/admin/AdminAssignmentsPage';
+import { AdminStudyMaterialsPage } from '../pages/admin/AdminStudyMaterialsPage';
 import { AdminPlaceholderPage } from '../pages/admin/AdminPlaceholderPage';
 import { TeacherDashboardPage } from '../pages/teacher/TeacherDashboardPage';
 import { TeacherClassesPage } from '../pages/teacher/TeacherClassesPage';
@@ -30,6 +33,7 @@ import { TeacherStudentsPage } from '../pages/teacher/TeacherStudentsPage';
 import { TeacherAttendancePage } from '../pages/teacher/TeacherAttendancePage';
 import { TeacherTimetablePage } from '../pages/teacher/TeacherTimetablePage';
 import { TeacherAssignmentsPage } from '../pages/teacher/TeacherAssignmentsPage';
+import { TeacherStudyMaterialsPage } from '../pages/teacher/TeacherStudyMaterialsPage';
 import { TeacherMyExamsPage } from '../pages/teacher/TeacherMyExamsPage';
 import { TeacherEnterMarksPage } from '../pages/teacher/TeacherEnterMarksPage';
 import { TeacherPlaceholderPage } from '../pages/teacher/TeacherPlaceholderPage';
@@ -127,6 +131,22 @@ export const AppRouter: React.FC = () => {
           element={
             <ProtectedRoute allowedRoles={['PARENT']}>
               <ParentAssignmentsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/parent/study-materials"
+          element={
+            <ProtectedRoute allowedRoles={['PARENT']}>
+              <ParentStudyMaterialsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/student/study-materials"
+          element={
+            <ProtectedRoute allowedRoles={['PARENT']}>
+              <ParentStudyMaterialsPage />
             </ProtectedRoute>
           }
         />
@@ -276,6 +296,32 @@ export const AppRouter: React.FC = () => {
             </ProtectedRoute>
           }
         />
+        {/* Academic Assignments Management Page */}
+        <Route
+          path="/admin/assignments"
+          element={
+            <ProtectedRoute allowedRoles={['MANAGEMENT']}>
+              <AdminAssignmentsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/academics/assignments"
+          element={<Navigate to="/admin/assignments" replace />}
+        />
+        {/* Academic Study Materials Management Page */}
+        <Route
+          path="/admin/study-materials"
+          element={
+            <ProtectedRoute allowedRoles={['MANAGEMENT']}>
+              <AdminStudyMaterialsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/academics/study-materials"
+          element={<Navigate to="/admin/study-materials" replace />}
+        />
         <Route
           path="/admin/attendance"
           element={
@@ -403,6 +449,14 @@ export const AppRouter: React.FC = () => {
           element={
             <ProtectedRoute allowedRoles={['TEACHER']}>
               <TeacherAssignmentsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/teacher/study-materials"
+          element={
+            <ProtectedRoute allowedRoles={['TEACHER']}>
+              <TeacherStudyMaterialsPage />
             </ProtectedRoute>
           }
         />

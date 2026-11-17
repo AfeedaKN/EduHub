@@ -3,6 +3,7 @@ import { TeacherDashboardController } from '../controllers/TeacherDashboardContr
 import { AttendanceController } from '../controllers/AttendanceController';
 import { AssignmentController } from '../controllers/AssignmentController';
 import { TeacherExamController } from '../controllers/TeacherExamController';
+import { StudyMaterialController } from '../controllers/StudyMaterialController';
 import { authorizeRoles } from '../../auth/middlewares/auth.middleware';
 import { UserRole } from '../../auth/dtos/auth.dto';
 
@@ -11,6 +12,7 @@ export interface TeacherRoutesDependencies {
   attendanceController?: AttendanceController;
   assignmentController?: AssignmentController;
   teacherExamController?: TeacherExamController;
+  studyMaterialController?: StudyMaterialController;
   authenticateMiddleware: RequestHandler;
 }
 
@@ -21,6 +23,7 @@ export function createTeacherRouter(deps: TeacherRoutesDependencies): Router {
     attendanceController,
     assignmentController,
     teacherExamController,
+    studyMaterialController,
     authenticateMiddleware,
   } = deps;
 
@@ -57,6 +60,15 @@ export function createTeacherRouter(deps: TeacherRoutesDependencies): Router {
     router.put('/assignments/:id', assignmentController.updateAssignment);
     router.patch('/assignments/:id/status', assignmentController.updateStatus);
     router.delete('/assignments/:id', assignmentController.deleteAssignment);
+  }
+
+  // Study Materials Management
+  if (studyMaterialController) {
+    router.get('/study-materials', studyMaterialController.getStudyMaterials);
+    router.post('/study-materials', studyMaterialController.createStudyMaterial);
+    router.get('/study-materials/:id', studyMaterialController.getStudyMaterialById);
+    router.put('/study-materials/:id', studyMaterialController.updateStudyMaterial);
+    router.delete('/study-materials/:id', studyMaterialController.deleteStudyMaterial);
   }
 
   // Teacher Exams & Marks Entry Management

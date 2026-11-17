@@ -363,7 +363,7 @@ describe('ParentService Unit Tests', () => {
       section: 'A',
       academicYear: '2026-2027',
       assignedDate: '2026-10-10',
-      dueDate: '2026-10-30', // Future due date
+      dueDate: '2026-12-30', // Future due date
       maxMarks: 25,
       status: 'PUBLISHED',
       allowLateSubmissions: false,

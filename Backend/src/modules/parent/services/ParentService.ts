@@ -15,6 +15,10 @@ import {
   ISubmissionHistoryItem,
 } from '../../teacher/models/Submission.model';
 import {
+  IStudyMaterialRepository,
+  StudyMaterialRepository,
+} from '../../teacher/repositories/StudyMaterialRepository';
+import {
   CreateStudentRegistrationDTO,
   StudentRegistrationResponseDTO,
   ParentDashboardResponseDTO,
@@ -32,6 +36,9 @@ import {
   ParentExamCardDTO,
   ParentExamResultsQueryDTO,
   ParentExamResultsResponseDTO,
+  ParentStudyMaterialItemDTO,
+  ParentStudyMaterialsQueryDTO,
+  ParentStudyMaterialsResponseDTO,
 } from '../dtos/parent.dto';
 import { ExamMarksModel } from '../../admin/models/ExamMarks.model';
 import { ExamModel } from '../../admin/models/Exam.model';
@@ -65,6 +72,10 @@ export interface IParentService {
     parentId: string,
     query?: ParentExamResultsQueryDTO
   ): Promise<ParentExamResultsResponseDTO>;
+  getParentStudyMaterials(
+    parentId: string,
+    query?: ParentStudyMaterialsQueryDTO
+  ): Promise<ParentStudyMaterialsResponseDTO>;
   getSchoolMetadata(): {
     classes: string[];
     academicYears: string[];
@@ -76,15 +87,18 @@ export interface IParentService {
 export class ParentService implements IParentService {
   private readonly assignmentRepo: IAssignmentRepository;
   private readonly submissionRepo: ISubmissionRepository;
+  private readonly studyMaterialRepo: IStudyMaterialRepository;
 
   constructor(
     private readonly registrationRequestRepo: IRegistrationRequestRepository,
     private readonly studentRepo: IStudentRepository,
     assignmentRepo?: IAssignmentRepository,
-    submissionRepo?: ISubmissionRepository
+    submissionRepo?: ISubmissionRepository,
+    studyMaterialRepo?: IStudyMaterialRepository
   ) {
     this.assignmentRepo = assignmentRepo || new AssignmentRepository();
     this.submissionRepo = submissionRepo || new SubmissionRepository();
+    this.studyMaterialRepo = studyMaterialRepo || new StudyMaterialRepository();
   }
 
 
@@ -1199,6 +1213,145 @@ export class ParentService implements IParentService {
         overallAveragePercentage,
       },
       exams: filteredExamCards,
+    };
+  }
+
+  async getParentStudyMaterials(
+    parentId: string,
+    query?: ParentStudyMaterialsQueryDTO
+  ): Promise<ParentStudyMaterialsResponseDTO> {
+    if (!parentId || !mongoose.Types.ObjectId.isValid(parentId)) {
+      throw new ValidationError('Invalid parent account identification.');
+    }
+
+    const childrenDocs = await this.studentRepo.findByParentId(parentId);
+    const activeChildren = childrenDocs.filter((c) => c.status === 'ACTIVE');
+
+    const childrenDTOs: ChildProfileDTO[] = activeChildren.map((c) => ({
+      id: c._id.toString(),
+      fullName: c.fullName,
+      studentId: c.studentId,
+      grade: c.grade,
+      section: c.section,
+      classTeacher: c.classTeacher,
+      status: c.status,
+      avatarUrl: c.avatarUrl,
+      rollNumber: c.rollNumber,
+      academicYear: c.academicYear,
+    }));
+
+    if (activeChildren.length === 0) {
+      return {
+        children: [],
+        selectedChild: null,
+        materials: [],
+        subjects: [],
+        academicYears: [],
+      };
+    }
+
+    const isAll = query?.studentId === 'ALL';
+    let selectedChild: IStudentDoc | null = null;
+
+    if (!isAll && query?.studentId && query.studentId.trim()) {
+      const match = activeChildren.find(
+        (c) => c._id.toString() === query.studentId || c.studentId === query.studentId
+      );
+      if (!match) {
+        throw new ForbiddenError(
+          'You are not authorized to view study materials for this student.'
+        );
+      }
+      selectedChild = match;
+    } else if (!isAll) {
+      selectedChild = activeChildren[0];
+    }
+
+    let materialsDocs: any[] = [];
+    let subjects: string[] = [];
+
+    if (selectedChild) {
+      const [docs, distinctSubjects] = await Promise.all([
+        this.studyMaterialRepo.findPublishedMaterialsByClass(
+          selectedChild.grade,
+          selectedChild.section,
+          query?.academicYear || selectedChild.academicYear,
+          {
+            subject: query?.subject,
+            search: query?.search,
+          }
+        ),
+        this.studyMaterialRepo.findDistinctPublishedSubjects(
+          selectedChild.grade,
+          selectedChild.section,
+          query?.academicYear || selectedChild.academicYear
+        ),
+      ]);
+      materialsDocs = docs;
+      subjects = distinctSubjects;
+    } else {
+      const classFilters = activeChildren.map((c) => ({
+        className: c.grade,
+        section: c.section,
+        academicYear: query?.academicYear || c.academicYear,
+      }));
+
+      materialsDocs = await this.studyMaterialRepo.findPublishedMaterialsForClasses(
+        classFilters,
+        {
+          subject: query?.subject,
+          search: query?.search,
+        }
+      );
+
+      const subjectsSet = new Set<string>();
+      materialsDocs.forEach((m) => {
+        if (m.subject) subjectsSet.add(m.subject);
+      });
+      subjects = Array.from(subjectsSet);
+    }
+
+    if (query?.materialType && query.materialType.trim() && query.materialType !== 'ALL') {
+      const mt = query.materialType.trim().toUpperCase();
+      materialsDocs = materialsDocs.filter((m) => m.materialType === mt);
+    }
+
+    const academicYearsSet = new Set<string>();
+    activeChildren.forEach((c) => {
+      if (c.academicYear) academicYearsSet.add(c.academicYear);
+    });
+    materialsDocs.forEach((m) => {
+      if (m.academicYear) academicYearsSet.add(m.academicYear);
+    });
+
+    const selectedChildDTO = selectedChild
+      ? childrenDTOs.find((c) => c.id === selectedChild!._id.toString()) || null
+      : null;
+
+    const materials: ParentStudyMaterialItemDTO[] = materialsDocs.map((doc) => ({
+      id: doc._id ? doc._id.toString() : (doc as any).id || '',
+      title: doc.title,
+      description: doc.description || '',
+      teacherName: doc.teacherName,
+      className: doc.className,
+      section: doc.section,
+      subject: doc.subject,
+      academicYear: doc.academicYear,
+      materialType: doc.materialType,
+      fileUrl: doc.fileUrl || '',
+      fileName: doc.fileName || '',
+      fileSize: doc.fileSize || 0,
+      fileType: doc.fileType || '',
+      externalUrl: doc.externalUrl || '',
+      createdAt: doc.createdAt ? doc.createdAt.toISOString() : new Date().toISOString(),
+    }));
+
+    return {
+      children: childrenDTOs,
+      selectedChild: selectedChildDTO,
+      materials,
+      subjects: subjects.sort(),
+      academicYears: Array.from(academicYearsSet).sort(),
     };
   }
 }

@@ -11,6 +11,9 @@ import { AssignmentController } from './controllers/AssignmentController';
 import { TeacherExamRepository } from './repositories/TeacherExamRepository';
 import { TeacherExamService } from './services/TeacherExamService';
 import { TeacherExamController } from './controllers/TeacherExamController';
+import { StudyMaterialRepository } from './repositories/StudyMaterialRepository';
+import { StudyMaterialService } from './services/StudyMaterialService';
+import { StudyMaterialController } from './controllers/StudyMaterialController';
 import { createTeacherRouter } from './routes/teacher.routes';
 
 export interface TeacherModuleComponents {
@@ -27,6 +30,9 @@ export interface TeacherModuleComponents {
   teacherExamController: TeacherExamController;
   teacherExamService: TeacherExamService;
   teacherExamRepository: TeacherExamRepository;
+  studyMaterialController: StudyMaterialController;
+  studyMaterialService: StudyMaterialService;
+  studyMaterialRepository: StudyMaterialRepository;
 }
 
 export function initTeacherModule(authenticateMiddleware: RequestHandler): TeacherModuleComponents {
@@ -34,22 +40,26 @@ export function initTeacherModule(authenticateMiddleware: RequestHandler): Teach
   const attendanceRepository = new AttendanceRepository();
   const assignmentRepository = new AssignmentRepository();
   const teacherExamRepository = new TeacherExamRepository();
+  const studyMaterialRepository = new StudyMaterialRepository();
 
   const teacherDashboardService = new TeacherDashboardService(teacherDashboardRepository);
   const attendanceService = new AttendanceService(attendanceRepository);
   const assignmentService = new AssignmentService(assignmentRepository);
   const teacherExamService = new TeacherExamService(teacherExamRepository);
+  const studyMaterialService = new StudyMaterialService(studyMaterialRepository);
 
   const teacherDashboardController = new TeacherDashboardController(teacherDashboardService);
   const attendanceController = new AttendanceController(attendanceService);
   const assignmentController = new AssignmentController(assignmentService);
   const teacherExamController = new TeacherExamController(teacherExamService);
+  const studyMaterialController = new StudyMaterialController(studyMaterialService);
 
   const router = createTeacherRouter({
     teacherDashboardController,
     attendanceController,
     assignmentController,
     teacherExamController,
+    studyMaterialController,
     authenticateMiddleware,
   });
 
@@ -67,5 +77,8 @@ export function initTeacherModule(authenticateMiddleware: RequestHandler): Teach
     teacherExamController,
     teacherExamService,
     teacherExamRepository,
+    studyMaterialController,
+    studyMaterialService,
+    studyMaterialRepository,
   };
 }

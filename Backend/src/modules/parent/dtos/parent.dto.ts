@@ -211,3 +211,38 @@ export interface ParentExamResultsResponseDTO {
   exams: ParentExamCardDTO[];
 }
 
+export interface ParentStudyMaterialItemDTO {
+  id: string;
+  title: string;
+  description: string;
+  teacherName: string;
+  className: string;
+  section: string;
+  subject: string;
+  academicYear: string;
+  materialType: 'DOCUMENT' | 'VIDEO' | 'LINK';
+  fileUrl: string;
+  fileName: string;
+  fileSize: number;
+  fileType: string;
+  externalUrl: string;
+  createdAt: string;
+}
+
+export interface ParentStudyMaterialsQueryDTO {
+  studentId?: string;
+  subject?: string;
+  academicYear?: string;
+  materialType?: string;
+  search?: string;
+}
+
+export interface ParentStudyMaterialsResponseDTO {
+  children: ChildProfileDTO[];
+  selectedChild: ChildProfileDTO | null;
+  materials: ParentStudyMaterialItemDTO[];
+  subjects: string[];
+  academicYears: string[];
+}
+
+

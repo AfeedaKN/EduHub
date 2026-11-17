@@ -8,6 +8,8 @@ import { ExamRepository } from './repositories/ExamRepository';
 import { StudentDirectoryRepository } from './repositories/StudentDirectoryRepository';
 import { ParentDirectoryRepository } from './repositories/ParentDirectoryRepository';
 import { AdminAttendanceRepository } from './repositories/AdminAttendanceRepository';
+import { AdminAssignmentRepository } from './repositories/AdminAssignmentRepository';
+import { AdminStudyMaterialRepository } from './repositories/AdminStudyMaterialRepository';
 import { PasswordService } from '../auth/services/PasswordService';
 import { AdminService } from './services/AdminService';
 import { ClassService } from './services/ClassService';
@@ -18,6 +20,8 @@ import { ExamService } from './services/ExamService';
 import { StudentDirectoryService } from './services/StudentDirectoryService';
 import { ParentDirectoryService } from './services/ParentDirectoryService';
 import { AdminAttendanceService } from './services/AdminAttendanceService';
+import { AdminAssignmentService } from './services/AdminAssignmentService';
+import { AdminStudyMaterialService } from './services/AdminStudyMaterialService';
 import { AdminController } from './controllers/AdminController';
 import { ClassController } from './controllers/ClassController';
 import { SubjectController } from './controllers/SubjectController';
@@ -27,6 +31,8 @@ import { ExamController } from './controllers/ExamController';
 import { StudentDirectoryController } from './controllers/StudentDirectoryController';
 import { ParentDirectoryController } from './controllers/ParentDirectoryController';
 import { AdminAttendanceController } from './controllers/AdminAttendanceController';
+import { AdminAssignmentController } from './controllers/AdminAssignmentController';
+import { AdminStudyMaterialController } from './controllers/AdminStudyMaterialController';
 import { createAdminRouter } from './routes/admin.routes';
 
 export interface AdminModuleComponents {
@@ -40,6 +46,8 @@ export interface AdminModuleComponents {
   studentDirectoryController: StudentDirectoryController;
   parentDirectoryController: ParentDirectoryController;
   adminAttendanceController: AdminAttendanceController;
+  adminAssignmentController: AdminAssignmentController;
+  adminStudyMaterialController: AdminStudyMaterialController;
   adminService: AdminService;
   classService: ClassService;
   subjectService: SubjectService;
@@ -49,6 +57,8 @@ export interface AdminModuleComponents {
   studentDirectoryService: StudentDirectoryService;
   parentDirectoryService: ParentDirectoryService;
   adminAttendanceService: AdminAttendanceService;
+  adminAssignmentService: AdminAssignmentService;
+  adminStudyMaterialService: AdminStudyMaterialService;
   adminDashboardRepository: AdminDashboardRepository;
   classRepository: ClassRepository;
   subjectRepository: SubjectRepository;
@@ -58,6 +68,8 @@ export interface AdminModuleComponents {
   studentDirectoryRepository: StudentDirectoryRepository;
   parentDirectoryRepository: ParentDirectoryRepository;
   adminAttendanceRepository: AdminAttendanceRepository;
+  adminAssignmentRepository: AdminAssignmentRepository;
+  adminStudyMaterialRepository: AdminStudyMaterialRepository;
 }
 
 export function initAdminModule(authenticateMiddleware: RequestHandler): AdminModuleComponents {
@@ -70,6 +82,8 @@ export function initAdminModule(authenticateMiddleware: RequestHandler): AdminMo
   const studentDirectoryRepository = new StudentDirectoryRepository();
   const parentDirectoryRepository = new ParentDirectoryRepository();
   const adminAttendanceRepository = new AdminAttendanceRepository();
+  const adminAssignmentRepository = new AdminAssignmentRepository();
+  const adminStudyMaterialRepository = new AdminStudyMaterialRepository();
 
   const passwordService = new PasswordService(10);
   const classService = new ClassService(classRepository);
@@ -89,6 +103,8 @@ export function initAdminModule(authenticateMiddleware: RequestHandler): AdminMo
   const studentDirectoryService = new StudentDirectoryService(studentDirectoryRepository);
   const parentDirectoryService = new ParentDirectoryService(parentDirectoryRepository);
   const adminAttendanceService = new AdminAttendanceService(adminAttendanceRepository);
+  const adminAssignmentService = new AdminAssignmentService(adminAssignmentRepository);
+  const adminStudyMaterialService = new AdminStudyMaterialService(adminStudyMaterialRepository);
 
   const adminController = new AdminController(adminService);
   const classController = new ClassController(classService);
@@ -99,6 +115,8 @@ export function initAdminModule(authenticateMiddleware: RequestHandler): AdminMo
   const studentDirectoryController = new StudentDirectoryController(studentDirectoryService);
   const parentDirectoryController = new ParentDirectoryController(parentDirectoryService);
   const adminAttendanceController = new AdminAttendanceController(adminAttendanceService);
+  const adminAssignmentController = new AdminAssignmentController(adminAssignmentService);
+  const adminStudyMaterialController = new AdminStudyMaterialController(adminStudyMaterialService);
 
   const router = createAdminRouter({
     adminController,
@@ -110,6 +128,8 @@ export function initAdminModule(authenticateMiddleware: RequestHandler): AdminMo
     studentDirectoryController,
     parentDirectoryController,
     adminAttendanceController,
+    adminAssignmentController,
+    adminStudyMaterialController,
     authenticateMiddleware,
   });
 
@@ -124,6 +144,8 @@ export function initAdminModule(authenticateMiddleware: RequestHandler): AdminMo
     studentDirectoryController,
     parentDirectoryController,
     adminAttendanceController,
+    adminAssignmentController,
+    adminStudyMaterialController,
     adminService,
     classService,
     subjectService,
@@ -133,6 +155,8 @@ export function initAdminModule(authenticateMiddleware: RequestHandler): AdminMo
     studentDirectoryService,
     parentDirectoryService,
     adminAttendanceService,
+    adminAssignmentService,
+    adminStudyMaterialService,
     adminDashboardRepository,
     classRepository,
     subjectRepository,
@@ -142,5 +166,7 @@ export function initAdminModule(authenticateMiddleware: RequestHandler): AdminMo
     studentDirectoryRepository,
     parentDirectoryRepository,
     adminAttendanceRepository,
+    adminAssignmentRepository,
+    adminStudyMaterialRepository,
   };
 }

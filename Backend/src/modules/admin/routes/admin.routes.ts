@@ -8,6 +8,8 @@ import { ExamController } from '../controllers/ExamController';
 import { StudentDirectoryController } from '../controllers/StudentDirectoryController';
 import { ParentDirectoryController } from '../controllers/ParentDirectoryController';
 import { AdminAttendanceController } from '../controllers/AdminAttendanceController';
+import { AdminAssignmentController } from '../controllers/AdminAssignmentController';
+import { AdminStudyMaterialController } from '../controllers/AdminStudyMaterialController';
 import { authorizeRoles } from '../../auth/middlewares/auth.middleware';
 import { UserRole } from '../../auth/dtos/auth.dto';
 
@@ -21,6 +23,8 @@ export interface AdminRoutesDependencies {
   studentDirectoryController: StudentDirectoryController;
   parentDirectoryController: ParentDirectoryController;
   adminAttendanceController: AdminAttendanceController;
+  adminAssignmentController: AdminAssignmentController;
+  adminStudyMaterialController?: AdminStudyMaterialController;
   authenticateMiddleware: RequestHandler;
 }
 
@@ -36,6 +40,8 @@ export function createAdminRouter(deps: AdminRoutesDependencies): Router {
     studentDirectoryController,
     parentDirectoryController,
     adminAttendanceController,
+    adminAssignmentController,
+    adminStudyMaterialController,
     authenticateMiddleware,
   } = deps;
 
@@ -152,6 +158,21 @@ export function createAdminRouter(deps: AdminRoutesDependencies): Router {
   router.get('/attendance/reports/student/:studentId', adminAttendanceController.getStudentHistory);
   router.post('/attendance/student/:studentId', adminAttendanceController.recordSingleStudentAttendance);
   router.put('/attendance/record/:id', adminAttendanceController.correctAttendanceRecord);
+
+  // Assignment Management & Monitoring
+  router.get('/assignments/summary', adminAssignmentController.getSummary);
+  router.get('/assignments/metadata', adminAssignmentController.getMetadata);
+  router.get('/assignments/monitoring/teachers', adminAssignmentController.getTeacherMonitoring);
+  router.get('/assignments/:id', adminAssignmentController.getAssignmentDetails);
+  router.get('/assignments', adminAssignmentController.getAssignments);
+
+  // Study Materials Management & Monitoring
+  if (adminStudyMaterialController) {
+    router.get('/study-materials/summary', adminStudyMaterialController.getSummary);
+    router.get('/study-materials/metadata', adminStudyMaterialController.getMetadata);
+    router.get('/study-materials/:id', adminStudyMaterialController.getStudyMaterialById);
+    router.get('/study-materials', adminStudyMaterialController.getStudyMaterials);
+  }
 
   return router;
 }

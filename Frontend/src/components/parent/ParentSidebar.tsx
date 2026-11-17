@@ -7,6 +7,7 @@ import {
   GraduationCap,
   Calendar,
   FileText,
+  BookOpen,
   Award,
   CreditCard,
   MessageSquare,
@@ -61,6 +62,7 @@ export const ParentSidebar: React.FC<ParentSidebarProps> = ({ isMobileOpen, onCl
     { label: 'Academics', icon: GraduationCap, path: '/parent/academics' },
     { label: 'Timetable', icon: Calendar, path: '/parent/timetable' },
     { label: 'Assignments', icon: FileText, path: '/parent/assignments' },
+    { label: 'Study Materials', icon: BookOpen, path: '/parent/study-materials' },
     { label: 'Exams & Results', icon: Award, path: '/parent/exams' },
     { label: 'Fees', icon: CreditCard, path: '/parent/fees' },
   ];

@@ -7,6 +7,7 @@ import {
   CalendarCheck,
   Clock,
   BookOpen,
+  FileText,
   Award,
   Bell,
   User,
@@ -60,6 +61,7 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
 
   const academicNavLinks = [
     { to: '/teacher/assignments', label: 'Assignments', icon: BookOpen },
+    { to: '/teacher/study-materials', label: 'Study Materials', icon: FileText },
     { to: '/teacher/exams', label: 'Exams & Marks', icon: Award },
     { to: '/teacher/notices', label: 'Notices', icon: Bell },
     { to: '/teacher/profile', label: 'Profile', icon: User },

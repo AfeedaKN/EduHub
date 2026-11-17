@@ -141,7 +141,8 @@ describe('AssignmentService Unit Tests', () => {
         className: 'Grade 10',
         section: 'B',
         subject: 'Physics',
-        dueDate: '2026-10-30',
+        assignedDate: '2026-12-01',
+        dueDate: '2026-12-30',
         maxMarks: 100,
         status: 'DRAFT' as const,
       };
