@@ -10,6 +10,7 @@ import { ParentDirectoryController } from '../controllers/ParentDirectoryControl
 import { AdminAttendanceController } from '../controllers/AdminAttendanceController';
 import { AdminAssignmentController } from '../controllers/AdminAssignmentController';
 import { AdminStudyMaterialController } from '../controllers/AdminStudyMaterialController';
+import { AdminFeeController } from '../controllers/AdminFeeController';
 import { authorizeRoles } from '../../auth/middlewares/auth.middleware';
 import { UserRole } from '../../auth/dtos/auth.dto';
 
@@ -25,6 +26,7 @@ export interface AdminRoutesDependencies {
   adminAttendanceController: AdminAttendanceController;
   adminAssignmentController: AdminAssignmentController;
   adminStudyMaterialController?: AdminStudyMaterialController;
+  adminFeeController?: AdminFeeController;
   authenticateMiddleware: RequestHandler;
 }
 
@@ -42,6 +44,7 @@ export function createAdminRouter(deps: AdminRoutesDependencies): Router {
     adminAttendanceController,
     adminAssignmentController,
     adminStudyMaterialController,
+    adminFeeController,
     authenticateMiddleware,
   } = deps;
 
@@ -172,6 +175,52 @@ export function createAdminRouter(deps: AdminRoutesDependencies): Router {
     router.get('/study-materials/metadata', adminStudyMaterialController.getMetadata);
     router.get('/study-materials/:id', adminStudyMaterialController.getStudyMaterialById);
     router.get('/study-materials', adminStudyMaterialController.getStudyMaterials);
+  }
+
+  // Fees & Payments Management
+  if (adminFeeController) {
+    // Dashboard & Metrics
+    router.get('/fees/dashboard', adminFeeController.getDashboardSummary);
+
+    // Fee Categories
+    router.get('/fees/categories', adminFeeController.getCategories);
+    router.get('/fees/categories/:id', adminFeeController.getCategoryById);
+    router.get('/fees/categories/:id/usage', adminFeeController.getCategoryUsage);
+    router.post('/fees/categories', adminFeeController.createCategory);
+    router.put('/fees/categories/:id', adminFeeController.updateCategory);
+
+    // Fee Concessions
+    router.get('/fees/concessions', adminFeeController.getConcessions);
+    router.post('/fees/concessions', adminFeeController.createConcession);
+    router.put('/fees/concessions/:id', adminFeeController.updateConcession);
+
+    // Fee Structures
+    router.get('/fees/structures', adminFeeController.getStructures);
+    router.get('/fees/structures/:id/usage', adminFeeController.getStructureUsage);
+    router.get('/fees/structures/:id', adminFeeController.getStructureById);
+    router.post('/fees/structures', adminFeeController.createStructure);
+    router.post('/fees/structures/:id/duplicate', adminFeeController.duplicateStructure);
+    router.put('/fees/structures/:id', adminFeeController.updateStructure);
+
+    // Student Fee Assignments
+    router.get('/fees/assignments', adminFeeController.getFeeAssignments);
+    router.post('/fees/assignments', adminFeeController.assignFees);
+
+    // Invoices
+    router.get('/fees/invoices', adminFeeController.getInvoices);
+    router.get('/fees/invoices/:id', adminFeeController.getInvoiceById);
+    router.post('/fees/invoices/generate', adminFeeController.generateInvoices);
+
+    // Fee Payments & Receipts
+    router.get('/fees/payments', adminFeeController.getPayments);
+    router.post('/fees/payments/collect', adminFeeController.collectFee);
+    router.post('/fees/payments/:id/reverse', adminFeeController.reversePayment);
+
+    // Defaulters
+    router.get('/fees/defaulters', adminFeeController.getDefaulters);
+
+    // Reports
+    router.get('/fees/reports', adminFeeController.getReports);
   }
 
   return router;

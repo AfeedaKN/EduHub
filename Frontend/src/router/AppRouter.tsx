@@ -26,6 +26,7 @@ import { AdminSubjectsPage } from '../pages/admin/AdminSubjectsPage';
 import { AdminAttendancePage } from '../pages/admin/AdminAttendancePage';
 import { AdminAssignmentsPage } from '../pages/admin/AdminAssignmentsPage';
 import { AdminStudyMaterialsPage } from '../pages/admin/AdminStudyMaterialsPage';
+import { AdminFeesPage } from '../pages/admin/AdminFeesPage';
 import { AdminPlaceholderPage } from '../pages/admin/AdminPlaceholderPage';
 import { TeacherDashboardPage } from '../pages/teacher/TeacherDashboardPage';
 import { TeacherClassesPage } from '../pages/teacher/TeacherClassesPage';
@@ -350,10 +351,7 @@ export const AppRouter: React.FC = () => {
           path="/admin/fees"
           element={
             <ProtectedRoute allowedRoles={['MANAGEMENT']}>
-              <AdminPlaceholderPage
-                title="Fee Collection & Accounting"
-                description="Configure school fee structures, review pending collections, and generate payment receipts."
-              />
+              <AdminFeesPage />
             </ProtectedRoute>
           }
         />

@@ -10,6 +10,7 @@ import { ParentDirectoryRepository } from './repositories/ParentDirectoryReposit
 import { AdminAttendanceRepository } from './repositories/AdminAttendanceRepository';
 import { AdminAssignmentRepository } from './repositories/AdminAssignmentRepository';
 import { AdminStudyMaterialRepository } from './repositories/AdminStudyMaterialRepository';
+import { AdminFeeRepository } from './repositories/AdminFeeRepository';
 import { PasswordService } from '../auth/services/PasswordService';
 import { AdminService } from './services/AdminService';
 import { ClassService } from './services/ClassService';
@@ -22,6 +23,7 @@ import { ParentDirectoryService } from './services/ParentDirectoryService';
 import { AdminAttendanceService } from './services/AdminAttendanceService';
 import { AdminAssignmentService } from './services/AdminAssignmentService';
 import { AdminStudyMaterialService } from './services/AdminStudyMaterialService';
+import { AdminFeeService } from './services/AdminFeeService';
 import { AdminController } from './controllers/AdminController';
 import { ClassController } from './controllers/ClassController';
 import { SubjectController } from './controllers/SubjectController';
@@ -33,6 +35,7 @@ import { ParentDirectoryController } from './controllers/ParentDirectoryControll
 import { AdminAttendanceController } from './controllers/AdminAttendanceController';
 import { AdminAssignmentController } from './controllers/AdminAssignmentController';
 import { AdminStudyMaterialController } from './controllers/AdminStudyMaterialController';
+import { AdminFeeController } from './controllers/AdminFeeController';
 import { createAdminRouter } from './routes/admin.routes';
 
 export interface AdminModuleComponents {
@@ -48,6 +51,7 @@ export interface AdminModuleComponents {
   adminAttendanceController: AdminAttendanceController;
   adminAssignmentController: AdminAssignmentController;
   adminStudyMaterialController: AdminStudyMaterialController;
+  adminFeeController: AdminFeeController;
   adminService: AdminService;
   classService: ClassService;
   subjectService: SubjectService;
@@ -59,6 +63,7 @@ export interface AdminModuleComponents {
   adminAttendanceService: AdminAttendanceService;
   adminAssignmentService: AdminAssignmentService;
   adminStudyMaterialService: AdminStudyMaterialService;
+  adminFeeService: AdminFeeService;
   adminDashboardRepository: AdminDashboardRepository;
   classRepository: ClassRepository;
   subjectRepository: SubjectRepository;
@@ -70,6 +75,7 @@ export interface AdminModuleComponents {
   adminAttendanceRepository: AdminAttendanceRepository;
   adminAssignmentRepository: AdminAssignmentRepository;
   adminStudyMaterialRepository: AdminStudyMaterialRepository;
+  adminFeeRepository: AdminFeeRepository;
 }
 
 export function initAdminModule(authenticateMiddleware: RequestHandler): AdminModuleComponents {
@@ -84,6 +90,7 @@ export function initAdminModule(authenticateMiddleware: RequestHandler): AdminMo
   const adminAttendanceRepository = new AdminAttendanceRepository();
   const adminAssignmentRepository = new AdminAssignmentRepository();
   const adminStudyMaterialRepository = new AdminStudyMaterialRepository();
+  const adminFeeRepository = new AdminFeeRepository();
 
   const passwordService = new PasswordService(10);
   const classService = new ClassService(classRepository);
@@ -105,6 +112,7 @@ export function initAdminModule(authenticateMiddleware: RequestHandler): AdminMo
   const adminAttendanceService = new AdminAttendanceService(adminAttendanceRepository);
   const adminAssignmentService = new AdminAssignmentService(adminAssignmentRepository);
   const adminStudyMaterialService = new AdminStudyMaterialService(adminStudyMaterialRepository);
+  const adminFeeService = new AdminFeeService(adminFeeRepository);
 
   const adminController = new AdminController(adminService);
   const classController = new ClassController(classService);
@@ -117,6 +125,7 @@ export function initAdminModule(authenticateMiddleware: RequestHandler): AdminMo
   const adminAttendanceController = new AdminAttendanceController(adminAttendanceService);
   const adminAssignmentController = new AdminAssignmentController(adminAssignmentService);
   const adminStudyMaterialController = new AdminStudyMaterialController(adminStudyMaterialService);
+  const adminFeeController = new AdminFeeController(adminFeeService);
 
   const router = createAdminRouter({
     adminController,
@@ -130,6 +139,7 @@ export function initAdminModule(authenticateMiddleware: RequestHandler): AdminMo
     adminAttendanceController,
     adminAssignmentController,
     adminStudyMaterialController,
+    adminFeeController,
     authenticateMiddleware,
   });
 
@@ -146,6 +156,7 @@ export function initAdminModule(authenticateMiddleware: RequestHandler): AdminMo
     adminAttendanceController,
     adminAssignmentController,
     adminStudyMaterialController,
+    adminFeeController,
     adminService,
     classService,
     subjectService,
@@ -157,6 +168,7 @@ export function initAdminModule(authenticateMiddleware: RequestHandler): AdminMo
     adminAttendanceService,
     adminAssignmentService,
     adminStudyMaterialService,
+    adminFeeService,
     adminDashboardRepository,
     classRepository,
     subjectRepository,
@@ -168,5 +180,6 @@ export function initAdminModule(authenticateMiddleware: RequestHandler): AdminMo
     adminAttendanceRepository,
     adminAssignmentRepository,
     adminStudyMaterialRepository,
+    adminFeeRepository,
   };
 }

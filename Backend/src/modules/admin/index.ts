@@ -9,6 +9,7 @@ import { ParentDirectoryRepository } from './repositories/ParentDirectoryReposit
 import { AdminAttendanceRepository } from './repositories/AdminAttendanceRepository';
 import { AdminAssignmentRepository } from './repositories/AdminAssignmentRepository';
 import { AdminStudyMaterialRepository } from './repositories/AdminStudyMaterialRepository';
+import { AdminFeeRepository } from './repositories/AdminFeeRepository';
 import { PasswordService } from '../auth/services/PasswordService';
 import { AdminService } from './services/AdminService';
 import { ClassService } from './services/ClassService';
@@ -21,6 +22,7 @@ import { ParentDirectoryService } from './services/ParentDirectoryService';
 import { AdminAttendanceService } from './services/AdminAttendanceService';
 import { AdminAssignmentService } from './services/AdminAssignmentService';
 import { AdminStudyMaterialService } from './services/AdminStudyMaterialService';
+import { AdminFeeService } from './services/AdminFeeService';
 import { AdminController } from './controllers/AdminController';
 import { ClassController } from './controllers/ClassController';
 import { SubjectController } from './controllers/SubjectController';
@@ -32,6 +34,7 @@ import { ParentDirectoryController } from './controllers/ParentDirectoryControll
 import { AdminAttendanceController } from './controllers/AdminAttendanceController';
 import { AdminAssignmentController } from './controllers/AdminAssignmentController';
 import { AdminStudyMaterialController } from './controllers/AdminStudyMaterialController';
+import { AdminFeeController } from './controllers/AdminFeeController';
 import { createAdminRouter } from './routes/admin.routes';
 import { authenticateMiddleware } from '../auth';
 import { AdminModuleComponents } from './admin.module';
@@ -47,6 +50,7 @@ export const parentDirectoryRepository = new ParentDirectoryRepository();
 export const adminAttendanceRepository = new AdminAttendanceRepository();
 export const adminAssignmentRepository = new AdminAssignmentRepository();
 export const adminStudyMaterialRepository = new AdminStudyMaterialRepository();
+export const adminFeeRepository = new AdminFeeRepository();
 
 export const passwordService = new PasswordService(10);
 export const classService = new ClassService(classRepository);
@@ -68,6 +72,7 @@ export const parentDirectoryService = new ParentDirectoryService(parentDirectory
 export const adminAttendanceService = new AdminAttendanceService(adminAttendanceRepository);
 export const adminAssignmentService = new AdminAssignmentService(adminAssignmentRepository);
 export const adminStudyMaterialService = new AdminStudyMaterialService(adminStudyMaterialRepository);
+export const adminFeeService = new AdminFeeService(adminFeeRepository);
 
 export const adminController = new AdminController(adminService);
 export const classController = new ClassController(classService);
@@ -80,6 +85,7 @@ export const parentDirectoryController = new ParentDirectoryController(parentDir
 export const adminAttendanceController = new AdminAttendanceController(adminAttendanceService);
 export const adminAssignmentController = new AdminAssignmentController(adminAssignmentService);
 export const adminStudyMaterialController = new AdminStudyMaterialController(adminStudyMaterialService);
+export const adminFeeController = new AdminFeeController(adminFeeService);
 
 export const adminRouter = createAdminRouter({
   adminController,
@@ -93,6 +99,7 @@ export const adminRouter = createAdminRouter({
   adminAttendanceController,
   adminAssignmentController,
   adminStudyMaterialController,
+  adminFeeController,
   authenticateMiddleware,
 });
 
@@ -109,6 +116,7 @@ export const adminModule: AdminModuleComponents = {
   adminAttendanceController,
   adminAssignmentController,
   adminStudyMaterialController,
+  adminFeeController,
   adminService,
   classService,
   subjectService,
@@ -120,6 +128,7 @@ export const adminModule: AdminModuleComponents = {
   adminAttendanceService,
   adminAssignmentService,
   adminStudyMaterialService,
+  adminFeeService,
   adminDashboardRepository,
   classRepository,
   subjectRepository,
@@ -131,4 +140,5 @@ export const adminModule: AdminModuleComponents = {
   adminAttendanceRepository,
   adminAssignmentRepository,
   adminStudyMaterialRepository,
+  adminFeeRepository,
 };
