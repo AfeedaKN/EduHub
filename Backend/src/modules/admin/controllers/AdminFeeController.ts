@@ -170,6 +170,18 @@ export class AdminFeeController {
     }
   };
 
+  publishStructure = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { id } = req.params;
+      const result = await this.feeService.publishStructure(id);
+      return res
+        .status(HttpStatusCode.OK)
+        .json(ApiResponse.success(result, result.message));
+    } catch (error) {
+      next(error);
+    }
+  };
+
   getStructureUsage = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { id } = req.params;
@@ -190,6 +202,18 @@ export class AdminFeeController {
       return res
         .status(HttpStatusCode.CREATED)
         .json(ApiResponse.success(result, 'Fee structure duplicated successfully for target academic year.'));
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  deleteStructure = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { id } = req.params;
+      const result = await this.feeService.deleteStructure(id);
+      return res
+        .status(HttpStatusCode.OK)
+        .json(ApiResponse.success(result, result.message));
     } catch (error) {
       next(error);
     }
@@ -227,6 +251,18 @@ export class AdminFeeController {
     }
   };
 
+  cancelFeeAssignment = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { id } = req.params;
+      const result = await this.feeService.cancelFeeAssignment(id);
+      return res
+        .status(HttpStatusCode.OK)
+        .json(ApiResponse.success(result, 'Fee assignment cancelled successfully.'));
+    } catch (error) {
+      next(error);
+    }
+  };
+
   // 6. Invoices
   getInvoices = async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -259,6 +295,18 @@ export class AdminFeeController {
     }
   };
 
+  getInvoicePayments = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { id } = req.params;
+      const result = await this.feeService.getInvoicePayments(id);
+      return res
+        .status(HttpStatusCode.OK)
+        .json(ApiResponse.success(result, 'Invoice payment history retrieved successfully.'));
+    } catch (error) {
+      next(error);
+    }
+  };
+
   generateInvoices = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const result = await this.feeService.generateInvoices(req.body);
@@ -270,14 +318,27 @@ export class AdminFeeController {
     }
   };
 
-  // 7. Payments / Collection
+  // 7. Payments / Collection & Ledger
   getPayments = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { academicYear, className, paymentMethod, startDate, endDate, search } = req.query;
+      const {
+        academicYear,
+        className,
+        section,
+        invoiceNumber,
+        paymentMethod,
+        status,
+        startDate,
+        endDate,
+        search,
+      } = req.query;
       const result = await this.feeService.getPayments({
         academicYear: academicYear ? String(academicYear) : undefined,
         className: className ? String(className) : undefined,
+        section: section ? String(section) : undefined,
+        invoiceNumber: invoiceNumber ? String(invoiceNumber) : undefined,
         paymentMethod: paymentMethod ? String(paymentMethod) : undefined,
+        status: status ? String(status) : undefined,
         startDate: startDate ? String(startDate) : undefined,
         endDate: endDate ? String(endDate) : undefined,
         search: search ? String(search) : undefined,
@@ -285,6 +346,49 @@ export class AdminFeeController {
       return res
         .status(HttpStatusCode.OK)
         .json(ApiResponse.success(result, 'Payment transactions retrieved successfully.'));
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  getPaymentById = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { id } = req.params;
+      const result = await this.feeService.getPaymentById(id);
+      return res
+        .status(HttpStatusCode.OK)
+        .json(ApiResponse.success(result, 'Payment receipt retrieved successfully.'));
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  getCollectionSummary = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { academicYear } = req.query;
+      const result = await this.feeService.getCollectionSummary(
+        academicYear ? String(academicYear) : undefined
+      );
+      return res
+        .status(HttpStatusCode.OK)
+        .json(ApiResponse.success(result, 'Fee collection summary retrieved successfully.'));
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  getLedgerEntries = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { academicYear, studentId, transactionType, status } = req.query;
+      const result = await this.feeService.getLedgerEntries({
+        academicYear: academicYear ? String(academicYear) : undefined,
+        studentId: studentId ? String(studentId) : undefined,
+        transactionType: transactionType ? String(transactionType) : undefined,
+        status: status ? String(status) : undefined,
+      });
+      return res
+        .status(HttpStatusCode.OK)
+        .json(ApiResponse.success(result, 'Financial fee ledger entries retrieved successfully.'));
     } catch (error) {
       next(error);
     }

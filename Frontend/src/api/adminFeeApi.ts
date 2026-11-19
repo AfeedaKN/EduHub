@@ -132,6 +132,13 @@ export const adminFeeApi = {
     return res.data;
   },
 
+  publishStructure: async (
+    id: string
+  ): Promise<ApiResponse<{ publishedCount: number; invoicesCount: number; skippedCount: number; message: string }>> => {
+    const res = await axiosClient.post<ApiResponse<any>>(`/admin/fees/structures/${id}/publish`);
+    return res.data;
+  },
+
   getStructureUsage: async (id: string): Promise<ApiResponse<FeeStructureUsage>> => {
     const res = await axiosClient.get<ApiResponse<FeeStructureUsage>>(
       `/admin/fees/structures/${id}/usage`
@@ -150,11 +157,20 @@ export const adminFeeApi = {
     return res.data;
   },
 
+  deleteStructure: async (id: string): Promise<ApiResponse<{ success: boolean; message: string }>> => {
+    const res = await axiosClient.delete<ApiResponse<{ success: boolean; message: string }>>(
+      `/admin/fees/structures/${id}`
+    );
+    return res.data;
+  },
+
   // Fee Assignments
   getAssignments: async (params?: {
     academicYear?: string;
     className?: string;
     section?: string;
+    feeStructureId?: string;
+    status?: string;
     search?: string;
   }): Promise<ApiResponse<StudentFeeAssignment[]>> => {
     const res = await axiosClient.get<ApiResponse<StudentFeeAssignment[]>>(
@@ -166,6 +182,13 @@ export const adminFeeApi = {
 
   assignFees: async (data: AssignFeeInput): Promise<ApiResponse<AssignFeeResult>> => {
     const res = await axiosClient.post<ApiResponse<AssignFeeResult>>('/admin/fees/assignments', data);
+    return res.data;
+  },
+
+  cancelAssignment: async (id: string): Promise<ApiResponse<StudentFeeAssignment>> => {
+    const res = await axiosClient.put<ApiResponse<StudentFeeAssignment>>(
+      `/admin/fees/assignments/${id}/cancel`
+    );
     return res.data;
   },
 
@@ -199,17 +222,51 @@ export const adminFeeApi = {
     return res.data;
   },
 
+  getInvoicePayments: async (invoiceId: string): Promise<ApiResponse<FeePayment[]>> => {
+    const res = await axiosClient.get<ApiResponse<FeePayment[]>>(
+      `/admin/fees/invoices/${invoiceId}/payments`
+    );
+    return res.data;
+  },
+
   // Fee Payments & Receipts
   getPayments: async (params?: {
     academicYear?: string;
     className?: string;
+    section?: string;
+    invoiceNumber?: string;
     paymentMethod?: string;
+    status?: string;
     startDate?: string;
     endDate?: string;
     search?: string;
   }): Promise<ApiResponse<FeePayment[]>> => {
     const res = await axiosClient.get<ApiResponse<FeePayment[]>>('/admin/fees/payments', {
       params,
+    });
+    return res.data;
+  },
+
+  getPaymentById: async (id: string): Promise<ApiResponse<FeePayment>> => {
+    const res = await axiosClient.get<ApiResponse<FeePayment>>(`/admin/fees/payments/${id}`);
+    return res.data;
+  },
+
+  getCollectionSummary: async (
+    academicYear?: string
+  ): Promise<ApiResponse<{
+    totalCollected: number;
+    todayCollected: number;
+    pendingPaymentsCount: number;
+    totalOutstanding: number;
+  }>> => {
+    const res = await axiosClient.get<ApiResponse<{
+      totalCollected: number;
+      todayCollected: number;
+      pendingPaymentsCount: number;
+      totalOutstanding: number;
+    }>>('/admin/fees/payments/summary', {
+      params: academicYear ? { academicYear } : undefined,
     });
     return res.data;
   },
@@ -227,6 +284,18 @@ export const adminFeeApi = {
       `/admin/fees/payments/${paymentId}/reverse`,
       data
     );
+    return res.data;
+  },
+
+  getLedgerEntries: async (params?: {
+    academicYear?: string;
+    studentId?: string;
+    transactionType?: string;
+    status?: string;
+  }): Promise<ApiResponse<any[]>> => {
+    const res = await axiosClient.get<ApiResponse<any[]>>('/admin/fees/ledger', {
+      params,
+    });
     return res.data;
   },
 

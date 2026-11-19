@@ -8,4 +8,11 @@ export const ParentMessages = {
   ASSIGNMENT_DETAIL_FETCHED: 'Assignment details retrieved successfully.',
   ASSIGNMENT_SUBMITTED: 'Assignment submitted successfully.',
   EXAM_RESULTS_FETCHED: "Student's examination results retrieved successfully.",
+  FEE_INVOICES_FETCHED: 'Fee invoices retrieved successfully.',
+  FEE_INVOICE_DETAIL_FETCHED: 'Fee invoice details retrieved successfully.',
+  PAYMENT_CONFIG_FETCHED: 'Payment gateway configuration retrieved successfully.',
+  PAYMENT_ORDER_CREATED: 'Payment order created successfully.',
+  PAYMENT_VERIFIED: 'Fee payment verified and processed successfully. Receipt generated.',
+  PAYMENT_WEBHOOK_PROCESSED: 'Payment webhook notification processed successfully.',
+  PAYMENT_HISTORY_FETCHED: 'Payment history retrieved successfully.',
 } as const;

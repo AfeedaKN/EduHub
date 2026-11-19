@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import '../../auth/models/User.model';
 import { FeeCategoryModel, IFeeCategoryDoc } from '../models/FeeCategory.model';
 import { FeeConcessionModel, IFeeConcessionDoc } from '../models/FeeConcession.model';
 import { FeeStructureModel, IFeeStructureDoc } from '../models/FeeStructure.model';
@@ -8,6 +9,7 @@ import {
 } from '../models/StudentFeeAssignment.model';
 import { FeeInvoiceModel, IFeeInvoiceDoc } from '../models/FeeInvoice.model';
 import { FeePaymentModel, IFeePaymentDoc } from '../models/FeePayment.model';
+import { FeeLedgerModel, IFeeLedgerDoc } from '../models/FeeLedger.model';
 import { StudentModel, IStudentDoc } from '../../parent/models/Student.model';
 
 export interface IAdminFeeRepository {
@@ -38,8 +40,10 @@ export interface IAdminFeeRepository {
   findStructuresByCategoryId(categoryId: string): Promise<IFeeStructureDoc[]>;
   countInvoicesByStructureId(structureId: string): Promise<number>;
   countAssignmentsByStructureId(structureId: string): Promise<number>;
+  deleteStructure(id: string): Promise<boolean>;
 
   // Student Enrollment & Assignments
+  findStudentById(studentId: string): Promise<IStudentDoc | null>;
   findActiveEnrolledStudents(
     className?: string,
     section?: string,
@@ -76,9 +80,11 @@ export interface IAdminFeeRepository {
   findInvoiceByNumber(invoiceNumber: string): Promise<IFeeInvoiceDoc | null>;
   findInvoiceByAssignmentAndInstallment(
     assignmentId: string,
-    installmentNumber: number
+    installmentNumber: number,
+    includeCancelled?: boolean
   ): Promise<IFeeInvoiceDoc | null>;
   updateInvoice(id: string, data: Partial<IFeeInvoiceDoc>): Promise<IFeeInvoiceDoc | null>;
+  findInvoicesByAssignmentId(assignmentId: string): Promise<IFeeInvoiceDoc[]>;
   getNextInvoiceNumber(academicYear: string): Promise<string>;
 
   // Payments
@@ -86,15 +92,44 @@ export interface IAdminFeeRepository {
   findPayments(filter?: {
     academicYear?: string;
     className?: string;
+    section?: string;
+    invoiceNumber?: string;
     paymentMethod?: string;
+    status?: string;
     startDate?: string;
     endDate?: string;
     search?: string;
   }): Promise<IFeePaymentDoc[]>;
   findPaymentById(id: string): Promise<IFeePaymentDoc | null>;
+  findPaymentByReceiptNumber(receiptNumber: string): Promise<IFeePaymentDoc | null>;
+  findPaymentByTransactionRef(ref: string): Promise<IFeePaymentDoc | null>;
+  findRecentDuplicatePayment(
+    invoiceId: string,
+    amount: number,
+    paymentMethod: string,
+    secondsWindow?: number
+  ): Promise<IFeePaymentDoc | null>;
   findPaymentsByInvoiceId(invoiceId: string): Promise<IFeePaymentDoc[]>;
   updatePayment(id: string, data: Partial<IFeePaymentDoc>): Promise<IFeePaymentDoc | null>;
   getNextReceiptNumber(academicYear: string): Promise<string>;
+  getCollectionMetrics(academicYear?: string): Promise<{
+    totalCollected: number;
+    todayCollected: number;
+    pendingPaymentsCount: number;
+    totalOutstanding: number;
+  }>;
+
+  // Ledger
+  createLedgerEntry(data: Partial<IFeeLedgerDoc>): Promise<IFeeLedgerDoc>;
+  findLedgerEntries(filter?: {
+    academicYear?: string;
+    studentId?: string;
+    transactionType?: string;
+    status?: string;
+  }): Promise<IFeeLedgerDoc[]>;
+  findLedgerByPaymentId(paymentId: string): Promise<IFeeLedgerDoc | null>;
+  updateLedgerEntry(id: string, data: Partial<IFeeLedgerDoc>): Promise<IFeeLedgerDoc | null>;
+  getNextLedgerNumber(academicYear: string): Promise<string>;
 
   // Defaulters
   findDefaulterInvoices(filter?: {
@@ -250,7 +285,18 @@ export class AdminFeeRepository implements IAdminFeeRepository {
     }).exec();
   }
 
+  async deleteStructure(id: string): Promise<boolean> {
+    if (!mongoose.Types.ObjectId.isValid(id)) return false;
+    const res = await FeeStructureModel.findByIdAndDelete(id).exec();
+    return !!res;
+  }
+
   // Student Enrollment & Assignments
+  async findStudentById(studentId: string): Promise<IStudentDoc | null> {
+    if (!mongoose.Types.ObjectId.isValid(studentId)) return null;
+    return await StudentModel.findById(studentId).populate('parentId').exec();
+  }
+
   async findActiveEnrolledStudents(
     className?: string,
     section?: string,
@@ -383,14 +429,18 @@ export class AdminFeeRepository implements IAdminFeeRepository {
 
   async findInvoiceByAssignmentAndInstallment(
     assignmentId: string,
-    installmentNumber: number
+    installmentNumber: number,
+    includeCancelled: boolean = true
   ): Promise<IFeeInvoiceDoc | null> {
     if (!mongoose.Types.ObjectId.isValid(assignmentId)) return null;
-    return await FeeInvoiceModel.findOne({
+    const query: Record<string, any> = {
       feeAssignmentId: new mongoose.Types.ObjectId(assignmentId),
       installmentNumber,
-      status: { $ne: 'CANCELLED' },
-    }).exec();
+    };
+    if (!includeCancelled) {
+      query.status = { $ne: 'CANCELLED' };
+    }
+    return await FeeInvoiceModel.findOne(query).exec();
   }
 
   async updateInvoice(
@@ -405,13 +455,26 @@ export class AdminFeeRepository implements IAdminFeeRepository {
     ).exec();
   }
 
+  async findInvoicesByAssignmentId(assignmentId: string): Promise<IFeeInvoiceDoc[]> {
+    if (!mongoose.Types.ObjectId.isValid(assignmentId)) return [];
+    return await FeeInvoiceModel.find({
+      feeAssignmentId: new mongoose.Types.ObjectId(assignmentId),
+    }).exec();
+  }
+
   async getNextInvoiceNumber(academicYear: string): Promise<string> {
     const yearPrefix = academicYear.split('-')[0] || new Date().getFullYear().toString();
-    const count = await FeeInvoiceModel.countDocuments({
+    let count = await FeeInvoiceModel.countDocuments({
       academicYear: academicYear.trim(),
     }).exec();
-    const nextSeq = (count + 1).toString().padStart(4, '0');
-    return `INV-${yearPrefix}-${nextSeq}`;
+    let candidate = `INV-${yearPrefix}-${(count + 1).toString().padStart(4, '0')}`;
+    let exists = await FeeInvoiceModel.findOne({ invoiceNumber: candidate }).exec();
+    while (exists) {
+      count++;
+      candidate = `INV-${yearPrefix}-${(count + 1).toString().padStart(4, '0')}`;
+      exists = await FeeInvoiceModel.findOne({ invoiceNumber: candidate }).exec();
+    }
+    return candidate;
   }
 
   // Payments
@@ -422,7 +485,10 @@ export class AdminFeeRepository implements IAdminFeeRepository {
   async findPayments(filter?: {
     academicYear?: string;
     className?: string;
+    section?: string;
+    invoiceNumber?: string;
     paymentMethod?: string;
+    status?: string;
     startDate?: string;
     endDate?: string;
     search?: string;
@@ -434,8 +500,17 @@ export class AdminFeeRepository implements IAdminFeeRepository {
     if (filter?.className && filter.className !== 'ALL') {
       query.className = { $regex: new RegExp(`^${filter.className.trim()}$`, 'i') };
     }
+    if (filter?.section && filter.section !== 'ALL') {
+      query.section = { $regex: new RegExp(`^${filter.section.trim()}$`, 'i') };
+    }
+    if (filter?.invoiceNumber && filter.invoiceNumber !== 'ALL') {
+      query.invoiceNumber = { $regex: new RegExp(`^${filter.invoiceNumber.trim()}$`, 'i') };
+    }
     if (filter?.paymentMethod && filter.paymentMethod !== 'ALL') {
       query.paymentMethod = filter.paymentMethod;
+    }
+    if (filter?.status && filter.status !== 'ALL') {
+      query.status = filter.status;
     }
     if (filter?.startDate || filter?.endDate) {
       query.paymentDate = {};
@@ -461,6 +536,38 @@ export class AdminFeeRepository implements IAdminFeeRepository {
   async findPaymentById(id: string): Promise<IFeePaymentDoc | null> {
     if (!mongoose.Types.ObjectId.isValid(id)) return null;
     return await FeePaymentModel.findById(id).exec();
+  }
+
+  async findPaymentByReceiptNumber(receiptNumber: string): Promise<IFeePaymentDoc | null> {
+    if (!receiptNumber) return null;
+    return await FeePaymentModel.findOne({
+      receiptNumber: receiptNumber.trim().toUpperCase(),
+    }).exec();
+  }
+
+  async findPaymentByTransactionRef(ref: string): Promise<IFeePaymentDoc | null> {
+    if (!ref || !ref.trim()) return null;
+    return await FeePaymentModel.findOne({
+      transactionReference: { $regex: new RegExp(`^${ref.trim()}$`, 'i') },
+      status: 'SUCCESS',
+    }).exec();
+  }
+
+  async findRecentDuplicatePayment(
+    invoiceId: string,
+    amount: number,
+    paymentMethod: string,
+    secondsWindow: number = 10
+  ): Promise<IFeePaymentDoc | null> {
+    if (!mongoose.Types.ObjectId.isValid(invoiceId)) return null;
+    const since = new Date(Date.now() - secondsWindow * 1000);
+    return await FeePaymentModel.findOne({
+      invoiceId: new mongoose.Types.ObjectId(invoiceId),
+      amount,
+      paymentMethod,
+      status: 'SUCCESS',
+      createdAt: { $gte: since },
+    }).exec();
   }
 
   async findPaymentsByInvoiceId(invoiceId: string): Promise<IFeePaymentDoc[]> {
@@ -489,8 +596,124 @@ export class AdminFeeRepository implements IAdminFeeRepository {
     const count = await FeePaymentModel.countDocuments({
       academicYear: academicYear.trim(),
     }).exec();
-    const nextSeq = (count + 1).toString().padStart(4, '0');
-    return `REC-${yearPrefix}-${nextSeq}`;
+    let nextNum = count + 1;
+    let candidate = `REC-${yearPrefix}-${nextNum.toString().padStart(4, '0')}`;
+    let exists = await FeePaymentModel.findOne({ receiptNumber: candidate }).exec();
+    while (exists) {
+      nextNum++;
+      candidate = `REC-${yearPrefix}-${nextNum.toString().padStart(4, '0')}`;
+      exists = await FeePaymentModel.findOne({ receiptNumber: candidate }).exec();
+    }
+    return candidate;
+  }
+
+  async getCollectionMetrics(academicYear?: string): Promise<{
+    totalCollected: number;
+    todayCollected: number;
+    pendingPaymentsCount: number;
+    totalOutstanding: number;
+  }> {
+    const todayStr = new Date().toISOString().split('T')[0];
+    const paymentQuery: Record<string, any> = { status: 'SUCCESS' };
+    const invoiceQuery: Record<string, any> = { status: { $ne: 'CANCELLED' } };
+
+    if (academicYear && academicYear !== 'ALL') {
+      paymentQuery.academicYear = academicYear;
+      invoiceQuery.academicYear = academicYear;
+    }
+
+    const [payments, invoices] = await Promise.all([
+      FeePaymentModel.find(paymentQuery).select('amount paymentDate').lean().exec(),
+      FeeInvoiceModel.find(invoiceQuery).select('outstandingAmount status').lean().exec(),
+    ]);
+
+    let totalCollected = 0;
+    let todayCollected = 0;
+    payments.forEach((p) => {
+      totalCollected += p.amount || 0;
+      if (p.paymentDate === todayStr) {
+        todayCollected += p.amount || 0;
+      }
+    });
+
+    let pendingPaymentsCount = 0;
+    let totalOutstanding = 0;
+    invoices.forEach((inv) => {
+      if (inv.status === 'UNPAID' || inv.status === 'PARTIAL' || inv.status === 'OVERDUE') {
+        pendingPaymentsCount++;
+      }
+      totalOutstanding += inv.outstandingAmount || 0;
+    });
+
+    return {
+      totalCollected: Math.round(totalCollected * 100) / 100,
+      todayCollected: Math.round(todayCollected * 100) / 100,
+      pendingPaymentsCount,
+      totalOutstanding: Math.round(totalOutstanding * 100) / 100,
+    };
+  }
+
+  // Ledger
+  async createLedgerEntry(data: Partial<IFeeLedgerDoc>): Promise<IFeeLedgerDoc> {
+    return await FeeLedgerModel.create(data);
+  }
+
+  async findLedgerEntries(filter?: {
+    academicYear?: string;
+    studentId?: string;
+    transactionType?: string;
+    status?: string;
+  }): Promise<IFeeLedgerDoc[]> {
+    const query: Record<string, any> = {};
+    if (filter?.academicYear && filter.academicYear !== 'ALL') {
+      query.academicYear = filter.academicYear;
+    }
+    if (filter?.studentId && mongoose.Types.ObjectId.isValid(filter.studentId)) {
+      query.studentId = new mongoose.Types.ObjectId(filter.studentId);
+    }
+    if (filter?.transactionType && filter.transactionType !== 'ALL') {
+      query.transactionType = filter.transactionType;
+    }
+    if (filter?.status && filter.status !== 'ALL') {
+      query.status = filter.status;
+    }
+    return await FeeLedgerModel.find(query).sort({ createdAt: -1 }).exec();
+  }
+
+  async findLedgerByPaymentId(paymentId: string): Promise<IFeeLedgerDoc | null> {
+    if (!mongoose.Types.ObjectId.isValid(paymentId)) return null;
+    return await FeeLedgerModel.findOne({
+      paymentId: new mongoose.Types.ObjectId(paymentId),
+      transactionType: 'FEE_PAYMENT',
+    }).exec();
+  }
+
+  async updateLedgerEntry(
+    id: string,
+    data: Partial<IFeeLedgerDoc>
+  ): Promise<IFeeLedgerDoc | null> {
+    if (!mongoose.Types.ObjectId.isValid(id)) return null;
+    return await FeeLedgerModel.findByIdAndUpdate(
+      id,
+      { $set: data },
+      { new: true, runValidators: true }
+    ).exec();
+  }
+
+  async getNextLedgerNumber(academicYear: string): Promise<string> {
+    const yearPrefix = academicYear.split('-')[0] || new Date().getFullYear().toString();
+    const count = await FeeLedgerModel.countDocuments({
+      academicYear: academicYear.trim(),
+    }).exec();
+    let nextNum = count + 1;
+    let candidate = `LED-${yearPrefix}-${nextNum.toString().padStart(4, '0')}`;
+    let exists = await FeeLedgerModel.findOne({ entryNumber: candidate }).exec();
+    while (exists) {
+      nextNum++;
+      candidate = `LED-${yearPrefix}-${nextNum.toString().padStart(4, '0')}`;
+      exists = await FeeLedgerModel.findOne({ entryNumber: candidate }).exec();
+    }
+    return candidate;
   }
 
   // Defaulters

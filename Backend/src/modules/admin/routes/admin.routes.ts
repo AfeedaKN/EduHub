@@ -200,21 +200,29 @@ export function createAdminRouter(deps: AdminRoutesDependencies): Router {
     router.get('/fees/structures/:id', adminFeeController.getStructureById);
     router.post('/fees/structures', adminFeeController.createStructure);
     router.post('/fees/structures/:id/duplicate', adminFeeController.duplicateStructure);
+    router.post('/fees/structures/:id/publish', adminFeeController.publishStructure);
     router.put('/fees/structures/:id', adminFeeController.updateStructure);
+    router.delete('/fees/structures/:id', adminFeeController.deleteStructure);
 
     // Student Fee Assignments
     router.get('/fees/assignments', adminFeeController.getFeeAssignments);
     router.post('/fees/assignments', adminFeeController.assignFees);
+    router.put('/fees/assignments/:id/cancel', adminFeeController.cancelFeeAssignment);
 
     // Invoices
     router.get('/fees/invoices', adminFeeController.getInvoices);
+    router.get('/fees/invoices/:id/payments', adminFeeController.getInvoicePayments);
     router.get('/fees/invoices/:id', adminFeeController.getInvoiceById);
     router.post('/fees/invoices/generate', adminFeeController.generateInvoices);
 
-    // Fee Payments & Receipts
+    // Fee Payments & Receipts & Ledger
+    router.get('/fees/payments/summary', adminFeeController.getCollectionSummary);
     router.get('/fees/payments', adminFeeController.getPayments);
+    router.get('/fees/payments/:id', adminFeeController.getPaymentById);
+    router.post('/fees/payments', adminFeeController.collectFee);
     router.post('/fees/payments/collect', adminFeeController.collectFee);
     router.post('/fees/payments/:id/reverse', adminFeeController.reversePayment);
+    router.get('/fees/ledger', adminFeeController.getLedgerEntries);
 
     // Defaulters
     router.get('/fees/defaulters', adminFeeController.getDefaulters);

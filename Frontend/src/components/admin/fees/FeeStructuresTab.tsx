@@ -15,6 +15,7 @@ import {
   ShieldAlert,
   Lock,
   Unlock,
+  Send,
 } from 'lucide-react';
 import { adminFeeApi } from '../../../api/adminFeeApi';
 import { adminApi } from '../../../api/adminApi';
@@ -67,6 +68,13 @@ export const FeeStructuresTab: React.FC<FeeStructuresTabProps> = ({
   const [duplicateName, setDuplicateName] = useState<string>('');
   const [duplicating, setDuplicating] = useState<boolean>(false);
   const [duplicateError, setDuplicateError] = useState<string | null>(null);
+
+  // Delete Modal State
+  const [deletingStructure, setDeletingStructure] = useState<FeeStructure | null>(null);
+  const [deleteUsage, setDeleteUsage] = useState<FeeStructureUsage | null>(null);
+  const [loadingDeleteUsage, setLoadingDeleteUsage] = useState<boolean>(false);
+  const [deleting, setDeleting] = useState<boolean>(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   // Status Action Alert
   const [actionAlert, setActionAlert] = useState<{ type: 'success' | 'error'; message: string } | null>(
@@ -465,6 +473,8 @@ export const FeeStructuresTab: React.FC<FeeStructuresTabProps> = ({
 
         // If financials are allowed to be edited, include them
         if (editUsage?.canEditFinancials !== false) {
+          updatePayload.className = formData.className.trim();
+          updatePayload.section = formData.section.trim();
           updatePayload.categories = formData.categories;
           updatePayload.totalAmount = calculatedGrandTotal;
           updatePayload.paymentFrequency = formData.paymentFrequency;
@@ -554,22 +564,95 @@ export const FeeStructuresTab: React.FC<FeeStructuresTabProps> = ({
     }
   };
 
+  // Publishing Structure State
+  const [publishingId, setPublishingId] = useState<string | null>(null);
+
   // Toggle Structure Status (Active / Inactive)
   const handleToggleStatus = async (struct: FeeStructure) => {
     const newStatus: FeeStructureStatus = struct.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
     setActionAlert(null);
     try {
-      await adminFeeApi.updateStructure(struct.id, { status: newStatus });
-      setActionAlert({
-        type: 'success',
-        message: `Structure "${struct.name}" is now marked as ${newStatus}.`,
-      });
+      if (newStatus === 'ACTIVE') {
+        const res = await adminFeeApi.publishStructure(struct.id);
+        setActionAlert({
+          type: 'success',
+          message: res.data?.message || `Structure "${struct.name}" published and activated for ${struct.className}.`,
+        });
+      } else {
+        await adminFeeApi.updateStructure(struct.id, { status: newStatus });
+        setActionAlert({
+          type: 'success',
+          message: `Structure "${struct.name}" is now marked as ${newStatus}.`,
+        });
+      }
       fetchStructures();
     } catch (err: any) {
       setActionAlert({
         type: 'error',
         message: err?.message || 'Failed to update structure status.',
       });
+    }
+  };
+
+  // Explicit Publish Structure and generate invoices for enrolled students
+  const handlePublishStructure = async (struct: FeeStructure) => {
+    setActionAlert(null);
+    try {
+      setPublishingId(struct.id);
+      const res = await adminFeeApi.publishStructure(struct.id);
+      setActionAlert({
+        type: 'success',
+        message:
+          res.data?.message ||
+          `Fee structure "${struct.name}" published successfully for ${struct.className}! Invoices generated.`,
+      });
+      fetchStructures();
+    } catch (err: any) {
+      setActionAlert({
+        type: 'error',
+        message: err?.message || 'Failed to publish fee structure.',
+      });
+    } finally {
+      setPublishingId(null);
+    }
+  };
+
+  const handleOpenDeleteModal = async (struct: FeeStructure) => {
+    setDeletingStructure(struct);
+    setDeleteError(null);
+    setLoadingDeleteUsage(true);
+    try {
+      const res = await adminFeeApi.getStructureUsage(struct.id);
+      if (res.success && res.data) {
+        setDeleteUsage(res.data);
+      }
+    } catch {
+      setDeleteUsage(null);
+    } finally {
+      setLoadingDeleteUsage(false);
+    }
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deletingStructure) return;
+    try {
+      setDeleting(true);
+      setDeleteError(null);
+      const res = await adminFeeApi.deleteStructure(deletingStructure.id);
+      if (res.success) {
+        setActionAlert({
+          type: 'success',
+          message: res.message || `Fee structure '${deletingStructure.name}' deleted successfully.`,
+        });
+        setTimeout(() => setActionAlert(null), 4000);
+        setDeletingStructure(null);
+        setDeleteUsage(null);
+        fetchStructures();
+      }
+    } catch (err: any) {
+      setDeleteError(err?.message || 'Failed to delete fee structure.');
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -1164,6 +1247,27 @@ export const FeeStructuresTab: React.FC<FeeStructuresTabProps> = ({
                             <Edit2 size={14} />
                           </button>
                           <button
+                            onClick={() => handlePublishStructure(st)}
+                            disabled={publishingId === st.id}
+                            title="Publish fee structure and generate invoices for enrolled students"
+                            style={{
+                              padding: '6px',
+                              borderRadius: '4px',
+                              border: '1px solid #BBF7D0',
+                              backgroundColor: '#F0FDF4',
+                              color: '#16A34A',
+                              cursor: publishingId === st.id ? 'not-allowed' : 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                            }}
+                          >
+                            {publishingId === st.id ? (
+                              <RotateCw className="animate-spin" size={14} />
+                            ) : (
+                              <Send size={14} />
+                            )}
+                          </button>
+                          <button
                             onClick={() => handleOpenDuplicateModal(st)}
                             title="Duplicate for Another Academic Year"
                             style={{
@@ -1187,13 +1291,29 @@ export const FeeStructuresTab: React.FC<FeeStructuresTabProps> = ({
                               borderRadius: '4px',
                               border: '1px solid #CBD5E1',
                               backgroundColor: '#ffffff',
-                              color: st.status === 'ACTIVE' ? '#DC2626' : '#16A34A',
+                              color: st.status === 'ACTIVE' ? '#D97706' : '#16A34A',
                               cursor: 'pointer',
                               display: 'flex',
                               alignItems: 'center',
                             }}
                           >
                             {st.status === 'ACTIVE' ? <XCircle size={14} /> : <CheckCircle size={14} />}
+                          </button>
+                          <button
+                            onClick={() => handleOpenDeleteModal(st)}
+                            title="Delete Structure"
+                            style={{
+                              padding: '6px',
+                              borderRadius: '4px',
+                              border: '1px solid #CBD5E1',
+                              backgroundColor: '#ffffff',
+                              color: '#DC2626',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                            }}
+                          >
+                            <Trash2 size={14} />
                           </button>
                         </div>
                       </td>
@@ -1547,6 +1667,28 @@ export const FeeStructuresTab: React.FC<FeeStructuresTabProps> = ({
               </button>
 
               <div style={{ display: 'flex', gap: '10px' }}>
+                <button
+                  onClick={() => {
+                    const target = inspectingStructure;
+                    setInspectingStructure(null);
+                    handleOpenDeleteModal(target);
+                  }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '7px 14px',
+                    borderRadius: '6px',
+                    border: '1px solid #FECACA',
+                    backgroundColor: '#FEF2F2',
+                    fontSize: '0.84rem',
+                    color: '#DC2626',
+                    cursor: 'pointer',
+                    fontWeight: 600,
+                  }}
+                >
+                  <Trash2 size={14} /> Delete
+                </button>
                 <button
                   onClick={() => {
                     const target = inspectingStructure;
@@ -2011,7 +2153,7 @@ export const FeeStructuresTab: React.FC<FeeStructuresTabProps> = ({
                       Applicable Class *
                     </label>
                     <select
-                      disabled={!!editingStructure}
+                      disabled={!!editingStructure && editUsage?.canEditFinancials === false}
                       value={formData.className}
                       onChange={(e) => setFormData({ ...formData, className: e.target.value })}
                       style={{
@@ -2021,7 +2163,7 @@ export const FeeStructuresTab: React.FC<FeeStructuresTabProps> = ({
                         border: '1px solid #CBD5E1',
                         fontSize: '0.88rem',
                         boxSizing: 'border-box',
-                        backgroundColor: editingStructure ? '#F1F5F9' : '#ffffff',
+                        backgroundColor: editingStructure && editUsage?.canEditFinancials === false ? '#F1F5F9' : '#ffffff',
                       }}
                     >
                       {classList.map((cls) => (
@@ -2724,6 +2866,265 @@ export const FeeStructuresTab: React.FC<FeeStructuresTabProps> = ({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {/* Safe Deletion Modal */}
+      {deletingStructure && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(15, 23, 42, 0.45)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            padding: '16px',
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: '#ffffff',
+              borderRadius: '12px',
+              maxWidth: '520px',
+              width: '100%',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)',
+              overflow: 'hidden',
+              border: '1px solid #E2E8F0',
+            }}
+          >
+            {/* Modal Header */}
+            <div
+              style={{
+                padding: '18px 24px',
+                borderBottom: '1px solid #E2E8F0',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                backgroundColor: '#F8FAFC',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div
+                  style={{
+                    width: '36px',
+                    height: '36px',
+                    borderRadius: '8px',
+                    backgroundColor: '#FEE2E2',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#DC2626',
+                  }}
+                >
+                  <Trash2 size={18} />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, color: '#20354A' }}>
+                    Delete Fee Structure
+                  </h3>
+                  <span style={{ fontSize: '0.78rem', color: '#647F99' }}>
+                    {deletingStructure.name} • {deletingStructure.academicYear}
+                  </span>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setDeletingStructure(null);
+                  setDeleteUsage(null);
+                  setDeleteError(null);
+                }}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#647F99',
+                  cursor: 'pointer',
+                  padding: '4px',
+                }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div style={{ padding: '24px' }}>
+              {deleteError && (
+                <div
+                  style={{
+                    padding: '12px 16px',
+                    backgroundColor: '#FEF2F2',
+                    border: '1px solid #FECACA',
+                    borderRadius: '6px',
+                    color: '#DC2626',
+                    fontSize: '0.84rem',
+                    marginBottom: '16px',
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: '8px',
+                  }}
+                >
+                  <AlertCircle size={16} style={{ flexShrink: 0, marginTop: '2px' }} />
+                  <span>{deleteError}</span>
+                </div>
+              )}
+
+              {loadingDeleteUsage ? (
+                <div style={{ padding: '24px', textAlign: 'center', color: '#647F99', fontSize: '0.86rem' }}>
+                  <RotateCw size={20} className="animate-spin" style={{ margin: '0 auto 8px' }} />
+                  <span>Checking financial ledger dependencies...</span>
+                </div>
+              ) : deleteUsage && (deleteUsage.assignmentsCount > 0 || deleteUsage.invoicesCount > 0) ? (
+                <div>
+                  <div
+                    style={{
+                      padding: '14px 16px',
+                      backgroundColor: '#FEF3C7',
+                      border: '1px solid #FDE68A',
+                      borderRadius: '8px',
+                      color: '#92400E',
+                      fontSize: '0.86rem',
+                      lineHeight: 1.5,
+                      marginBottom: '16px',
+                      display: 'flex',
+                      gap: '12px',
+                    }}
+                  >
+                    <ShieldAlert size={22} style={{ flexShrink: 0, marginTop: '2px', color: '#D97706' }} />
+                    <div>
+                      <strong>Permanent Deletion Blocked:</strong>
+                      <p style={{ margin: '6px 0 0' }}>
+                        This fee structure is actively referenced by{' '}
+                        <strong>{deleteUsage.assignmentsCount} student fee assignment(s)</strong> and{' '}
+                        <strong>{deleteUsage.invoicesCount} generated invoice(s)</strong>.
+                      </p>
+                      <p style={{ margin: '6px 0 0' }}>
+                        To protect audit integrity and preserve historical billing records, structures with active financial linkages cannot be permanently deleted. You can safely deactivate this structure instead so no new students can be assigned.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '20px' }}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDeletingStructure(null);
+                        setDeleteUsage(null);
+                        setDeleteError(null);
+                      }}
+                      style={{
+                        padding: '8px 16px',
+                        borderRadius: '6px',
+                        border: '1px solid #CBD5E1',
+                        backgroundColor: '#ffffff',
+                        fontSize: '0.86rem',
+                        color: '#647F99',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      Close
+                    </button>
+                    {deletingStructure.status === 'ACTIVE' && (
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          const struct = deletingStructure;
+                          setDeletingStructure(null);
+                          setDeleteUsage(null);
+                          await handleToggleStatus(struct);
+                        }}
+                        style={{
+                          padding: '8px 18px',
+                          borderRadius: '6px',
+                          border: 'none',
+                          backgroundColor: '#D97706',
+                          fontSize: '0.86rem',
+                          fontWeight: 600,
+                          color: '#ffffff',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        Deactivate Structure Instead
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  <p style={{ fontSize: '0.9rem', color: '#334155', lineHeight: 1.5, margin: '0 0 16px' }}>
+                    Are you sure you want to permanently delete{' '}
+                    <strong>"{deletingStructure.name}"</strong>?
+                  </p>
+                  <div
+                    style={{
+                      padding: '12px 16px',
+                      backgroundColor: '#F8FAFC',
+                      borderRadius: '8px',
+                      border: '1px solid #E2E8F0',
+                      fontSize: '0.82rem',
+                      color: '#647F99',
+                      marginBottom: '20px',
+                    }}
+                  >
+                    <div>• <strong>Class:</strong> {deletingStructure.className} ({deletingStructure.section || 'ALL'})</div>
+                    <div>• <strong>Academic Year:</strong> {deletingStructure.academicYear}</div>
+                    <div>• <strong>Total Fee:</strong> {formatCurrency(deletingStructure.totalAmount)}</div>
+                    <div>• <strong>Linked Records:</strong> 0 student assignments, 0 invoices</div>
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+                    <button
+                      type="button"
+                      disabled={deleting}
+                      onClick={() => {
+                        setDeletingStructure(null);
+                        setDeleteUsage(null);
+                        setDeleteError(null);
+                      }}
+                      style={{
+                        padding: '8px 16px',
+                        borderRadius: '6px',
+                        border: '1px solid #CBD5E1',
+                        backgroundColor: '#ffffff',
+                        fontSize: '0.86rem',
+                        color: '#647F99',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      disabled={deleting}
+                      onClick={handleConfirmDelete}
+                      style={{
+                        padding: '8px 18px',
+                        borderRadius: '6px',
+                        border: 'none',
+                        backgroundColor: '#DC2626',
+                        fontSize: '0.86rem',
+                        fontWeight: 600,
+                        color: '#ffffff',
+                        cursor: deleting ? 'not-allowed' : 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                      }}
+                    >
+                      {deleting ? (
+                        <>
+                          <RotateCw size={14} className="animate-spin" /> Deleting...
+                        </>
+                      ) : (
+                        <>
+                          <Trash2 size={14} /> Confirm & Delete
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}

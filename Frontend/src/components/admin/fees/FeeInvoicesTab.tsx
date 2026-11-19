@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import {
   FileText,
   Search,
@@ -9,10 +9,11 @@ import {
   X,
   AlertCircle,
   CheckCircle,
+  Receipt,
 } from 'lucide-react';
 import { adminFeeApi } from '../../../api/adminFeeApi';
 import { adminApi } from '../../../api/adminApi';
-import { FeeInvoice, InvoiceStatus } from '../../../types/adminFee.types';
+import { FeeInvoice, InvoiceStatus, FeePayment } from '../../../types/adminFee.types';
 
 interface FeeInvoicesTabProps {
   academicYear: string;
@@ -28,10 +29,17 @@ export const FeeInvoicesTab: React.FC<FeeInvoicesTabProps> = ({ academicYear }) 
   const [selectedClass, setSelectedClass] = useState<string>('ALL');
   const [selectedSection, setSelectedSection] = useState<string>('ALL');
   const [selectedStatus, setSelectedStatus] = useState<string>('ALL');
+  const [dueDateSort, setDueDateSort] = useState<'NONE' | 'OVERDUE_FIRST' | 'DUE_ASC' | 'DUE_DESC'>('NONE');
   const [searchTerm, setSearchTerm] = useState<string>('');
 
   // Invoice Details Modal
   const [viewingInvoice, setViewingInvoice] = useState<FeeInvoice | null>(null);
+
+  // Payment History Modal
+  const [historyInvoice, setHistoryInvoice] = useState<FeeInvoice | null>(null);
+  const [historyPayments, setHistoryPayments] = useState<FeePayment[]>([]);
+  const [historyLoading, setHistoryLoading] = useState<boolean>(false);
+  const [historyError, setHistoryError] = useState<string | null>(null);
 
   // Generate Invoices Modal
   const [isGenerateModalOpen, setIsGenerateModalOpen] = useState<boolean>(false);
@@ -91,7 +99,7 @@ export const FeeInvoicesTab: React.FC<FeeInvoicesTabProps> = ({ academicYear }) 
     fetchInvoices();
   }, [academicYear, selectedClass, selectedSection, selectedStatus]);
 
-  const formatCurrency = (val: number = 0) => `₹${val.toLocaleString('en-IN')}`;
+  const formatCurrency = (val: number = 0) => `₹${Number(val || 0).toLocaleString('en-IN')}`;
 
   const getStatusBadgeStyle = (status: InvoiceStatus) => {
     switch (status) {
@@ -108,6 +116,26 @@ export const FeeInvoicesTab: React.FC<FeeInvoicesTabProps> = ({ academicYear }) 
         return { bg: '#F1F5F9', text: '#647F99' };
     }
   };
+
+  // Sorted and Filtered Invoices
+  const displayedInvoices = useMemo(() => {
+    let list = [...invoices];
+    if (dueDateSort === 'OVERDUE_FIRST') {
+      const today = new Date().toISOString().slice(0, 10);
+      list.sort((a, b) => {
+        const aOver = a.status === 'OVERDUE' || (a.status !== 'PAID' && a.dueDate < today);
+        const bOver = b.status === 'OVERDUE' || (b.status !== 'PAID' && b.dueDate < today);
+        if (aOver && !bOver) return -1;
+        if (!aOver && bOver) return 1;
+        return a.dueDate.localeCompare(b.dueDate);
+      });
+    } else if (dueDateSort === 'DUE_ASC') {
+      list.sort((a, b) => a.dueDate.localeCompare(b.dueDate));
+    } else if (dueDateSort === 'DUE_DESC') {
+      list.sort((a, b) => b.dueDate.localeCompare(a.dueDate));
+    }
+    return list;
+  }, [invoices, dueDateSort]);
 
   const handleOpenGenerateModal = () => {
     const yr = academicYear !== 'ALL' ? academicYear : '2026-2027';
@@ -149,12 +177,30 @@ export const FeeInvoicesTab: React.FC<FeeInvoicesTabProps> = ({ academicYear }) 
         setTimeout(() => {
           setIsGenerateModalOpen(false);
           fetchInvoices();
-        }, 1200);
+        }, 1300);
       }
     } catch (err: any) {
       setGenerateError(err?.message || 'Failed to generate fee invoices.');
     } finally {
       setGenerating(false);
+    }
+  };
+
+  // Open Payment History Modal
+  const handleOpenPaymentHistory = async (invoice: FeeInvoice) => {
+    setHistoryInvoice(invoice);
+    setHistoryPayments([]);
+    setHistoryLoading(true);
+    setHistoryError(null);
+    try {
+      const res = await adminFeeApi.getInvoicePayments(invoice.id);
+      if (res.success && res.data) {
+        setHistoryPayments(res.data);
+      }
+    } catch (err: any) {
+      setHistoryError(err?.message || 'Failed to load payment history.');
+    } finally {
+      setHistoryLoading(false);
     }
   };
 
@@ -178,7 +224,7 @@ export const FeeInvoicesTab: React.FC<FeeInvoicesTabProps> = ({ academicYear }) 
           border: '1px solid #E2E8F0',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1, minWidth: '260px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1, minWidth: '260px', flexWrap: 'wrap' }}>
           <div
             style={{
               display: 'flex',
@@ -273,6 +319,26 @@ export const FeeInvoicesTab: React.FC<FeeInvoicesTabProps> = ({ academicYear }) 
             <option value="OVERDUE">Overdue</option>
             <option value="CANCELLED">Cancelled</option>
           </select>
+
+          <select
+            value={dueDateSort}
+            onChange={(e) => setDueDateSort(e.target.value as any)}
+            style={{
+              padding: '7px 12px',
+              borderRadius: '6px',
+              border: '1px solid #CBD5E1',
+              fontSize: '0.84rem',
+              color: '#20354A',
+              backgroundColor: '#ffffff',
+              outline: 'none',
+              cursor: 'pointer',
+            }}
+          >
+            <option value="NONE">Sort: Default</option>
+            <option value="OVERDUE_FIRST">Sort: Overdue First</option>
+            <option value="DUE_ASC">Sort: Due Date (Earliest)</option>
+            <option value="DUE_DESC">Sort: Due Date (Latest)</option>
+          </select>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -307,6 +373,7 @@ export const FeeInvoicesTab: React.FC<FeeInvoicesTabProps> = ({ academicYear }) 
               fontWeight: 600,
               color: '#ffffff',
               cursor: 'pointer',
+              boxShadow: '0 2px 4px rgba(32, 53, 74, 0.2)',
             }}
           >
             <Plus size={16} /> Generate Invoices
@@ -331,7 +398,7 @@ export const FeeInvoicesTab: React.FC<FeeInvoicesTabProps> = ({ academicYear }) 
           </div>
         ) : error ? (
           <div style={{ padding: '30px', textAlign: 'center', color: '#DC2626' }}>{error}</div>
-        ) : invoices.length === 0 ? (
+        ) : displayedInvoices.length === 0 ? (
           <div style={{ padding: '50px 20px', textAlign: 'center', color: '#94A3B8' }}>
             <FileText size={36} style={{ margin: '0 auto 10px', opacity: 0.5 }} />
             <p style={{ margin: 0, fontSize: '0.95rem', fontWeight: 500 }}>No fee invoices found.</p>
@@ -344,47 +411,51 @@ export const FeeInvoicesTab: React.FC<FeeInvoicesTabProps> = ({ academicYear }) 
             <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
               <thead>
                 <tr style={{ backgroundColor: '#F8FAFC', borderBottom: '1px solid #E2E8F0' }}>
-                  <th style={{ padding: '12px 16px', fontSize: '0.78rem', color: '#647F99' }}>
+                  <th style={{ padding: '12px 16px', fontSize: '0.78rem', fontWeight: 600, color: '#647F99' }}>
                     Invoice #
                   </th>
-                  <th style={{ padding: '12px 16px', fontSize: '0.78rem', color: '#647F99' }}>
+                  <th style={{ padding: '12px 16px', fontSize: '0.78rem', fontWeight: 600, color: '#647F99' }}>
                     Student Name
                   </th>
-                  <th style={{ padding: '12px 16px', fontSize: '0.78rem', color: '#647F99' }}>
+                  <th style={{ padding: '12px 16px', fontSize: '0.78rem', fontWeight: 600, color: '#647F99' }}>
                     Class / Sec
                   </th>
-                  <th style={{ padding: '12px 16px', fontSize: '0.78rem', color: '#647F99' }}>
+                  <th style={{ padding: '12px 16px', fontSize: '0.78rem', fontWeight: 600, color: '#647F99' }}>
                     Installment
                   </th>
-                  <th style={{ padding: '12px 16px', fontSize: '0.78rem', color: '#647F99' }}>
-                    Total Payable
+                  <th style={{ padding: '12px 16px', fontSize: '0.78rem', fontWeight: 600, color: '#647F99' }}>
+                    Issue Date
                   </th>
-                  <th style={{ padding: '12px 16px', fontSize: '0.78rem', color: '#647F99' }}>
-                    Paid (₹)
-                  </th>
-                  <th style={{ padding: '12px 16px', fontSize: '0.78rem', color: '#647F99' }}>
-                    Outstanding (₹)
-                  </th>
-                  <th style={{ padding: '12px 16px', fontSize: '0.78rem', color: '#647F99' }}>
+                  <th style={{ padding: '12px 16px', fontSize: '0.78rem', fontWeight: 600, color: '#647F99' }}>
                     Due Date
                   </th>
-                  <th style={{ padding: '12px 16px', fontSize: '0.78rem', color: '#647F99' }}>
+                  <th style={{ padding: '12px 16px', fontSize: '0.78rem', fontWeight: 600, color: '#647F99' }}>
+                    Total Payable
+                  </th>
+                  <th style={{ padding: '12px 16px', fontSize: '0.78rem', fontWeight: 600, color: '#647F99' }}>
+                    Paid Amount
+                  </th>
+                  <th style={{ padding: '12px 16px', fontSize: '0.78rem', fontWeight: 600, color: '#647F99' }}>
+                    Balance
+                  </th>
+                  <th style={{ padding: '12px 16px', fontSize: '0.78rem', fontWeight: 600, color: '#647F99' }}>
                     Status
                   </th>
                   <th
                     style={{
                       padding: '12px 16px',
                       fontSize: '0.78rem',
+                      fontWeight: 600,
                       color: '#647F99',
                       textAlign: 'right',
                     }}
                   >
-                    Action
+                    Actions
                   </th>
                 </tr>
               </thead>
               <tbody>
-                {invoices.map((inv) => {
+                {displayedInvoices.map((inv) => {
                   const badge = getStatusBadgeStyle(inv.status);
                   return (
                     <tr key={inv.id} style={{ borderBottom: '1px solid #F1F5F9' }}>
@@ -394,6 +465,7 @@ export const FeeInvoicesTab: React.FC<FeeInvoicesTabProps> = ({ academicYear }) 
                           fontSize: '0.84rem',
                           fontWeight: 700,
                           color: '#20354A',
+                          fontFamily: 'monospace',
                         }}
                       >
                         {inv.invoiceNumber}
@@ -409,6 +481,12 @@ export const FeeInvoicesTab: React.FC<FeeInvoicesTabProps> = ({ academicYear }) 
                       </td>
                       <td style={{ padding: '14px 16px', fontSize: '0.84rem', color: '#20354A' }}>
                         {inv.installmentName}
+                      </td>
+                      <td style={{ padding: '14px 16px', fontSize: '0.82rem', color: '#647F99' }}>
+                        {inv.issueDate}
+                      </td>
+                      <td style={{ padding: '14px 16px', fontSize: '0.82rem', color: inv.status === 'OVERDUE' ? '#DC2626' : '#647F99', fontWeight: inv.status === 'OVERDUE' ? 700 : 400 }}>
+                        {inv.dueDate}
                       </td>
                       <td
                         style={{
@@ -440,9 +518,6 @@ export const FeeInvoicesTab: React.FC<FeeInvoicesTabProps> = ({ academicYear }) 
                       >
                         {formatCurrency(inv.outstandingAmount)}
                       </td>
-                      <td style={{ padding: '14px 16px', fontSize: '0.82rem', color: '#647F99' }}>
-                        {inv.dueDate}
-                      </td>
                       <td style={{ padding: '14px 16px' }}>
                         <span
                           style={{
@@ -458,25 +533,47 @@ export const FeeInvoicesTab: React.FC<FeeInvoicesTabProps> = ({ academicYear }) 
                         </span>
                       </td>
                       <td style={{ padding: '14px 16px', textAlign: 'right' }}>
-                        <button
-                          onClick={() => setViewingInvoice(inv)}
-                          title="View & Print Invoice"
-                          style={{
-                            padding: '6px 10px',
-                            borderRadius: '4px',
-                            border: '1px solid #CBD5E1',
-                            backgroundColor: '#ffffff',
-                            color: '#20354A',
-                            cursor: 'pointer',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '4px',
-                            fontSize: '0.78rem',
-                            fontWeight: 600,
-                          }}
-                        >
-                          <Eye size={13} /> View
-                        </button>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '6px' }}>
+                          <button
+                            onClick={() => setViewingInvoice(inv)}
+                            title="View Printable Voucher"
+                            style={{
+                              padding: '6px 10px',
+                              borderRadius: '4px',
+                              border: '1px solid #CBD5E1',
+                              backgroundColor: '#ffffff',
+                              color: '#20354A',
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              fontSize: '0.78rem',
+                              fontWeight: 600,
+                            }}
+                          >
+                            <Eye size={13} /> View
+                          </button>
+
+                          <button
+                            onClick={() => handleOpenPaymentHistory(inv)}
+                            title="View Payment History"
+                            style={{
+                              padding: '6px 10px',
+                              borderRadius: '4px',
+                              border: '1px solid #CBD5E1',
+                              backgroundColor: '#F8FAFC',
+                              color: '#647F99',
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              fontSize: '0.78rem',
+                              fontWeight: 600,
+                            }}
+                          >
+                            <Receipt size={13} /> Payments
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -487,7 +584,9 @@ export const FeeInvoicesTab: React.FC<FeeInvoicesTabProps> = ({ academicYear }) 
         )}
       </div>
 
-      {/* View & Print Invoice Modal */}
+      {/* ========================================================================= */}
+      {/* 1. VIEW & PRINT INVOICE MODAL                                             */}
+      {/* ========================================================================= */}
       {viewingInvoice && (
         <div
           style={{
@@ -524,7 +623,7 @@ export const FeeInvoicesTab: React.FC<FeeInvoicesTabProps> = ({ academicYear }) 
               }}
             >
               <span style={{ fontSize: '0.84rem', fontWeight: 600, color: '#647F99' }}>
-                Invoice Preview
+                Official Fee Demand Voucher
               </span>
               <div style={{ display: 'flex', gap: '8px' }}>
                 <button
@@ -575,19 +674,19 @@ export const FeeInvoicesTab: React.FC<FeeInvoicesTabProps> = ({ academicYear }) 
                     Affiliated to CBSE • Excellence in Education
                   </p>
                   <p style={{ margin: '2px 0 0', fontSize: '0.76rem', color: '#94A3B8' }}>
-                    Official Fee Invoice & Demand Note
+                    Official Fee Invoice & Demand Voucher
                   </p>
                 </div>
 
                 <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#20354A' }}>
+                  <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#20354A', fontFamily: 'monospace' }}>
                     {viewingInvoice.invoiceNumber}
                   </div>
                   <div style={{ fontSize: '0.78rem', color: '#647F99', marginTop: '4px' }}>
                     Issued: {viewingInvoice.issueDate}
                   </div>
-                  <div style={{ fontSize: '0.78rem', fontWeight: 600, color: '#DC2626' }}>
-                    Due: {viewingInvoice.dueDate}
+                  <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#DC2626' }}>
+                    Due Date: {viewingInvoice.dueDate}
                   </div>
                 </div>
               </div>
@@ -612,7 +711,7 @@ export const FeeInvoicesTab: React.FC<FeeInvoicesTabProps> = ({ academicYear }) 
                 </div>
                 <div>
                   <span style={{ color: '#647F99' }}>Admission No: </span>
-                  <strong>{viewingInvoice.studentAdmissionNumber}</strong>
+                  <strong style={{ fontFamily: 'monospace' }}>{viewingInvoice.studentAdmissionNumber}</strong>
                 </div>
                 <div>
                   <span style={{ color: '#647F99' }}>Class / Section: </span>
@@ -631,32 +730,45 @@ export const FeeInvoicesTab: React.FC<FeeInvoicesTabProps> = ({ academicYear }) 
               </div>
 
               {/* Line Items Table */}
-              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', marginBottom: '20px' }}>
-                <thead>
-                  <tr style={{ borderBottom: '1px solid #CBD5E1', backgroundColor: '#EEF3F8' }}>
-                    <th style={{ padding: '8px 12px', fontSize: '0.8rem', color: '#20354A' }}>Fee Category</th>
-                    <th style={{ padding: '8px 12px', fontSize: '0.8rem', color: '#20354A', textAlign: 'right' }}>Base Amount</th>
-                    <th style={{ padding: '8px 12px', fontSize: '0.8rem', color: '#20354A', textAlign: 'right' }}>Concession</th>
-                    <th style={{ padding: '8px 12px', fontSize: '0.8rem', color: '#20354A', textAlign: 'right' }}>Net Payable</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {viewingInvoice.lineItems.map((item, idx) => (
-                    <tr key={idx} style={{ borderBottom: '1px solid #F1F5F9' }}>
-                      <td style={{ padding: '10px 12px', fontSize: '0.84rem' }}>{item.categoryName}</td>
-                      <td style={{ padding: '10px 12px', fontSize: '0.84rem', textAlign: 'right', color: '#647F99' }}>
-                        {formatCurrency(item.baseAmount)}
-                      </td>
-                      <td style={{ padding: '10px 12px', fontSize: '0.84rem', textAlign: 'right', color: item.concessionAmount > 0 ? '#16A34A' : '#94A3B8' }}>
-                        {item.concessionAmount > 0 ? `-${formatCurrency(item.concessionAmount)}` : '-'}
-                      </td>
-                      <td style={{ padding: '10px 12px', fontSize: '0.84rem', fontWeight: 600, textAlign: 'right' }}>
-                        {formatCurrency(item.netAmount)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              {(() => {
+                const itemsToRender = (viewingInvoice.lineItems && viewingInvoice.lineItems.length > 0)
+                  ? viewingInvoice.lineItems
+                  : (viewingInvoice.items || []).map((it: any) => ({
+                      categoryName: it.categoryName,
+                      baseAmount: it.amount || 0,
+                      concessionAmount: 0,
+                      netAmount: it.amount || 0,
+                    }));
+
+                return (
+                  <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', marginBottom: '20px' }}>
+                    <thead>
+                      <tr style={{ borderBottom: '1px solid #CBD5E1', backgroundColor: '#EEF3F8' }}>
+                        <th style={{ padding: '8px 12px', fontSize: '0.8rem', color: '#20354A' }}>Fee Category</th>
+                        <th style={{ padding: '8px 12px', fontSize: '0.8rem', color: '#20354A', textAlign: 'right' }}>Base Amount</th>
+                        <th style={{ padding: '8px 12px', fontSize: '0.8rem', color: '#20354A', textAlign: 'right' }}>Concession</th>
+                        <th style={{ padding: '8px 12px', fontSize: '0.8rem', color: '#20354A', textAlign: 'right' }}>Net Payable</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {itemsToRender.map((item, idx) => (
+                        <tr key={idx} style={{ borderBottom: '1px solid #F1F5F9' }}>
+                          <td style={{ padding: '10px 12px', fontSize: '0.84rem' }}>{item.categoryName}</td>
+                          <td style={{ padding: '10px 12px', fontSize: '0.84rem', textAlign: 'right', color: '#647F99' }}>
+                            {formatCurrency(item.baseAmount)}
+                          </td>
+                          <td style={{ padding: '10px 12px', fontSize: '0.84rem', textAlign: 'right', color: (item.concessionAmount || 0) > 0 ? '#16A34A' : '#94A3B8' }}>
+                            {(item.concessionAmount || 0) > 0 ? `-${formatCurrency(item.concessionAmount)}` : '-'}
+                          </td>
+                          <td style={{ padding: '10px 12px', fontSize: '0.84rem', fontWeight: 600, textAlign: 'right' }}>
+                            {formatCurrency(item.netAmount)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                );
+              })()}
 
               {/* Financial Totals Calculation Box */}
               <div
@@ -729,7 +841,7 @@ export const FeeInvoicesTab: React.FC<FeeInvoicesTabProps> = ({ academicYear }) 
                 }}
               >
                 <div style={{ fontSize: '0.74rem', color: '#94A3B8', maxWidth: '320px' }}>
-                  * This is a computer-generated school fee demand invoice. Payments can be submitted via cash, cheque, bank transfer, or UPI at the accounts counter.
+                  * This is a computer-generated school fee demand voucher. Payments can be submitted via cash, cheque, bank transfer, or UPI at the accounts counter.
                 </div>
                 <div style={{ textAlign: 'center' }}>
                   <div
@@ -749,7 +861,190 @@ export const FeeInvoicesTab: React.FC<FeeInvoicesTabProps> = ({ academicYear }) 
         </div>
       )}
 
-      {/* Generate Invoices Modal */}
+      {/* ========================================================================= */}
+      {/* 2. PAYMENT HISTORY MODAL                                                  */}
+      {/* ========================================================================= */}
+      {historyInvoice && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(15, 23, 42, 0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            padding: '16px',
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: '#ffffff',
+              borderRadius: '12px',
+              maxWidth: '640px',
+              width: '100%',
+              maxHeight: '90vh',
+              overflowY: 'auto',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.15)',
+            }}
+          >
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                padding: '18px 24px',
+                borderBottom: '1px solid #E2E8F0',
+                backgroundColor: '#F8FAFC',
+              }}
+            >
+              <div>
+                <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, color: '#20354A' }}>
+                  Payment History: {historyInvoice.invoiceNumber}
+                </h3>
+                <span style={{ fontSize: '0.8rem', color: '#647F99' }}>
+                  {historyInvoice.studentName} ({historyInvoice.studentAdmissionNumber}) • {historyInvoice.installmentName}
+                </span>
+              </div>
+              <button
+                onClick={() => setHistoryInvoice(null)}
+                style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#647F99' }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div style={{ padding: '24px' }}>
+              {/* Payment Summary */}
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(3, 1fr)',
+                  gap: '12px',
+                  backgroundColor: '#F8FAFC',
+                  padding: '12px 16px',
+                  borderRadius: '8px',
+                  border: '1px solid #E2E8F0',
+                  marginBottom: '16px',
+                  fontSize: '0.84rem',
+                }}
+              >
+                <div>
+                  <span style={{ color: '#647F99', display: 'block', fontSize: '0.74rem' }}>Total Payable</span>
+                  <strong style={{ fontSize: '0.92rem', color: '#20354A' }}>{formatCurrency(historyInvoice.totalPayable)}</strong>
+                </div>
+                <div>
+                  <span style={{ color: '#647F99', display: 'block', fontSize: '0.74rem' }}>Amount Paid</span>
+                  <strong style={{ fontSize: '0.92rem', color: '#16A34A' }}>{formatCurrency(historyInvoice.paidAmount)}</strong>
+                </div>
+                <div>
+                  <span style={{ color: '#647F99', display: 'block', fontSize: '0.74rem' }}>Balance Due</span>
+                  <strong style={{ fontSize: '0.92rem', color: historyInvoice.outstandingAmount > 0 ? '#DC2626' : '#16A34A' }}>
+                    {formatCurrency(historyInvoice.outstandingAmount)}
+                  </strong>
+                </div>
+              </div>
+
+              {historyLoading ? (
+                <div style={{ padding: '40px 0', textAlign: 'center', color: '#647F99' }}>
+                  <RotateCw className="animate-spin" size={24} style={{ margin: '0 auto 8px' }} />
+                  <p style={{ margin: 0, fontSize: '0.86rem' }}>Loading transaction records...</p>
+                </div>
+              ) : historyError ? (
+                <div style={{ padding: '14px', backgroundColor: '#FEF2F2', color: '#DC2626', borderRadius: '6px' }}>
+                  {historyError}
+                </div>
+              ) : historyPayments.length === 0 ? (
+                <div style={{ padding: '36px 16px', textAlign: 'center', color: '#94A3B8' }}>
+                  <Receipt size={32} style={{ margin: '0 auto 8px', opacity: 0.5 }} />
+                  <p style={{ margin: 0, fontSize: '0.9rem', fontWeight: 500 }}>No payments recorded yet</p>
+                  <p style={{ margin: '2px 0 0', fontSize: '0.78rem' }}>
+                    Payments collected against this voucher will appear here.
+                  </p>
+                </div>
+              ) : (
+                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.82rem' }}>
+                  <thead>
+                    <tr style={{ backgroundColor: '#F8FAFC', borderBottom: '1px solid #E2E8F0', color: '#647F99' }}>
+                      <th style={{ padding: '8px 12px' }}>Receipt #</th>
+                      <th style={{ padding: '8px 12px' }}>Date</th>
+                      <th style={{ padding: '8px 12px' }}>Method</th>
+                      <th style={{ padding: '8px 12px' }}>Amount</th>
+                      <th style={{ padding: '8px 12px' }}>Ref / Cheque</th>
+                      <th style={{ padding: '8px 12px' }}>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {historyPayments.map((p) => (
+                      <tr key={p.id} style={{ borderBottom: '1px solid #F1F5F9' }}>
+                        <td style={{ padding: '10px 12px', fontWeight: 600, fontFamily: 'monospace' }}>
+                          {p.receiptNumber}
+                        </td>
+                        <td style={{ padding: '10px 12px', color: '#647F99' }}>{p.paymentDate}</td>
+                        <td style={{ padding: '10px 12px' }}>
+                          <span
+                            style={{
+                              padding: '2px 6px',
+                              borderRadius: '4px',
+                              backgroundColor: '#EEF3F8',
+                              fontSize: '0.72rem',
+                              fontWeight: 600,
+                              color: '#20354A',
+                            }}
+                          >
+                            {p.paymentMethod}
+                          </span>
+                        </td>
+                        <td style={{ padding: '10px 12px', fontWeight: 700, color: '#16A34A' }}>
+                          {formatCurrency(p.amount)}
+                        </td>
+                        <td style={{ padding: '10px 12px', color: '#647F99', fontSize: '0.76rem' }}>
+                          {p.transactionReference || p.chequeDate || '-'}
+                        </td>
+                        <td style={{ padding: '10px 12px' }}>
+                          <span
+                            style={{
+                              padding: '2px 6px',
+                              borderRadius: '8px',
+                              fontSize: '0.7rem',
+                              fontWeight: 700,
+                              backgroundColor: p.status === 'SUCCESS' ? '#DCFCE7' : '#FEE2E2',
+                              color: p.status === 'SUCCESS' ? '#16A34A' : '#DC2626',
+                            }}
+                          >
+                            {p.status}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '20px' }}>
+                <button
+                  onClick={() => setHistoryInvoice(null)}
+                  style={{
+                    padding: '8px 18px',
+                    borderRadius: '6px',
+                    border: '1px solid #CBD5E1',
+                    backgroundColor: '#ffffff',
+                    fontSize: '0.84rem',
+                    color: '#20354A',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* 3. GENERATE INVOICES MODAL                                                */}
+      {/* ========================================================================= */}
       {isGenerateModalOpen && (
         <div
           style={{
@@ -785,10 +1080,10 @@ export const FeeInvoicesTab: React.FC<FeeInvoicesTabProps> = ({ academicYear }) 
             >
               <div>
                 <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, color: '#20354A' }}>
-                  Generate Fee Invoices
+                  Generate Class Invoices
                 </h3>
                 <span style={{ fontSize: '0.8rem', color: '#647F99' }}>
-                  Issue installment invoices for students with active fee structures
+                  Issue installment fee invoices in batch for students with assigned fee structures
                 </span>
               </div>
               <button
@@ -840,31 +1135,31 @@ export const FeeInvoicesTab: React.FC<FeeInvoicesTabProps> = ({ academicYear }) 
                 </div>
               )}
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#20354A', marginBottom: '6px' }}>
-                    Academic Year *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={generateData.academicYear}
-                    onChange={(e) => setGenerateData({ ...generateData, academicYear: e.target.value })}
-                    style={{
-                      width: '100%',
-                      padding: '8px 12px',
-                      borderRadius: '6px',
-                      border: '1px solid #CBD5E1',
-                      fontSize: '0.88rem',
-                      boxSizing: 'border-box',
-                    }}
-                  />
-                </div>
-
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                   <div>
                     <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#20354A', marginBottom: '6px' }}>
-                      Class *
+                      Academic Year *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={generateData.academicYear}
+                      onChange={(e) => setGenerateData({ ...generateData, academicYear: e.target.value })}
+                      style={{
+                        width: '100%',
+                        padding: '8px 12px',
+                        borderRadius: '6px',
+                        border: '1px solid #CBD5E1',
+                        fontSize: '0.88rem',
+                        boxSizing: 'border-box',
+                      }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#20354A', marginBottom: '6px' }}>
+                      Target Class *
                     </label>
                     <select
                       required
@@ -886,7 +1181,9 @@ export const FeeInvoicesTab: React.FC<FeeInvoicesTabProps> = ({ academicYear }) 
                       ))}
                     </select>
                   </div>
+                </div>
 
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                   <div>
                     <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#20354A', marginBottom: '6px' }}>
                       Section
@@ -909,18 +1206,14 @@ export const FeeInvoicesTab: React.FC<FeeInvoicesTabProps> = ({ academicYear }) 
                       <option value="C">Section C</option>
                     </select>
                   </div>
-                </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                   <div>
                     <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#20354A', marginBottom: '6px' }}>
-                      Installment Number *
+                      Installment Term *
                     </label>
                     <select
                       value={generateData.installmentNumber}
-                      onChange={(e) =>
-                        setGenerateData({ ...generateData, installmentNumber: Number(e.target.value) })
-                      }
+                      onChange={(e) => setGenerateData({ ...generateData, installmentNumber: Number(e.target.value) })}
                       style={{
                         width: '100%',
                         padding: '8px 12px',
@@ -930,35 +1223,35 @@ export const FeeInvoicesTab: React.FC<FeeInvoicesTabProps> = ({ academicYear }) 
                         backgroundColor: '#ffffff',
                       }}
                     >
-                      <option value={1}>Installment 1 (Term 1 / Annual)</option>
+                      <option value={1}>Installment 1 (Term 1 / Admission)</option>
                       <option value={2}>Installment 2 (Term 2)</option>
                       <option value={3}>Installment 3 (Term 3)</option>
-                      <option value={4}>Installment 4 (Term 4 / Q4)</option>
+                      <option value={4}>Installment 4 (Term 4)</option>
                     </select>
                   </div>
+                </div>
 
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#20354A', marginBottom: '6px' }}>
-                      Invoice Due Date
-                    </label>
-                    <input
-                      type="date"
-                      value={generateData.dueDate}
-                      onChange={(e) => setGenerateData({ ...generateData, dueDate: e.target.value })}
-                      style={{
-                        width: '100%',
-                        padding: '7px 10px',
-                        borderRadius: '6px',
-                        border: '1px solid #CBD5E1',
-                        fontSize: '0.84rem',
-                        boxSizing: 'border-box',
-                      }}
-                    />
-                  </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#20354A', marginBottom: '6px' }}>
+                    Payment Due Date *
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={generateData.dueDate}
+                    onChange={(e) => setGenerateData({ ...generateData, dueDate: e.target.value })}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      borderRadius: '6px',
+                      border: '1px solid #CBD5E1',
+                      fontSize: '0.88rem',
+                      boxSizing: 'border-box',
+                    }}
+                  />
                 </div>
               </div>
 
-              {/* Modal Actions */}
               <div
                 style={{
                   display: 'flex',
@@ -995,14 +1288,14 @@ export const FeeInvoicesTab: React.FC<FeeInvoicesTabProps> = ({ academicYear }) 
                     fontSize: '0.86rem',
                     fontWeight: 600,
                     color: '#ffffff',
-                    cursor: 'pointer',
+                    cursor: generating ? 'not-allowed' : 'pointer',
                     display: 'flex',
                     alignItems: 'center',
                     gap: '6px',
                   }}
                 >
                   {generating && <RotateCw className="animate-spin" size={14} />}
-                  Generate Invoices
+                  Generate Batch
                 </button>
               </div>
             </form>

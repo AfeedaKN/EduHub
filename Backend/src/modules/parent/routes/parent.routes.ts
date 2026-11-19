@@ -17,6 +17,9 @@ export function createParentRouter(deps: ParentRoutesDependencies): Router {
   // Metadata endpoint (can be accessed by authenticated parent or for options)
   router.get('/meta', authenticateMiddleware, parentController.getMetadata);
 
+  // Webhook endpoint (unauthenticated session, signature verified cryptographically)
+  router.post('/fees/webhook', parentController.handlePaymentWebhook);
+
   // Authenticated Parent Routes
   router.use(authenticateMiddleware, authorizeRoles(UserRole.PARENT));
 
@@ -46,6 +49,16 @@ export function createParentRouter(deps: ParentRoutesDependencies): Router {
 
   // Study Materials (Published Only)
   router.get('/study-materials', parentController.getStudyMaterials);
+
+  // Fees & Invoices
+  router.get('/fees/invoices', parentController.getFeeInvoices);
+  router.get('/fees/invoices/:id', parentController.getFeeInvoiceById);
+
+  // Online Fee Payments (Razorpay Gateway)
+  router.get('/fees/config', parentController.getPaymentConfig);
+  router.post('/fees/create-order', parentController.createPaymentOrder);
+  router.post('/fees/verify-payment', parentController.verifyPayment);
+  router.get('/fees/payments', parentController.getParentPayments);
 
   return router;
 }

@@ -39,6 +39,11 @@ const envSchema = z.object({
   INITIAL_MANAGEMENT_EMAIL: z.string().default('admin@eduhub.school'),
   INITIAL_MANAGEMENT_PASSWORD: z.string().default('EduHubAdmin@2026!'),
   INITIAL_MANAGEMENT_PHONE: z.string().default('+1234567890'),
+
+  // Razorpay Payment Gateway (Test Mode)
+  RAZORPAY_KEY_ID: z.string().default('rzp_test_eduhub2026'),
+  RAZORPAY_KEY_SECRET: z.string().default('eduhub_test_secret_key_2026'),
+  RAZORPAY_WEBHOOK_SECRET: z.string().default('eduhub_webhook_secret_2026'),
 }).refine(
   (data) => {
     if (data.NODE_ENV === 'production') {

@@ -39,10 +39,29 @@ import {
   ParentStudyMaterialItemDTO,
   ParentStudyMaterialsQueryDTO,
   ParentStudyMaterialsResponseDTO,
+  ParentInvoiceDTO,
+  ParentFeeAssignmentDTO,
+  ParentFeeInvoicesQueryDTO,
+  ParentFeeInvoicesResponseDTO,
+  CreateOnlinePaymentOrderDTO,
+  OnlinePaymentOrderResponseDTO,
+  VerifyOnlinePaymentDTO,
+  ParentPaymentItemDTO,
+  ParentPaymentHistoryResponseDTO,
 } from '../dtos/parent.dto';
 import { ExamMarksModel } from '../../admin/models/ExamMarks.model';
 import { ExamModel } from '../../admin/models/Exam.model';
 import { ExamScheduleModel } from '../../admin/models/ExamSchedule.model';
+import { FeeInvoiceModel } from '../../admin/models/FeeInvoice.model';
+import { FeePaymentModel } from '../../admin/models/FeePayment.model';
+import { StudentFeeAssignmentModel } from '../../admin/models/StudentFeeAssignment.model';
+import { FeeStructureModel } from '../../admin/models/FeeStructure.model';
+import { FeeCategoryModel } from '../../admin/models/FeeCategory.model';
+import { FeeOnlineOrderModel } from '../models/FeeOnlineOrder.model';
+import { UserModel } from '../../auth/models/User.model';
+import { RazorpayService, IRazorpayService } from './RazorpayService';
+import { AdminFeeRepository, IAdminFeeRepository } from '../../admin/repositories/AdminFeeRepository';
+import { AdminFeeService } from '../../admin/services/AdminFeeService';
 import {
   ConflictError,
   ValidationError,
@@ -76,6 +95,32 @@ export interface IParentService {
     parentId: string,
     query?: ParentStudyMaterialsQueryDTO
   ): Promise<ParentStudyMaterialsResponseDTO>;
+  getParentFeeInvoices(
+    parentId: string,
+    query?: ParentFeeInvoicesQueryDTO
+  ): Promise<ParentFeeInvoicesResponseDTO>;
+  getParentFeeInvoiceDetails(
+    parentId: string,
+    invoiceId: string
+  ): Promise<ParentInvoiceDTO>;
+  getPaymentConfig(): { keyId: string; currency: string; isTestMode: boolean };
+  createOnlinePaymentOrder(
+    parentId: string,
+    dto: CreateOnlinePaymentOrderDTO
+  ): Promise<OnlinePaymentOrderResponseDTO>;
+  verifyOnlinePayment(
+    parentId: string,
+    dto: VerifyOnlinePaymentDTO
+  ): Promise<{ payment: ParentPaymentItemDTO; receiptNumber: string; invoice: ParentInvoiceDTO }>;
+  handlePaymentWebhook(
+    rawBody: string,
+    signature: string,
+    payload: any
+  ): Promise<{ handled: boolean; event: string; orderId?: string }>;
+  getParentPayments(
+    parentId: string,
+    query?: { studentId?: string; academicYear?: string }
+  ): Promise<ParentPaymentHistoryResponseDTO>;
   getSchoolMetadata(): {
     classes: string[];
     academicYears: string[];
@@ -88,17 +133,26 @@ export class ParentService implements IParentService {
   private readonly assignmentRepo: IAssignmentRepository;
   private readonly submissionRepo: ISubmissionRepository;
   private readonly studyMaterialRepo: IStudyMaterialRepository;
+  private readonly razorpayService: IRazorpayService;
+  private readonly adminFeeRepo: IAdminFeeRepository;
+  private readonly adminFeeService: AdminFeeService;
 
   constructor(
     private readonly registrationRequestRepo: IRegistrationRequestRepository,
     private readonly studentRepo: IStudentRepository,
     assignmentRepo?: IAssignmentRepository,
     submissionRepo?: ISubmissionRepository,
-    studyMaterialRepo?: IStudyMaterialRepository
+    studyMaterialRepo?: IStudyMaterialRepository,
+    razorpayService?: IRazorpayService,
+    adminFeeRepo?: IAdminFeeRepository,
+    adminFeeService?: AdminFeeService
   ) {
     this.assignmentRepo = assignmentRepo || new AssignmentRepository();
     this.submissionRepo = submissionRepo || new SubmissionRepository();
     this.studyMaterialRepo = studyMaterialRepo || new StudyMaterialRepository();
+    this.razorpayService = razorpayService || new RazorpayService();
+    this.adminFeeRepo = adminFeeRepo || new AdminFeeRepository();
+    this.adminFeeService = adminFeeService || new AdminFeeService(this.adminFeeRepo);
   }
 
 
@@ -1352,6 +1406,829 @@ export class ParentService implements IParentService {
       materials,
       subjects: subjects.sort(),
       academicYears: Array.from(academicYearsSet).sort(),
+    };
+  }
+
+  async getParentFeeInvoices(
+    parentId: string,
+    query?: ParentFeeInvoicesQueryDTO
+  ): Promise<ParentFeeInvoicesResponseDTO> {
+    if (!parentId || !mongoose.Types.ObjectId.isValid(parentId)) {
+      throw new ValidationError('Invalid parent account identification.');
+    }
+
+    const [childrenDocs, regRequests] = await Promise.all([
+      this.studentRepo.findByParentId(parentId),
+      this.registrationRequestRepo.findByParentId(parentId),
+    ]);
+
+    const activeChildren: IStudentDoc[] = childrenDocs.filter((c: IStudentDoc) => c.status === 'ACTIVE');
+    const childrenDTOs: ChildProfileDTO[] = activeChildren.map((c: IStudentDoc) => ({
+      id: c._id.toString(),
+      fullName: c.fullName,
+      studentId: c.studentId,
+      grade: c.grade,
+      section: c.section,
+      classTeacher: c.classTeacher,
+      status: c.status,
+      avatarUrl: c.avatarUrl,
+      rollNumber: c.rollNumber,
+      academicYear: c.academicYear,
+    }));
+
+    const isAll = !query?.studentId || query.studentId === 'ALL';
+    let selectedChild: IStudentDoc | null = null;
+    let targetStudentIds: mongoose.Types.ObjectId[] = [];
+
+    if (!isAll && query?.studentId && query.studentId.trim()) {
+      const match = activeChildren.find(
+        (c: IStudentDoc) => c._id.toString() === query.studentId || c.studentId === query.studentId
+      );
+      if (!match) {
+        throw new ForbiddenError(
+          'You are not authorized to view fee invoices for this student.'
+        );
+      }
+      selectedChild = match;
+      targetStudentIds = [match._id];
+    } else if (activeChildren.length === 0) {
+      return {
+        children: [],
+        selectedChild: null,
+        hasEnrolledChildren: false,
+        registrationRequestsCount: regRequests.length,
+        assignment: null,
+        assignments: [],
+        summary: {
+          totalFees: 0,
+          amountPaid: 0,
+          outstandingBalance: 0,
+          overdueAmount: 0,
+          totalInvoiced: 0,
+          totalPaid: 0,
+          totalOutstanding: 0,
+          overdueInvoicesCount: 0,
+        },
+        invoices: [],
+        academicYears: [],
+      };
+    } else {
+      // All active children of this parent
+      targetStudentIds = activeChildren.map((c: IStudentDoc) => c._id);
+    }
+
+    // Fetch category descriptions and structure names
+    const [feeCategories, feeStructures] = await Promise.all([
+      FeeCategoryModel.find().lean().exec(),
+      FeeStructureModel.find().lean().exec(),
+    ]);
+    const categoryDescMap = new Map<string, string>();
+    feeCategories.forEach((c) => {
+      categoryDescMap.set(c.name.trim().toLowerCase(), c.description);
+    });
+    const structureMap = new Map<string, string>();
+    feeStructures.forEach((s) => {
+      structureMap.set(s._id.toString(), s.name);
+    });
+
+    // Query active assignments
+    const assignmentFilter: any = {
+      studentId: { $in: targetStudentIds },
+      status: 'ACTIVE',
+    };
+    if (query?.academicYear && query.academicYear.trim() && query.academicYear !== 'ALL') {
+      assignmentFilter.academicYear = query.academicYear.trim();
+    }
+    const assignmentDocs = await StudentFeeAssignmentModel.find(assignmentFilter)
+      .sort({ createdAt: -1 })
+      .lean()
+      .exec();
+
+    // Ensure all active assignments have invoices generated for their installments
+    for (const assignment of assignmentDocs) {
+      try {
+        await this.adminFeeService.generateInvoicesForAssignment(assignment as any);
+      } catch (err) {
+        console.warn('Auto-generate missing invoices warning:', assignment._id, err);
+      }
+    }
+
+    const assignmentDTOs: ParentFeeAssignmentDTO[] = assignmentDocs.map((doc) => ({
+      id: doc._id.toString(),
+      studentId: doc.studentId.toString(),
+      studentName: doc.studentName,
+      admissionNumber: doc.admissionNumber,
+      className: doc.className,
+      section: doc.section,
+      academicYear: doc.academicYear,
+      feeStructureId: doc.feeStructureId.toString(),
+      feeStructureName: doc.feeStructureName,
+      baseAmount: doc.baseAmount,
+      concessionName: doc.concessionName,
+      concessionAmount: doc.concessionAmount,
+      concessionReason: doc.concessionReason,
+      netPayable: doc.netPayable,
+      status: doc.status,
+      installments: (doc.installments || []).map((inst) => ({
+        installmentNumber: inst.installmentNumber,
+        name: inst.name,
+        baseAmount: inst.baseAmount,
+        concessionAmount: inst.concessionAmount,
+        netAmount: inst.netAmount,
+        dueDate: inst.dueDate,
+        paidAmount: inst.paidAmount,
+        status: inst.status,
+      })),
+    }));
+
+    const selectedAssignment = selectedChild
+      ? assignmentDTOs.find((a) => a.studentId === selectedChild!._id.toString()) || null
+      : assignmentDTOs[0] || null;
+
+    // Query Invoices
+    const invoiceFilter: any = {
+      studentId: { $in: targetStudentIds },
+    };
+
+    if (query?.academicYear && query.academicYear.trim() && query.academicYear !== 'ALL') {
+      invoiceFilter.academicYear = query.academicYear.trim();
+    }
+
+    if (query?.status && query.status.trim() && query.status !== 'ALL') {
+      invoiceFilter.status = query.status.trim().toUpperCase();
+    }
+
+    const invoiceDocs = await FeeInvoiceModel.find(invoiceFilter)
+      .sort({ dueDate: -1, createdAt: -1 })
+      .lean()
+      .exec();
+
+    const invoiceIds = invoiceDocs.map((inv) => inv._id);
+    const paymentDocs = invoiceIds.length > 0
+      ? await FeePaymentModel.find({
+          invoiceId: { $in: invoiceIds },
+          status: 'SUCCESS',
+        })
+          .sort({ paymentDate: -1, createdAt: -1 })
+          .lean()
+          .exec()
+      : [];
+
+    let totalFees = 0;
+    let amountPaid = 0;
+    let outstandingBalance = 0;
+    let overdueAmount = 0;
+    let overdueInvoicesCount = 0;
+    const todayStr = new Date().toISOString().slice(0, 10);
+
+    const invoices: ParentInvoiceDTO[] = invoiceDocs.map((inv) => {
+      let status = inv.status;
+      if ((status === 'UNPAID' || status === 'PARTIAL') && inv.dueDate < todayStr) {
+        status = 'OVERDUE';
+      }
+
+      if (status !== 'CANCELLED') {
+        totalFees += inv.totalPayable || 0;
+        amountPaid += inv.paidAmount || 0;
+        outstandingBalance += inv.outstandingAmount || 0;
+        if (status === 'OVERDUE') {
+          overdueAmount += inv.outstandingAmount || 0;
+          overdueInvoicesCount += 1;
+        }
+      }
+
+      const invPayments = paymentDocs
+        .filter((p) => p.invoiceId.toString() === inv._id.toString())
+        .map((p) => ({
+          id: p._id.toString(),
+          receiptNumber: p.receiptNumber,
+          paymentDate: p.paymentDate,
+          paymentMethod: p.paymentMethod,
+          amount: p.amount,
+          transactionReference: p.transactionReference,
+          status: p.status,
+          recordedByName: p.recordedByName,
+          remarks: p.remarks,
+          balanceAfter: inv.outstandingAmount,
+          invoiceNumber: p.invoiceNumber || inv.invoiceNumber,
+          installmentName: inv.installmentName,
+          studentName: p.studentName || inv.studentName,
+          studentAdmissionNumber: p.studentAdmissionNumber || inv.studentAdmissionNumber,
+          className: p.className || inv.className,
+          section: p.section || inv.section,
+          academicYear: p.academicYear || inv.academicYear,
+        }));
+
+      const matchingAssignment = assignmentDocs.find(
+        (a) => a._id.toString() === inv.feeAssignmentId?.toString()
+      );
+
+      return {
+        id: inv._id.toString(),
+        invoiceNumber: inv.invoiceNumber,
+        studentId: inv.studentId.toString(),
+        studentName: inv.studentName,
+        studentAdmissionNumber: inv.studentAdmissionNumber,
+        className: inv.className,
+        section: inv.section,
+        academicYear: inv.academicYear,
+        feeStructureId: inv.feeStructureId?.toString() || matchingAssignment?.feeStructureId?.toString(),
+        feeStructureName: matchingAssignment?.feeStructureName || (inv.feeStructureId ? structureMap.get(inv.feeStructureId.toString()) : '') || 'Standard Tuition Fee Plan',
+        installmentNumber: inv.installmentNumber,
+        installmentName: inv.installmentName,
+        items: (inv.items && inv.items.length > 0)
+          ? inv.items.map((it) => ({
+              categoryName: it.categoryName,
+              description: categoryDescMap.get(it.categoryName.trim().toLowerCase()) || 'School curriculum and instructional fee',
+              amount: it.amount,
+            }))
+          : [
+              {
+                categoryName: inv.installmentName || 'Tuition Fee',
+                description: 'School curriculum and instructional fee',
+                amount: inv.totalPayable,
+              },
+            ],
+        subtotal: inv.subtotal,
+        concessionAmount: inv.concessionAmount,
+        lateFeeAmount: inv.lateFeeAmount,
+        totalPayable: inv.totalPayable,
+        paidAmount: inv.paidAmount,
+        outstandingAmount: inv.outstandingAmount,
+        issueDate: inv.issueDate,
+        dueDate: inv.dueDate,
+        status,
+        notes: inv.notes,
+        payments: invPayments,
+      };
+    });
+
+    // If invoices do not exist yet but fee structure is assigned, reflect in summary
+    if (invoiceDocs.length === 0 && assignmentDTOs.length > 0) {
+      if (selectedChild && selectedAssignment) {
+        totalFees = selectedAssignment.netPayable;
+        outstandingBalance = selectedAssignment.netPayable;
+      } else {
+        totalFees = assignmentDTOs.reduce((acc, a) => acc + (a.netPayable || 0), 0);
+        outstandingBalance = totalFees;
+      }
+    }
+
+    const academicYearsSet = new Set<string>();
+    activeChildren.forEach((c: IStudentDoc) => {
+      if (c.academicYear) academicYearsSet.add(c.academicYear);
+    });
+    assignmentDocs.forEach((a) => {
+      if (a.academicYear) academicYearsSet.add(a.academicYear);
+    });
+    invoiceDocs.forEach((inv) => {
+      if (inv.academicYear) academicYearsSet.add(inv.academicYear);
+    });
+
+    const selectedChildDTO = selectedChild
+      ? childrenDTOs.find((c) => c.id === selectedChild!._id.toString()) || null
+      : null;
+
+    return {
+      children: childrenDTOs,
+      selectedChild: selectedChildDTO,
+      hasEnrolledChildren: true,
+      registrationRequestsCount: regRequests.length,
+      assignment: selectedAssignment,
+      assignments: assignmentDTOs,
+      summary: {
+        totalFees: Math.round(totalFees * 100) / 100,
+        amountPaid: Math.round(amountPaid * 100) / 100,
+        outstandingBalance: Math.round(outstandingBalance * 100) / 100,
+        overdueAmount: Math.round(overdueAmount * 100) / 100,
+        totalInvoiced: Math.round(totalFees * 100) / 100,
+        totalPaid: Math.round(amountPaid * 100) / 100,
+        totalOutstanding: Math.round(outstandingBalance * 100) / 100,
+        overdueInvoicesCount,
+      },
+      invoices,
+      academicYears: Array.from(academicYearsSet).sort(),
+    };
+  }
+
+  async getParentFeeInvoiceDetails(
+    parentId: string,
+    invoiceId: string
+  ): Promise<ParentInvoiceDTO> {
+    if (!parentId || !mongoose.Types.ObjectId.isValid(parentId)) {
+      throw new ValidationError('Invalid parent account identification.');
+    }
+    if (!invoiceId || !mongoose.Types.ObjectId.isValid(invoiceId)) {
+      throw new ValidationError('Invalid invoice identification.');
+    }
+
+    const invoice = await FeeInvoiceModel.findById(invoiceId).lean().exec();
+    if (!invoice) {
+      throw new NotFoundError('Fee invoice not found.');
+    }
+
+    const childrenDocs = await this.studentRepo.findByParentId(parentId);
+    const activeChildren: IStudentDoc[] = childrenDocs.filter((c: IStudentDoc) => c.status === 'ACTIVE');
+    const isParentStudent = activeChildren.some(
+      (c: IStudentDoc) => c._id.toString() === invoice.studentId.toString()
+    );
+    const isDirectParent = invoice.parentId && invoice.parentId.toString() === parentId;
+
+    if (!isParentStudent && !isDirectParent) {
+      throw new ForbiddenError('You are not authorized to view this fee invoice.');
+    }
+
+    const [payments, feeCategories, linkedAssignment] = await Promise.all([
+      FeePaymentModel.find({
+        invoiceId: invoice._id,
+        status: 'SUCCESS',
+      })
+        .sort({ paymentDate: -1, createdAt: -1 })
+        .lean()
+        .exec(),
+      FeeCategoryModel.find().lean().exec(),
+      invoice.feeAssignmentId
+        ? StudentFeeAssignmentModel.findById(invoice.feeAssignmentId).lean().exec()
+        : null,
+    ]);
+
+    const categoryDescMap = new Map<string, string>();
+    feeCategories.forEach((c) => {
+      categoryDescMap.set(c.name.trim().toLowerCase(), c.description);
+    });
+
+    const todayStr = new Date().toISOString().slice(0, 10);
+    let status = invoice.status;
+    if ((status === 'UNPAID' || status === 'PARTIAL') && invoice.dueDate < todayStr) {
+      status = 'OVERDUE';
+    }
+
+    return {
+      id: invoice._id.toString(),
+      invoiceNumber: invoice.invoiceNumber,
+      studentId: invoice.studentId.toString(),
+      studentName: invoice.studentName,
+      studentAdmissionNumber: invoice.studentAdmissionNumber,
+      className: invoice.className,
+      section: invoice.section,
+      academicYear: invoice.academicYear,
+      feeStructureId: invoice.feeStructureId?.toString() || linkedAssignment?.feeStructureId?.toString(),
+      feeStructureName: linkedAssignment?.feeStructureName || '',
+      installmentNumber: invoice.installmentNumber,
+      installmentName: invoice.installmentName,
+      items: (invoice.items || []).map((it) => ({
+        categoryName: it.categoryName,
+        description: categoryDescMap.get(it.categoryName.trim().toLowerCase()) || 'School curriculum and instructional fee',
+        amount: it.amount,
+      })),
+      subtotal: invoice.subtotal,
+      concessionAmount: invoice.concessionAmount,
+      lateFeeAmount: invoice.lateFeeAmount,
+      totalPayable: invoice.totalPayable,
+      paidAmount: invoice.paidAmount,
+      outstandingAmount: invoice.outstandingAmount,
+      issueDate: invoice.issueDate,
+      dueDate: invoice.dueDate,
+      status,
+      notes: invoice.notes,
+      payments: payments.map((p) => ({
+        receiptNumber: p.receiptNumber,
+        paymentDate: p.paymentDate,
+        paymentMethod: p.paymentMethod,
+        amount: p.amount,
+        transactionReference: p.transactionReference,
+        status: p.status,
+      })),
+    };
+  }
+
+  // =========================================================================
+  // ONLINE FEE PAYMENT (RAZORPAY GATEWAY INTEGRATION)
+  // =========================================================================
+
+  getPaymentConfig(): { keyId: string; currency: string; isTestMode: boolean } {
+    const keyId = this.razorpayService.getKeyId();
+    return {
+      keyId,
+      currency: 'INR',
+      isTestMode: keyId.startsWith('rzp_test_'),
+    };
+  }
+
+  async createOnlinePaymentOrder(
+    parentId: string,
+    dto: CreateOnlinePaymentOrderDTO
+  ): Promise<OnlinePaymentOrderResponseDTO> {
+    if (!parentId || !mongoose.Types.ObjectId.isValid(parentId)) {
+      throw new ValidationError('Invalid parent account identification.');
+    }
+    if (!dto.invoiceId || !mongoose.Types.ObjectId.isValid(dto.invoiceId)) {
+      throw new ValidationError('Valid fee invoice ID is required.');
+    }
+
+    const requestedAmount = Number(dto.amount);
+    if (isNaN(requestedAmount) || requestedAmount <= 0) {
+      throw new ValidationError('Payment amount must be greater than zero.');
+    }
+
+    // 1. Fetch invoice from database
+    const invoice = await FeeInvoiceModel.findById(dto.invoiceId);
+    if (!invoice) {
+      throw new NotFoundError('Fee invoice not found.');
+    }
+
+    if (invoice.status === 'CANCELLED') {
+      throw new ValidationError('Cannot pay a cancelled invoice.');
+    }
+    if (invoice.status === 'PAID' || invoice.outstandingAmount <= 0) {
+      throw new ValidationError('This invoice is already fully paid.');
+    }
+
+    // 2. Security Check: Parent-Child authorization verification
+    const parentChildren = await this.studentRepo.findByParentId(parentId);
+    const isAuthorized =
+      parentChildren.some((c) => c._id.toString() === invoice.studentId.toString()) ||
+      (invoice.parentId && invoice.parentId.toString() === parentId);
+
+    if (!isAuthorized) {
+      throw new ForbiddenError(
+        'Access denied: You are not authorized to make fee payments for this student.'
+      );
+    }
+
+    // 3. Security Check: Amount cannot exceed current outstanding balance in MongoDB
+    if (requestedAmount > invoice.outstandingAmount) {
+      throw new ValidationError(
+        `Payment amount (₹${requestedAmount.toLocaleString('en-IN')}) cannot exceed the outstanding balance (₹${invoice.outstandingAmount.toLocaleString('en-IN')}).`
+      );
+    }
+
+    // 4. Fetch Parent Details for prefill and audit
+    const parentUser = await UserModel.findById(parentId).lean();
+    const parentName = parentUser?.fullName || invoice.parentName || 'Parent';
+
+    // 5. Create Razorpay Payment Order
+    const razorpayOrder = await this.razorpayService.createOrder({
+      amount: requestedAmount,
+      currency: 'INR',
+      receipt: invoice.invoiceNumber,
+      notes: {
+        invoiceId: invoice._id.toString(),
+        invoiceNumber: invoice.invoiceNumber,
+        studentId: invoice.studentId.toString(),
+        studentName: invoice.studentName,
+        parentId,
+      },
+    });
+
+    // 6. Record the order in MongoDB
+    await FeeOnlineOrderModel.create({
+      orderId: razorpayOrder.id,
+      gatewayOrderId: razorpayOrder.id,
+      invoiceId: invoice._id,
+      invoiceNumber: invoice.invoiceNumber,
+      studentId: invoice.studentId,
+      studentName: invoice.studentName,
+      studentAdmissionNumber: invoice.studentAdmissionNumber,
+      className: invoice.className,
+      section: invoice.section,
+      academicYear: invoice.academicYear,
+      parentId: new mongoose.Types.ObjectId(parentId),
+      parentName,
+      parentEmail: parentUser?.email || '',
+      amount: requestedAmount,
+      amountInPaise: razorpayOrder.amount,
+      currency: razorpayOrder.currency,
+      status: 'CREATED',
+    });
+
+    return {
+      orderId: razorpayOrder.id,
+      gatewayOrderId: razorpayOrder.id,
+      amount: requestedAmount,
+      amountInPaise: razorpayOrder.amount,
+      currency: razorpayOrder.currency,
+      keyId: this.razorpayService.getKeyId(),
+      invoiceId: invoice._id.toString(),
+      invoiceNumber: invoice.invoiceNumber,
+      studentName: invoice.studentName,
+      studentAdmissionNumber: invoice.studentAdmissionNumber,
+      className: invoice.className,
+      section: invoice.section,
+      installmentName: invoice.installmentName,
+    };
+  }
+
+  async verifyOnlinePayment(
+    parentId: string,
+    dto: VerifyOnlinePaymentDTO
+  ): Promise<{ payment: ParentPaymentItemDTO; receiptNumber: string; invoice: ParentInvoiceDTO }> {
+    if (!parentId || !mongoose.Types.ObjectId.isValid(parentId)) {
+      throw new ValidationError('Invalid parent account identification.');
+    }
+    if (!dto.invoiceId || !mongoose.Types.ObjectId.isValid(dto.invoiceId)) {
+      throw new ValidationError('Valid fee invoice ID is required.');
+    }
+    if (!dto.razorpayOrderId || !dto.razorpayOrderId.trim()) {
+      throw new ValidationError('Razorpay Order ID is required.');
+    }
+    if (!dto.razorpayPaymentId || !dto.razorpayPaymentId.trim()) {
+      throw new ValidationError('Razorpay Payment ID is required.');
+    }
+    if (!dto.razorpaySignature || !dto.razorpaySignature.trim()) {
+      throw new ValidationError('Razorpay Payment Signature is required.');
+    }
+
+    // 1. Locate the initiated payment order
+    const order = await FeeOnlineOrderModel.findOne({
+      gatewayOrderId: dto.razorpayOrderId.trim(),
+    });
+    if (!order) {
+      throw new NotFoundError(
+        'Payment order not found. Please initiate payment from the fee dashboard.'
+      );
+    }
+
+    // 2. Verify parent authorization for this order
+    if (order.parentId.toString() !== parentId) {
+      throw new ForbiddenError('Access denied: Payment order does not belong to your account.');
+    }
+
+    // 3. Idempotency Check: Check if this payment was already recorded
+    const existingPayment = await FeePaymentModel.findOne({
+      transactionReference: dto.razorpayPaymentId.trim(),
+    });
+
+    if (existingPayment) {
+      const currentInvoice = await this.getParentFeeInvoiceDetails(parentId, dto.invoiceId);
+      return {
+        payment: this.toParentPaymentItemDTO(existingPayment),
+        receiptNumber: existingPayment.receiptNumber,
+        invoice: currentInvoice,
+      };
+    }
+
+    if (order.status === 'PAID' && order.paymentId) {
+      const existingPaymentById = await FeePaymentModel.findById(order.paymentId);
+      if (existingPaymentById) {
+        const currentInvoice = await this.getParentFeeInvoiceDetails(parentId, dto.invoiceId);
+        return {
+          payment: this.toParentPaymentItemDTO(existingPaymentById),
+          receiptNumber: existingPaymentById.receiptNumber,
+          invoice: currentInvoice,
+        };
+      }
+    }
+
+    // 4. Cryptographic Signature Verification (HMAC SHA-256)
+    const isValidSignature = this.razorpayService.verifyPaymentSignature(
+      dto.razorpayOrderId.trim(),
+      dto.razorpayPaymentId.trim(),
+      dto.razorpaySignature.trim()
+    );
+
+    if (!isValidSignature) {
+      await FeeOnlineOrderModel.findByIdAndUpdate(order._id, {
+        status: 'FAILED',
+        gatewayPaymentId: dto.razorpayPaymentId.trim(),
+        gatewaySignature: dto.razorpaySignature.trim(),
+        failureReason: 'Cryptographic HMAC-SHA256 signature mismatch.',
+      });
+      throw new ValidationError('Invalid payment signature. Payment verification failed.');
+    }
+
+    // 5. Fetch fresh invoice data from database
+    const invoice = await FeeInvoiceModel.findById(dto.invoiceId);
+    if (!invoice) {
+      throw new NotFoundError('Fee invoice not found.');
+    }
+    if (invoice.status === 'CANCELLED') {
+      throw new ValidationError('Cannot apply payment to a cancelled invoice.');
+    }
+
+    // 6. Record payment via shared AdminFeeService (ensures atomic invoice updates, assignment sync, and double-entry ledger posting)
+    const parentUser = await UserModel.findById(parentId).lean();
+    const recordedByName = `${parentUser?.fullName || 'Parent'} (Online Gateway)`;
+    const paymentMethod = dto.paymentMethod || 'ONLINE';
+
+    const paymentDTO = await this.adminFeeService.collectFee(parentId, recordedByName, {
+      invoiceId: invoice._id.toString(),
+      amount: order.amount,
+      paymentMethod: 'ONLINE',
+      paymentDate: new Date().toISOString().split('T')[0],
+      transactionReference: dto.razorpayPaymentId.trim(),
+      remarks: `Online Payment via Razorpay (${paymentMethod}, Order: ${order.gatewayOrderId})`,
+    });
+
+    // 7. Update FeePayment with online gateway fields
+    await FeePaymentModel.findByIdAndUpdate(paymentDTO.id, {
+      gatewayOrderId: dto.razorpayOrderId.trim(),
+      gatewayPaymentId: dto.razorpayPaymentId.trim(),
+      gatewaySignature: dto.razorpaySignature.trim(),
+      isOnline: true,
+    });
+
+    // 8. Update Order status in database
+    await FeeOnlineOrderModel.findByIdAndUpdate(order._id, {
+      status: 'PAID',
+      paymentId: new mongoose.Types.ObjectId(paymentDTO.id),
+      receiptNumber: paymentDTO.receiptNumber,
+      gatewayPaymentId: dto.razorpayPaymentId.trim(),
+      gatewaySignature: dto.razorpaySignature.trim(),
+      paymentMethod,
+    });
+
+    // 9. Fetch updated invoice details
+    const updatedInvoice = await this.getParentFeeInvoiceDetails(parentId, dto.invoiceId);
+    const updatedPaymentDoc = await FeePaymentModel.findById(paymentDTO.id);
+
+    return {
+      payment: this.toParentPaymentItemDTO(updatedPaymentDoc!),
+      receiptNumber: paymentDTO.receiptNumber,
+      invoice: updatedInvoice,
+    };
+  }
+
+  async handlePaymentWebhook(
+    rawBody: string,
+    signature: string,
+    payload: any
+  ): Promise<{ handled: boolean; event: string; orderId?: string }> {
+    // 1. Verify Webhook Signature
+    const isValidSignature = this.razorpayService.verifyWebhookSignature(rawBody, signature);
+    if (!isValidSignature) {
+      throw new ValidationError('Invalid webhook cryptographic signature.');
+    }
+
+    const event = payload?.event || '';
+    let orderId: string | undefined;
+
+    // 2. Handle Asynchronous / Delayed Payment Confirmations
+    if (event === 'order.paid' || event === 'payment.captured') {
+      const entity = payload?.payload?.payment?.entity || payload?.payload?.order?.entity;
+      const gatewayOrderId = entity?.order_id || entity?.id;
+      const gatewayPaymentId = entity?.id;
+      const method = entity?.method || 'ONLINE';
+
+      if (gatewayOrderId) {
+        orderId = gatewayOrderId;
+        const order = await FeeOnlineOrderModel.findOne({ gatewayOrderId });
+        if (order && order.status !== 'PAID') {
+          // Check if payment already recorded
+          const existing = await FeePaymentModel.findOne({
+            transactionReference: gatewayPaymentId,
+          });
+
+          if (!existing) {
+            const invoice = await FeeInvoiceModel.findById(order.invoiceId);
+            if (invoice && invoice.status !== 'CANCELLED' && invoice.outstandingAmount > 0) {
+              const recordedByName = `${order.parentName} (Razorpay Webhook)`;
+              const paymentDTO = await this.adminFeeService.collectFee(
+                order.parentId.toString(),
+                recordedByName,
+                {
+                  invoiceId: invoice._id.toString(),
+                  amount: order.amount,
+                  paymentMethod: 'ONLINE',
+                  paymentDate: new Date().toISOString().split('T')[0],
+                  transactionReference: gatewayPaymentId,
+                  remarks: `Online Payment via Razorpay Webhook (${method}, Order: ${gatewayOrderId})`,
+                }
+              );
+
+              await FeePaymentModel.findByIdAndUpdate(paymentDTO.id, {
+                gatewayOrderId,
+                gatewayPaymentId,
+                isOnline: true,
+              });
+
+              await FeeOnlineOrderModel.findByIdAndUpdate(order._id, {
+                status: 'PAID',
+                paymentId: new mongoose.Types.ObjectId(paymentDTO.id),
+                receiptNumber: paymentDTO.receiptNumber,
+                gatewayPaymentId,
+                paymentMethod: method,
+              });
+            }
+          }
+        }
+      }
+    } else if (event === 'payment.failed') {
+      const entity = payload?.payload?.payment?.entity;
+      const gatewayOrderId = entity?.order_id;
+      if (gatewayOrderId) {
+        orderId = gatewayOrderId;
+        await FeeOnlineOrderModel.findOneAndUpdate(
+          { gatewayOrderId, status: 'CREATED' },
+          {
+            status: 'FAILED',
+            failureReason: entity?.error_description || 'Payment failed on gateway',
+          }
+        );
+      }
+    }
+
+    return {
+      handled: true,
+      event,
+      orderId,
+    };
+  }
+
+  async getParentPayments(
+    parentId: string,
+    query?: { studentId?: string; academicYear?: string }
+  ): Promise<ParentPaymentHistoryResponseDTO> {
+    if (!parentId || !mongoose.Types.ObjectId.isValid(parentId)) {
+      throw new ValidationError('Invalid parent account identification.');
+    }
+
+    // Fetch enrolled children for parent
+    const childrenDocs = await this.studentRepo.findByParentId(parentId);
+    const activeChildren = childrenDocs.filter((c) => c.status === 'ACTIVE');
+    const childIds = activeChildren.map((c) => c._id);
+
+    let targetStudentIds = childIds;
+    if (query?.studentId && query.studentId !== 'ALL') {
+      if (!mongoose.Types.ObjectId.isValid(query.studentId)) {
+        throw new ValidationError('Invalid student ID filter.');
+      }
+      const match = childIds.find((id) => id.toString() === query.studentId);
+      if (!match) {
+        throw new ForbiddenError('Access denied: Selected child does not belong to your account.');
+      }
+      targetStudentIds = [match];
+    }
+
+    const filter: any = {
+      studentId: { $in: targetStudentIds },
+    };
+
+    if (query?.academicYear && query.academicYear !== 'ALL') {
+      filter.academicYear = query.academicYear.trim();
+    }
+
+    const paymentDocs = await FeePaymentModel.find(filter)
+      .sort({ paymentDate: -1, createdAt: -1 })
+      .lean()
+      .exec();
+
+    let totalCollected = 0;
+    const payments: ParentPaymentItemDTO[] = paymentDocs.map((p) => {
+      if (p.status === 'SUCCESS') {
+        totalCollected += p.amount || 0;
+      }
+      return {
+        id: p._id.toString(),
+        receiptNumber: p.receiptNumber,
+        invoiceId: p.invoiceId.toString(),
+        invoiceNumber: p.invoiceNumber,
+        studentId: p.studentId.toString(),
+        studentName: p.studentName,
+        studentAdmissionNumber: p.studentAdmissionNumber,
+        className: p.className,
+        section: p.section,
+        academicYear: p.academicYear,
+        amount: p.amount,
+        paymentDate: p.paymentDate,
+        paymentMethod: p.paymentMethod,
+        transactionReference: p.transactionReference || '',
+        status: p.status,
+        isOnline: Boolean((p as any).isOnline || p.paymentMethod === 'ONLINE'),
+        recordedByName: p.recordedByName,
+        remarks: p.remarks,
+        balanceAfter: (p as any).balanceAfter,
+      };
+    });
+
+    return {
+      payments,
+      totalCollected,
+      totalTransactions: payments.length,
+    };
+  }
+
+  private toParentPaymentItemDTO(doc: any): ParentPaymentItemDTO {
+    return {
+      id: doc._id.toString(),
+      receiptNumber: doc.receiptNumber,
+      invoiceId: doc.invoiceId.toString(),
+      invoiceNumber: doc.invoiceNumber,
+      studentId: doc.studentId.toString(),
+      studentName: doc.studentName,
+      studentAdmissionNumber: doc.studentAdmissionNumber,
+      className: doc.className,
+      section: doc.section,
+      academicYear: doc.academicYear,
+      amount: doc.amount,
+      paymentDate: doc.paymentDate,
+      paymentMethod: doc.paymentMethod,
+      transactionReference: doc.transactionReference || '',
+      status: doc.status,
+      isOnline: Boolean(doc.isOnline || doc.paymentMethod === 'ONLINE'),
+      recordedByName: doc.recordedByName,
+      remarks: doc.remarks,
+      balanceAfter: doc.balanceAfter,
     };
   }
 }

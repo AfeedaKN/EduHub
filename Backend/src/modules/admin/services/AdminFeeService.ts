@@ -11,6 +11,7 @@ import {
   CreateFeeStructureDTO,
   UpdateFeeStructureDTO,
   FeeStructureUsageDTO,
+  PublishStructureResultDTO,
   StudentFeeAssignmentDTO,
   AssignFeeDTO,
   FeeInvoiceDTO,
@@ -18,6 +19,8 @@ import {
   CollectFeeDTO,
   ReversePaymentDTO,
   FeePaymentDTO,
+  FeeLedgerDTO,
+  FeeCollectionSummaryDTO,
   DefaulterItemDTO,
   FeeDashboardSummaryDTO,
   FeeReportDTO,
@@ -33,6 +36,7 @@ import {
 } from '../models/StudentFeeAssignment.model';
 import { IFeeInvoiceDoc } from '../models/FeeInvoice.model';
 import { IFeePaymentDoc } from '../models/FeePayment.model';
+import { IFeeLedgerDoc } from '../models/FeeLedger.model';
 import {
   ValidationError,
   ConflictError,
@@ -443,6 +447,41 @@ export class AdminFeeService {
     return this.toStructureDTO(created);
   }
 
+  async deleteStructure(id: string): Promise<{ success: boolean; message: string }> {
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      throw new ValidationError('Invalid fee structure ID.');
+    }
+    const structure = await this.feeRepo.findStructureById(id);
+    if (!structure) {
+      throw new NotFoundError('Fee structure not found.');
+    }
+
+    const [assignmentsCount, invoicesCount] = await Promise.all([
+      this.feeRepo.countAssignmentsByStructureId(id),
+      this.feeRepo.countInvoicesByStructureId(id),
+    ]);
+
+    if (invoicesCount > 0 || assignmentsCount > 0) {
+      const reasons: string[] = [];
+      if (assignmentsCount > 0) reasons.push(`${assignmentsCount} student fee assignment(s)`);
+      if (invoicesCount > 0) reasons.push(`${invoicesCount} invoice(s)`);
+
+      throw new ValidationError(
+        `Cannot delete fee structure '${structure.name}' because active financial records reference it (${reasons.join(' and ')}). To prevent inconsistencies in student accounts, please deactivate or archive this fee structure instead.`
+      );
+    }
+
+    const deleted = await this.feeRepo.deleteStructure(id);
+    if (!deleted) {
+      throw new NotFoundError('Fee structure not found or already deleted.');
+    }
+
+    return {
+      success: true,
+      message: `Fee structure '${structure.name}' was permanently deleted successfully.`,
+    };
+  }
+
   async updateStructure(id: string, dto: UpdateFeeStructureDTO): Promise<FeeStructureDTO> {
     if (!mongoose.Types.ObjectId.isValid(id)) {
       throw new ValidationError('Invalid fee structure ID.');
@@ -470,6 +509,25 @@ export class AdminFeeService {
     const payload: Partial<IFeeStructureDoc> = {};
     if (dto.name !== undefined) payload.name = dto.name.trim();
     if (dto.description !== undefined) payload.description = dto.description.trim();
+
+    if (dto.className !== undefined && dto.className.trim() !== existing.className) {
+      if (invoiceCount > 0) {
+        throw new ValidationError(
+          `Cannot modify class designation of fee structure '${existing.name}' because ${invoiceCount} invoice(s) have already been issued.`
+        );
+      }
+      const assignmentsCount = await this.feeRepo.countAssignmentsByStructureId(id);
+      if (assignmentsCount > 0) {
+        throw new ValidationError(
+          `Cannot modify class designation of fee structure '${existing.name}' because ${assignmentsCount} student(s) have already been assigned to it.`
+        );
+      }
+      payload.className = dto.className.trim();
+    }
+
+    if (dto.section !== undefined) {
+      payload.section = dto.section.trim().toUpperCase();
+    }
 
     let newTotal = existing.totalAmount;
     if (dto.categories !== undefined) {
@@ -610,10 +668,259 @@ export class AdminFeeService {
     return this.toStructureDTO(created);
   }
 
+  async publishStructure(structureId: string): Promise<PublishStructureResultDTO> {
+    if (!mongoose.Types.ObjectId.isValid(structureId)) {
+      throw new ValidationError('Invalid fee structure ID.');
+    }
+
+    const structure = await this.feeRepo.findStructureById(structureId);
+    if (!structure) {
+      throw new NotFoundError('Fee structure not found.');
+    }
+
+    if (structure.status !== 'ACTIVE') {
+      await this.feeRepo.updateStructure(structureId, { status: 'ACTIVE' });
+      structure.status = 'ACTIVE';
+    }
+
+    const enrolledStudents = await this.feeRepo.findActiveEnrolledStudents(
+      structure.className,
+      structure.section,
+      structure.academicYear
+    );
+
+    let publishedCount = 0;
+    let invoicesCount = 0;
+    let skippedCount = 0;
+
+    for (const student of enrolledStudents) {
+      if (student.status !== 'ACTIVE') {
+        skippedCount++;
+        continue;
+      }
+
+      const existingAssignment = await this.feeRepo.findAssignmentByStudentAndYear(
+        student._id.toString(),
+        structure.academicYear
+      );
+
+      if (existingAssignment) {
+        const existingInvoices = await this.feeRepo.findInvoicesByAssignmentId(
+          existingAssignment._id.toString()
+        );
+        const hasPaid = existingInvoices.some(
+          (inv) => inv.status === 'PAID' || inv.status === 'PARTIAL' || (inv.paidAmount || 0) > 0
+        );
+
+        if (hasPaid) {
+          // If structure is the same, generate any missing installment invoices
+          if (existingAssignment.feeStructureId.toString() === structure._id.toString()) {
+            const gen = await this.generateInvoicesForAssignment(existingAssignment, structure);
+            invoicesCount += gen.length;
+            publishedCount++;
+          } else {
+            // Already paid under a different fee plan, preserve data integrity
+            skippedCount++;
+          }
+          continue;
+        }
+
+        // Student has only unpaid invoices or no invoices
+        // If assigned structure had MORE installments than the new structure, cancel the excess ones
+        const newInstallmentNumbers = new Set(structure.installments.map((i) => i.installmentNumber));
+        for (const inv of existingInvoices) {
+          if (inv.status === 'UNPAID' && !newInstallmentNumbers.has(inv.installmentNumber)) {
+            await this.feeRepo.updateInvoice(inv._id.toString(), { status: 'CANCELLED' });
+          }
+        }
+
+        const assignedInstallments: IAssignedInstallment[] = structure.installments.map((inst) => ({
+          installmentNumber: inst.installmentNumber,
+          name: inst.name,
+          baseAmount: inst.amount,
+          concessionAmount: 0,
+          netAmount: inst.amount,
+          dueDate: inst.dueDate,
+          paidAmount: 0,
+          status: 'UNPAID',
+        }));
+
+        const updatedAssignment = await this.feeRepo.updateFeeAssignment(
+          existingAssignment._id.toString(),
+          {
+            feeStructureId: structure._id,
+            feeStructureName: structure.name,
+            baseAmount: structure.totalAmount,
+            concessionId: undefined,
+            concessionName: '',
+            concessionAmount: 0,
+            concessionReason: '',
+            netPayable: structure.totalAmount,
+            installments: assignedInstallments,
+            status: 'ACTIVE',
+          }
+        );
+
+        if (updatedAssignment) {
+          const gen = await this.generateInvoicesForAssignment(updatedAssignment, structure);
+          invoicesCount += gen.length;
+          publishedCount++;
+        }
+      } else {
+        const assignedInstallments: IAssignedInstallment[] = structure.installments.map((inst) => ({
+          installmentNumber: inst.installmentNumber,
+          name: inst.name,
+          baseAmount: inst.amount,
+          concessionAmount: 0,
+          netAmount: inst.amount,
+          dueDate: inst.dueDate,
+          paidAmount: 0,
+          status: 'UNPAID',
+        }));
+
+        const createdAssignment = await this.feeRepo.createFeeAssignment({
+          studentId: student._id,
+          admissionNumber: student.studentId,
+          studentName: student.fullName,
+          className: student.grade,
+          section: student.section,
+          academicYear: structure.academicYear,
+          feeStructureId: structure._id,
+          feeStructureName: structure.name,
+          baseAmount: structure.totalAmount,
+          concessionAmount: 0,
+          netPayable: structure.totalAmount,
+          installments: assignedInstallments,
+          assignedBy: undefined,
+          status: 'ACTIVE',
+        });
+
+        const gen = await this.generateInvoicesForAssignment(createdAssignment, structure);
+        invoicesCount += gen.length;
+        publishedCount++;
+      }
+    }
+
+    return {
+      publishedCount,
+      invoicesCount,
+      skippedCount,
+      message: `Fee structure '${structure.name}' published for ${structure.className}. Assigned to ${publishedCount} student(s) with ${invoicesCount} invoices generated.`,
+    };
+  }
+
   // ---------------------------------------------------------------------------
   // 4. Student Fee Assignment
   // ---------------------------------------------------------------------------
+  async generateInvoicesForAssignment(
+    assignment: IStudentFeeAssignmentDoc,
+    feeStructure?: IFeeStructureDoc | null
+  ): Promise<IFeeInvoiceDoc[]> {
+    const structure =
+      feeStructure ||
+      (await this.feeRepo.findStructureById(assignment.feeStructureId.toString()));
+    const student = await this.feeRepo.findStudentById(assignment.studentId.toString());
+
+    const parentObj = student?.parentId as any;
+    const parentId =
+      parentObj?._id || (parentObj instanceof mongoose.Types.ObjectId ? parentObj : undefined);
+    const parentName = parentObj?.fullName || '';
+    const parentContact = parentObj?.phone || parentObj?.email || '';
+
+    const items = structure
+      ? structure.categories.map((c) => ({
+          categoryName: c.categoryName,
+          amount: c.amount,
+        }))
+      : [];
+    const todayStr = new Date().toISOString().split('T')[0];
+
+    const generatedInvoices: IFeeInvoiceDoc[] = [];
+
+    for (const inst of assignment.installments) {
+      const existing = await this.feeRepo.findInvoiceByAssignmentAndInstallment(
+        assignment._id.toString(),
+        inst.installmentNumber
+      );
+
+      if (existing) {
+        if (existing.status === 'UNPAID' || existing.status === 'CANCELLED') {
+          const updated = await this.feeRepo.updateInvoice(existing._id.toString(), {
+            feeStructureId: assignment.feeStructureId,
+            studentName: assignment.studentName,
+            studentAdmissionNumber: assignment.admissionNumber,
+            parentId,
+            parentName,
+            parentContact,
+            className: assignment.className,
+            section: assignment.section,
+            installmentName: inst.name,
+            items: existing.items && existing.items.length > 0 ? existing.items : items.length > 0 ? items : existing.items,
+            subtotal: inst.baseAmount,
+            concessionAmount: inst.concessionAmount,
+            totalPayable: inst.netAmount,
+            outstandingAmount: Math.max(0, inst.netAmount - (existing.paidAmount || 0)),
+            dueDate: existing.dueDate || inst.dueDate,
+            status: 'UNPAID',
+          });
+          if (updated) generatedInvoices.push(updated);
+        } else {
+          generatedInvoices.push(existing);
+        }
+        continue;
+      }
+
+      const invoiceNumber = await this.feeRepo.getNextInvoiceNumber(assignment.academicYear);
+
+      const created = await this.feeRepo.createInvoice({
+        invoiceNumber,
+        studentId: assignment.studentId,
+        studentAdmissionNumber: assignment.admissionNumber,
+        studentName: assignment.studentName,
+        parentId,
+        parentName,
+        parentContact,
+        className: assignment.className,
+        section: assignment.section,
+        academicYear: assignment.academicYear,
+        feeAssignmentId: assignment._id,
+        feeStructureId: assignment.feeStructureId,
+        installmentNumber: inst.installmentNumber,
+        installmentName: inst.name,
+        items,
+        subtotal: inst.baseAmount,
+        concessionAmount: inst.concessionAmount,
+        lateFeeAmount: 0,
+        totalPayable: inst.netAmount,
+        paidAmount: 0,
+        outstandingAmount: inst.netAmount,
+        issueDate: todayStr,
+        dueDate: inst.dueDate,
+        status: 'UNPAID',
+      });
+
+      generatedInvoices.push(created);
+    }
+
+    return generatedInvoices;
+  }
   private toAssignmentDTO(doc: IStudentFeeAssignmentDoc): StudentFeeAssignmentDTO {
+    const totalPaid = (doc.installments || []).reduce((sum, i) => sum + (i.paidAmount || 0), 0);
+    const outstanding = Math.max(0, doc.netPayable - totalPaid);
+    const todayStr = new Date().toISOString().split('T')[0];
+
+    let paymentStatus: AssignmentInstallmentStatus = 'UNPAID';
+    if (totalPaid >= doc.netPayable && doc.netPayable > 0) {
+      paymentStatus = 'PAID';
+    } else if (totalPaid > 0) {
+      paymentStatus = 'PARTIAL';
+    } else {
+      const hasOverdue = (doc.installments || []).some(
+        (i) => i.status === 'OVERDUE' || (i.dueDate < todayStr && (i.paidAmount || 0) < i.netAmount)
+      );
+      paymentStatus = hasOverdue ? 'OVERDUE' : 'UNPAID';
+    }
+
     return {
       id: doc._id ? doc._id.toString() : (doc as any).id || '',
       studentId: doc.studentId ? doc.studentId.toString() : '',
@@ -630,6 +937,9 @@ export class AdminFeeService {
       concessionAmount: doc.concessionAmount || 0,
       concessionReason: doc.concessionReason,
       netPayable: doc.netPayable,
+      paidAmount: totalPaid,
+      outstandingAmount: outstanding,
+      paymentStatus,
       installments: (doc.installments || []).map((inst) => ({
         installmentNumber: inst.installmentNumber,
         name: inst.name,
@@ -688,6 +998,17 @@ export class AdminFeeService {
         dto.academicYear
       );
       targetStudents = allActive.filter((s) => dto.studentIds!.includes(s._id.toString()));
+      if (targetStudents.length < dto.studentIds.length) {
+        const foundIds = new Set(targetStudents.map((s) => s._id.toString()));
+        for (const sId of dto.studentIds) {
+          if (!foundIds.has(sId)) {
+            const direct = await this.feeRepo.findStudentById(sId);
+            if (direct && direct.status === 'ACTIVE') {
+              targetStudents.push(direct);
+            }
+          }
+        }
+      }
     } else {
       targetStudents = await this.feeRepo.findActiveEnrolledStudents(
         dto.className,
@@ -707,6 +1028,17 @@ export class AdminFeeService {
     const createdAssignments: StudentFeeAssignmentDTO[] = [];
 
     for (const student of targetStudents) {
+      if (student.status !== 'ACTIVE') {
+        skippedCount++;
+        continue;
+      }
+
+      if (structure.className.trim().toLowerCase() !== student.grade.trim().toLowerCase()) {
+        throw new ValidationError(
+          `Fee structure '${structure.name}' is designated for ${structure.className}, but student ${student.fullName} is enrolled in ${student.grade}.`
+        );
+      }
+
       // Check if already assigned for this academic year
       const existingAssignment = await this.feeRepo.findAssignmentByStudentAndYear(
         student._id.toString(),
@@ -775,6 +1107,11 @@ export class AdminFeeService {
         status: 'ACTIVE',
       });
 
+      // Automatically generate invoices for all installments of this assignment if requested
+      if (dto.generateInvoices) {
+        await this.generateInvoicesForAssignment(createdDoc, structure);
+      }
+
       assignedCount++;
       createdAssignments.push(this.toAssignmentDTO(createdDoc));
     }
@@ -790,6 +1127,40 @@ export class AdminFeeService {
       skippedCount,
       assignments: createdAssignments,
     };
+  }
+
+  async cancelFeeAssignment(id: string): Promise<StudentFeeAssignmentDTO> {
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      throw new ValidationError('Invalid assignment ID.');
+    }
+    const assignment = await this.feeRepo.findFeeAssignmentById(id);
+    if (!assignment) {
+      throw new NotFoundError('Fee assignment not found.');
+    }
+    if (assignment.status === 'CANCELLED') {
+      throw new ValidationError('Fee assignment is already cancelled.');
+    }
+
+    const invoices = await this.feeRepo.findInvoicesByAssignmentId(id);
+    const hasPayments = invoices.some((inv) => (inv.paidAmount || 0) > 0);
+    if (hasPayments) {
+      throw new ValidationError(
+        'Cannot cancel fee assignment because payments have already been collected against its invoices. Please reverse the payments first if needed.'
+      );
+    }
+
+    for (const inv of invoices) {
+      if (inv.status !== 'CANCELLED') {
+        await this.feeRepo.updateInvoice(inv._id.toString(), { status: 'CANCELLED' });
+      }
+    }
+
+    const updated = await this.feeRepo.updateFeeAssignment(id, { status: 'CANCELLED' });
+    if (!updated) {
+      throw new NotFoundError('Failed to cancel fee assignment.');
+    }
+
+    return this.toAssignmentDTO(updated);
   }
 
   // ---------------------------------------------------------------------------
@@ -850,6 +1221,18 @@ export class AdminFeeService {
     return this.toInvoiceDTO(doc);
   }
 
+  async getInvoicePayments(invoiceId: string): Promise<FeePaymentDTO[]> {
+    if (!mongoose.Types.ObjectId.isValid(invoiceId)) {
+      throw new ValidationError('Invalid invoice ID.');
+    }
+    const invoice = await this.feeRepo.findInvoiceById(invoiceId);
+    if (!invoice) {
+      throw new NotFoundError('Fee invoice not found.');
+    }
+    const docs = await this.feeRepo.findPaymentsByInvoiceId(invoiceId);
+    return docs.map((d) => this.toPaymentDTO(d));
+  }
+
   async generateInvoices(
     dto: GenerateInvoicesDTO
   ): Promise<{ generatedCount: number; skippedCount: number; invoices: FeeInvoiceDTO[] }> {
@@ -873,12 +1256,32 @@ export class AdminFeeService {
       );
     }
 
+    const targetStudentIds =
+      dto.studentIds && Array.isArray(dto.studentIds) && dto.studentIds.length > 0
+        ? dto.studentIds.map((id) => id.toString())
+        : dto.studentId
+        ? [dto.studentId.toString()]
+        : undefined;
+
+    let targetAssignments = assignments;
+    if (targetStudentIds) {
+      targetAssignments = assignments.filter((a) =>
+        targetStudentIds.includes(a.studentId.toString())
+      );
+    }
+
+    if (targetAssignments.length === 0) {
+      throw new ValidationError(
+        'No active fee assignments found for the specified student(s).'
+      );
+    }
+
     const todayStr = new Date().toISOString().split('T')[0];
     let generatedCount = 0;
     let skippedCount = 0;
     const generatedInvoices: FeeInvoiceDTO[] = [];
 
-    for (const assignment of assignments) {
+    for (const assignment of targetAssignments) {
       // Find matching installment plan
       const installment = assignment.installments.find(
         (i) => i.installmentNumber === dto.installmentNumber
@@ -892,7 +1295,8 @@ export class AdminFeeService {
       // Check duplicate invoice
       const existingInvoice = await this.feeRepo.findInvoiceByAssignmentAndInstallment(
         assignment._id.toString(),
-        dto.installmentNumber
+        dto.installmentNumber,
+        false
       );
 
       if (existingInvoice) {
@@ -901,12 +1305,7 @@ export class AdminFeeService {
       }
 
       // Get student's parent details
-      const studentDoc = await this.feeRepo.findActiveEnrolledStudents(
-        assignment.className,
-        assignment.section,
-        assignment.academicYear
-      );
-      const student = studentDoc.find((s) => s._id.toString() === assignment.studentId.toString());
+      const student = await this.feeRepo.findStudentById(assignment.studentId.toString());
 
       const parentName = student?.parentId ? (student.parentId as any).fullName || '' : '';
       const parentContact = student?.parentId ? (student.parentId as any).phone || (student.parentId as any).email || '' : '';
@@ -957,7 +1356,7 @@ export class AdminFeeService {
   }
 
   // ---------------------------------------------------------------------------
-  // 6. Fee Collection & Payment Recording
+  // 6. Fee Collection, Payments & Ledger
   // ---------------------------------------------------------------------------
   private toPaymentDTO(doc: IFeePaymentDoc): FeePaymentDTO {
     return {
@@ -987,16 +1386,82 @@ export class AdminFeeService {
     };
   }
 
+  private toLedgerDTO(doc: IFeeLedgerDoc): FeeLedgerDTO {
+    return {
+      id: doc._id ? doc._id.toString() : (doc as any).id || '',
+      entryNumber: doc.entryNumber,
+      transactionType: doc.transactionType,
+      entryType: doc.entryType,
+      paymentId: doc.paymentId ? doc.paymentId.toString() : undefined,
+      receiptNumber: doc.receiptNumber,
+      invoiceId: doc.invoiceId ? doc.invoiceId.toString() : '',
+      invoiceNumber: doc.invoiceNumber,
+      studentId: doc.studentId ? doc.studentId.toString() : '',
+      studentAdmissionNumber: doc.studentAdmissionNumber,
+      studentName: doc.studentName,
+      className: doc.className,
+      section: doc.section,
+      academicYear: doc.academicYear,
+      amount: doc.amount,
+      paymentMethod: doc.paymentMethod,
+      description: doc.description,
+      balanceAfter: doc.balanceAfter,
+      recordedByName: doc.recordedByName,
+      reversalOfLedgerId: doc.reversalOfLedgerId ? doc.reversalOfLedgerId.toString() : undefined,
+      status: doc.status,
+      createdAt: doc.createdAt ? doc.createdAt.toISOString() : new Date().toISOString(),
+    };
+  }
+
   async getPayments(filter?: {
     academicYear?: string;
     className?: string;
+    section?: string;
+    invoiceNumber?: string;
     paymentMethod?: string;
+    status?: string;
     startDate?: string;
     endDate?: string;
     search?: string;
   }): Promise<FeePaymentDTO[]> {
     const docs = await this.feeRepo.findPayments(filter);
     return docs.map((d) => this.toPaymentDTO(d));
+  }
+
+  async getPaymentById(id: string): Promise<FeePaymentDTO> {
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      throw new ValidationError('Invalid payment ID.');
+    }
+    const doc = await this.feeRepo.findPaymentById(id);
+    if (!doc) {
+      throw new NotFoundError('Payment transaction record not found.');
+    }
+    return this.toPaymentDTO(doc);
+  }
+
+  async getPaymentByReceiptNumber(receiptNumber: string): Promise<FeePaymentDTO> {
+    if (!receiptNumber || !receiptNumber.trim()) {
+      throw new ValidationError('Valid receipt number is required.');
+    }
+    const doc = await this.feeRepo.findPaymentByReceiptNumber(receiptNumber.trim());
+    if (!doc) {
+      throw new NotFoundError(`Receipt '${receiptNumber}' not found.`);
+    }
+    return this.toPaymentDTO(doc);
+  }
+
+  async getCollectionSummary(academicYear?: string): Promise<FeeCollectionSummaryDTO> {
+    return await this.feeRepo.getCollectionMetrics(academicYear);
+  }
+
+  async getLedgerEntries(filter?: {
+    academicYear?: string;
+    studentId?: string;
+    transactionType?: string;
+    status?: string;
+  }): Promise<FeeLedgerDTO[]> {
+    const docs = await this.feeRepo.findLedgerEntries(filter);
+    return docs.map((d) => this.toLedgerDTO(d));
   }
 
   async collectFee(
@@ -1033,6 +1498,31 @@ export class AdminFeeService {
       );
     }
 
+    // Duplicate Check 1: Check if transaction reference is already used by an active payment
+    if (dto.transactionReference && dto.transactionReference.trim()) {
+      const existingRef = await this.feeRepo.findPaymentByTransactionRef(
+        dto.transactionReference.trim()
+      );
+      if (existingRef) {
+        throw new ConflictError(
+          `A payment with transaction reference '${dto.transactionReference.trim()}' is already recorded (Receipt: ${existingRef.receiptNumber}).`
+        );
+      }
+    }
+
+    // Duplicate Check 2: Rapid duplicate submission prevention (same invoice, amount, method within 10s)
+    const duplicateRecent = await this.feeRepo.findRecentDuplicatePayment(
+      invoice._id.toString(),
+      paymentAmount,
+      dto.paymentMethod,
+      10
+    );
+    if (duplicateRecent) {
+      throw new ConflictError(
+        'A duplicate payment for this invoice was recently recorded. Please refresh before trying again.'
+      );
+    }
+
     const receiptNumber = await this.feeRepo.getNextReceiptNumber(invoice.academicYear);
 
     // Create payment transaction
@@ -1059,7 +1549,7 @@ export class AdminFeeService {
       status: 'SUCCESS',
     });
 
-    // Update invoice balance
+    // Update invoice balance and status
     const newPaidAmount = (invoice.paidAmount || 0) + paymentAmount;
     const newOutstanding = Math.max(0, invoice.totalPayable - newPaidAmount);
     const newStatus = newOutstanding === 0 ? 'PAID' : 'PARTIAL';
@@ -1094,6 +1584,31 @@ export class AdminFeeService {
       });
     }
 
+    // Ledger Integration: Create Financial Ledger Entry exactly once
+    const ledgerNumber = await this.feeRepo.getNextLedgerNumber(invoice.academicYear);
+    await this.feeRepo.createLedgerEntry({
+      entryNumber: ledgerNumber,
+      transactionType: 'FEE_PAYMENT',
+      entryType: 'CREDIT',
+      paymentId: payment._id,
+      receiptNumber: payment.receiptNumber,
+      invoiceId: invoice._id,
+      invoiceNumber: invoice.invoiceNumber,
+      studentId: invoice.studentId,
+      studentAdmissionNumber: invoice.studentAdmissionNumber,
+      studentName: invoice.studentName,
+      className: invoice.className,
+      section: invoice.section,
+      academicYear: invoice.academicYear,
+      amount: paymentAmount,
+      paymentMethod: dto.paymentMethod,
+      description: `Fee payment of ₹${paymentAmount.toLocaleString('en-IN')} received via ${dto.paymentMethod} for invoice ${invoice.invoiceNumber}`,
+      balanceAfter: newOutstanding,
+      recordedBy: new mongoose.Types.ObjectId(recordedByUserId),
+      recordedByName,
+      status: 'POSTED',
+    });
+
     return this.toPaymentDTO(payment);
   }
 
@@ -1119,9 +1634,10 @@ export class AdminFeeService {
     }
 
     const invoice = await this.feeRepo.findInvoiceById(payment.invoiceId.toString());
+    let restoredOutstanding = 0;
     if (invoice) {
       const restoredPaid = Math.max(0, (invoice.paidAmount || 0) - payment.amount);
-      const restoredOutstanding = Math.min(invoice.totalPayable, invoice.outstandingAmount + payment.amount);
+      restoredOutstanding = Math.min(invoice.totalPayable, invoice.outstandingAmount + payment.amount);
       const restoredStatus = restoredPaid === 0 ? 'UNPAID' : 'PARTIAL';
 
       await this.feeRepo.updateInvoice(invoice._id.toString(), {
@@ -1159,6 +1675,39 @@ export class AdminFeeService {
       reversalReason: dto.reason.trim(),
       reversedAt: new Date(),
       reversedBy: new mongoose.Types.ObjectId(reversedByUserId),
+    });
+
+    // Ledger Integration: Update original ledger entry & record contra reversal entry
+    const originalLedger = await this.feeRepo.findLedgerByPaymentId(payment._id.toString());
+    if (originalLedger) {
+      await this.feeRepo.updateLedgerEntry(originalLedger._id.toString(), {
+        status: 'REVERSED',
+      });
+    }
+
+    const reversalLedgerNumber = await this.feeRepo.getNextLedgerNumber(payment.academicYear);
+    await this.feeRepo.createLedgerEntry({
+      entryNumber: reversalLedgerNumber,
+      transactionType: 'FEE_REVERSAL',
+      entryType: 'DEBIT',
+      paymentId: payment._id,
+      receiptNumber: payment.receiptNumber,
+      invoiceId: invoice ? invoice._id : payment.invoiceId,
+      invoiceNumber: payment.invoiceNumber,
+      studentId: payment.studentId,
+      studentAdmissionNumber: payment.studentAdmissionNumber,
+      studentName: payment.studentName,
+      className: payment.className,
+      section: payment.section,
+      academicYear: payment.academicYear,
+      amount: payment.amount,
+      paymentMethod: payment.paymentMethod,
+      description: `Payment Reversal for ${payment.receiptNumber}: ${dto.reason.trim()}`,
+      balanceAfter: restoredOutstanding,
+      recordedBy: new mongoose.Types.ObjectId(reversedByUserId),
+      recordedByName: payment.recordedByName || 'Admin',
+      reversalOfLedgerId: originalLedger?._id,
+      status: 'POSTED',
     });
 
     return this.toPaymentDTO(updatedPayment!);

@@ -128,6 +128,8 @@ export interface CreateFeeStructureDTO {
 export interface UpdateFeeStructureDTO {
   name?: string;
   description?: string;
+  className?: string;
+  section?: string;
   categories?: FeeStructureCategoryDTO[];
   totalAmount?: number;
   paymentFrequency?: PaymentFrequency;
@@ -147,6 +149,13 @@ export interface FeeStructureUsageDTO {
 export interface DuplicateFeeStructureDTO {
   targetAcademicYear: string;
   name?: string;
+}
+
+export interface PublishStructureResultDTO {
+  publishedCount: number;
+  invoicesCount: number;
+  skippedCount: number;
+  message: string;
 }
 
 // Student Fee Assignment DTOs
@@ -177,6 +186,9 @@ export interface StudentFeeAssignmentDTO {
   concessionAmount: number;
   concessionReason?: string;
   netPayable: number;
+  paidAmount?: number;
+  outstandingAmount?: number;
+  paymentStatus?: AssignmentInstallmentStatus;
   installments: AssignedInstallmentDTO[];
   status: StudentFeeAssignmentStatus;
   createdAt: string;
@@ -190,6 +202,7 @@ export interface AssignFeeDTO {
   feeStructureId: string;
   concessionId?: string;
   concessionReason?: string;
+  generateInvoices?: boolean;
 }
 
 // Invoice DTOs
@@ -234,6 +247,7 @@ export interface GenerateInvoicesDTO {
   section?: string;
   installmentNumber: number;
   studentId?: string; // Optional: generate for single student
+  studentIds?: string[]; // Optional: generate for specific list of students
   dueDate?: string;
 }
 
@@ -276,6 +290,38 @@ export interface FeePaymentDTO {
   status: PaymentRecordStatus;
   reversalReason?: string;
   reversedAt?: string;
+  createdAt: string;
+}
+
+export interface FeeCollectionSummaryDTO {
+  totalCollected: number;
+  todayCollected: number;
+  pendingPaymentsCount: number;
+  totalOutstanding: number;
+}
+
+export interface FeeLedgerDTO {
+  id: string;
+  entryNumber: string;
+  transactionType: string;
+  entryType: string;
+  paymentId?: string;
+  receiptNumber?: string;
+  invoiceId: string;
+  invoiceNumber: string;
+  studentId: string;
+  studentAdmissionNumber: string;
+  studentName: string;
+  className: string;
+  section: string;
+  academicYear: string;
+  amount: number;
+  paymentMethod?: string;
+  description: string;
+  balanceAfter: number;
+  recordedByName: string;
+  reversalOfLedgerId?: string;
+  status: string;
   createdAt: string;
 }
 

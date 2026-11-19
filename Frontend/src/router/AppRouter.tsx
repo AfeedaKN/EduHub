@@ -12,6 +12,7 @@ import { MyChildrenPage } from '../pages/parent/MyChildrenPage';
 import { ParentAssignmentsPage } from '../pages/parent/ParentAssignmentsPage';
 import { ParentStudyMaterialsPage } from '../pages/parent/ParentStudyMaterialsPage';
 import { ParentExamsPage } from '../pages/parent/ParentExamsPage';
+import { ParentFeesPage } from '../pages/parent/ParentFeesPage';
 import { ParentPlaceholderPage } from '../pages/parent/ParentPlaceholderPage';
 import { AddStudentPage } from '../pages/parent/AddStudentPage';
 import { AdminDashboardPage } from '../pages/admin/AdminDashboardPage';
@@ -167,7 +168,7 @@ export const AppRouter: React.FC = () => {
           path="/parent/fees"
           element={
             <ProtectedRoute allowedRoles={['PARENT']}>
-              <ParentPlaceholderPage title="Tuition & School Fees" />
+              <ParentFeesPage />
             </ProtectedRoute>
           }
         />

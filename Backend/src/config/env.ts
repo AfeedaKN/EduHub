@@ -13,4 +13,9 @@ export const config = {
     secret: process.env.JWT_SECRET || 'fallback_secret_for_dev_only',
     expiresIn: process.env.JWT_EXPIRES_IN || '7d',
   },
+  razorpay: {
+    keyId: process.env.RAZORPAY_KEY_ID || 'rzp_test_eduhub2026',
+    keySecret: process.env.RAZORPAY_KEY_SECRET || 'eduhub_test_secret_key_2026',
+    webhookSecret: process.env.RAZORPAY_WEBHOOK_SECRET || 'eduhub_webhook_secret_2026',
+  },
 } as const;

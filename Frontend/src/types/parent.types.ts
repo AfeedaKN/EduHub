@@ -205,5 +205,179 @@ export interface ParentExamResultsResponse {
   exams: ParentExamCard[];
 }
 
+export interface ParentPaymentHistory {
+  id?: string;
+  receiptNumber: string;
+  paymentDate: string;
+  paymentMethod: string;
+  amount: number;
+  transactionReference?: string;
+  status: string;
+  recordedByName?: string;
+  remarks?: string;
+  balanceAfter?: number;
+  invoiceNumber?: string;
+  installmentName?: string;
+  studentName?: string;
+  studentAdmissionNumber?: string;
+  className?: string;
+  section?: string;
+  academicYear?: string;
+}
+
+export interface ParentInvoiceItem {
+  categoryName: string;
+  description?: string;
+  amount: number;
+}
+
+export interface ParentInvoice {
+  id: string;
+  invoiceNumber: string;
+  studentId: string;
+  studentName: string;
+  studentAdmissionNumber: string;
+  className: string;
+  section: string;
+  academicYear: string;
+  feeStructureId?: string;
+  feeStructureName?: string;
+  installmentNumber: number;
+  installmentName: string;
+  items: ParentInvoiceItem[];
+  subtotal: number;
+  concessionAmount: number;
+  lateFeeAmount: number;
+  totalPayable: number;
+  paidAmount: number;
+  outstandingAmount: number;
+  issueDate: string;
+  dueDate: string;
+  status: string;
+  notes?: string;
+  payments?: ParentPaymentHistory[];
+}
+
+export interface ParentAssignedInstallment {
+  installmentNumber: number;
+  name: string;
+  baseAmount: number;
+  concessionAmount: number;
+  netAmount: number;
+  dueDate: string;
+  paidAmount: number;
+  status: string;
+}
+
+export interface ParentFeeAssignment {
+  id: string;
+  studentId: string;
+  studentName: string;
+  admissionNumber: string;
+  className: string;
+  section: string;
+  academicYear: string;
+  feeStructureId: string;
+  feeStructureName: string;
+  baseAmount: number;
+  concessionName?: string;
+  concessionAmount: number;
+  concessionReason?: string;
+  netPayable: number;
+  status: string;
+  installments: ParentAssignedInstallment[];
+}
+
+export interface ParentFeeInvoicesQueryParams {
+  studentId?: string;
+  academicYear?: string;
+  status?: string;
+}
+
+export interface ParentFeeInvoicesResponse {
+  children: ChildProfile[];
+  selectedChild: ChildProfile | null;
+  hasEnrolledChildren: boolean;
+  registrationRequestsCount: number;
+  assignment: ParentFeeAssignment | null;
+  assignments: ParentFeeAssignment[];
+  summary: {
+    totalFees: number;
+    amountPaid: number;
+    outstandingBalance: number;
+    overdueAmount: number;
+    totalInvoiced: number;
+    totalPaid: number;
+    totalOutstanding: number;
+    overdueInvoicesCount: number;
+  };
+  invoices: ParentInvoice[];
+  academicYears: string[];
+}
+
+export interface PaymentConfig {
+  keyId: string;
+  currency: string;
+  isTestMode: boolean;
+}
+
+export interface CreatePaymentOrderPayload {
+  invoiceId: string;
+  amount: number;
+}
+
+export interface PaymentOrderResponse {
+  orderId: string;
+  gatewayOrderId: string;
+  amount: number;
+  amountInPaise: number;
+  currency: string;
+  keyId: string;
+  invoiceId: string;
+  invoiceNumber: string;
+  studentName: string;
+  studentAdmissionNumber: string;
+  className: string;
+  section: string;
+  installmentName: string;
+}
+
+export interface VerifyPaymentPayload {
+  invoiceId: string;
+  razorpayOrderId: string;
+  razorpayPaymentId: string;
+  razorpaySignature: string;
+  paymentMethod?: string;
+}
+
+export interface ParentPaymentRecord {
+  id: string;
+  receiptNumber: string;
+  invoiceId: string;
+  invoiceNumber: string;
+  studentId: string;
+  studentName: string;
+  studentAdmissionNumber: string;
+  className: string;
+  section: string;
+  academicYear: string;
+  amount: number;
+  paymentDate: string;
+  paymentMethod: string;
+  transactionReference?: string;
+  status: string;
+  isOnline: boolean;
+  recordedByName?: string;
+  remarks?: string;
+  balanceAfter?: number;
+}
+
+export interface ParentPaymentHistoryResponse {
+  payments: ParentPaymentRecord[];
+  totalCollected: number;
+  totalTransactions: number;
+}
+
+
 
 

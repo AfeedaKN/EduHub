@@ -32,6 +32,10 @@ export interface IFeePaymentDoc extends Document {
   recordedBy: mongoose.Types.ObjectId;
   recordedByName: string;
   status: PaymentRecordStatus;
+  gatewayOrderId?: string;
+  gatewayPaymentId?: string;
+  gatewaySignature?: string;
+  isOnline?: boolean;
   reversalReason?: string;
   reversedAt?: Date;
   reversedBy?: mongoose.Types.ObjectId;
@@ -153,6 +157,27 @@ const FeePaymentSchema = new Schema<IFeePaymentDoc>(
       type: String,
       enum: ['SUCCESS', 'REVERSED'],
       default: 'SUCCESS',
+      index: true,
+    },
+    gatewayOrderId: {
+      type: String,
+      trim: true,
+      default: null,
+      index: true,
+    },
+    gatewayPaymentId: {
+      type: String,
+      trim: true,
+      default: null,
+      index: true,
+    },
+    gatewaySignature: {
+      type: String,
+      default: null,
+    },
+    isOnline: {
+      type: Boolean,
+      default: false,
       index: true,
     },
     reversalReason: {

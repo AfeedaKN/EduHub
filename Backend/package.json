@@ -32,6 +32,7 @@
     "jsonwebtoken": "^9.0.3",
     "mongoose": "^8.9.5",
     "nodemailer": "^10.0.16",
+    "razorpay": "^2.9.8",
     "zod": "^4.6.5"
   },
   "devDependencies": {

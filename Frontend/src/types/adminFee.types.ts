@@ -159,6 +159,8 @@ export interface CreateFeeStructureInput {
 export interface UpdateFeeStructureInput {
   name?: string;
   description?: string;
+  className?: string;
+  section?: string;
   categories?: {
     categoryId: string;
     categoryName: string;
@@ -221,6 +223,9 @@ export interface StudentFeeAssignment {
   concessionReason?: string;
   netPayable: number;
   installments: AssignedInstallment[];
+  paidAmount?: number;
+  outstandingAmount?: number;
+  paymentStatus?: AssignmentInstallmentStatus;
   status: StudentFeeAssignmentStatus;
   createdAt: string;
 }
@@ -233,6 +238,7 @@ export interface AssignFeeInput {
   studentIds?: string[];
   concessionId?: string;
   concessionReason?: string;
+  generateInvoices?: boolean;
 }
 
 export interface AssignFeeResult {
@@ -262,7 +268,8 @@ export interface FeeInvoice {
   feeAssignmentId: string;
   installmentNumber: number;
   installmentName: string;
-  lineItems: InvoiceLineItem[];
+  lineItems?: InvoiceLineItem[];
+  items?: { categoryName: string; amount: number }[];
   subtotal: number;
   concessionAmount: number;
   lateFeeAmount: number;
@@ -339,6 +346,38 @@ export interface FeePayment {
 
 export interface ReversePaymentInput {
   reason: string;
+}
+
+export interface FeeCollectionSummary {
+  totalCollected: number;
+  todayCollected: number;
+  pendingPaymentsCount: number;
+  totalOutstanding: number;
+}
+
+export interface FeeLedgerEntry {
+  id: string;
+  entryNumber: string;
+  transactionType: string;
+  entryType: string;
+  paymentId?: string;
+  receiptNumber?: string;
+  invoiceId: string;
+  invoiceNumber: string;
+  studentId: string;
+  studentAdmissionNumber: string;
+  studentName: string;
+  className: string;
+  section: string;
+  academicYear: string;
+  amount: number;
+  paymentMethod?: string;
+  description: string;
+  balanceAfter: number;
+  recordedByName: string;
+  reversalOfLedgerId?: string;
+  status: string;
+  createdAt: string;
 }
 
 export interface DefaulterItem {

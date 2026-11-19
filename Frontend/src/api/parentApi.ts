@@ -10,6 +10,13 @@ import {
   ParentAssignment,
   SubmitAssignmentPayload,
   SubmissionDetails,
+  PaymentConfig,
+  CreatePaymentOrderPayload,
+  PaymentOrderResponse,
+  VerifyPaymentPayload,
+  ParentPaymentRecord,
+  ParentPaymentHistoryResponse,
+  ParentInvoice,
 } from '../types/parent.types';
 
 export interface ApiResponse<T> {
@@ -120,6 +127,60 @@ export const parentApi = {
     const res = await axiosClient.get<
       ApiResponse<import('../types/parent.types').ParentExamResultsResponse>
     >('/parent/exams', { params });
+    return res.data;
+  },
+
+  // Fee Invoices and Payment History for children
+  getFeeInvoices: async (
+    params?: import('../types/parent.types').ParentFeeInvoicesQueryParams
+  ): Promise<ApiResponse<import('../types/parent.types').ParentFeeInvoicesResponse>> => {
+    const res = await axiosClient.get<
+      ApiResponse<import('../types/parent.types').ParentFeeInvoicesResponse>
+    >('/parent/fees/invoices', { params });
+    return res.data;
+  },
+
+  getFeeInvoiceDetails: async (
+    id: string
+  ): Promise<ApiResponse<import('../types/parent.types').ParentInvoice>> => {
+    const res = await axiosClient.get<
+      ApiResponse<import('../types/parent.types').ParentInvoice>
+    >(`/parent/fees/invoices/${id}`);
+    return res.data;
+  },
+
+  // Online Fee Payment Gateway (Razorpay)
+  getPaymentConfig: async (): Promise<ApiResponse<PaymentConfig>> => {
+    const res = await axiosClient.get<ApiResponse<PaymentConfig>>('/parent/fees/config');
+    return res.data;
+  },
+
+  createPaymentOrder: async (
+    payload: CreatePaymentOrderPayload
+  ): Promise<ApiResponse<PaymentOrderResponse>> => {
+    const res = await axiosClient.post<ApiResponse<PaymentOrderResponse>>(
+      '/parent/fees/create-order',
+      payload
+    );
+    return res.data;
+  },
+
+  verifyPayment: async (
+    payload: VerifyPaymentPayload
+  ): Promise<ApiResponse<{ payment: ParentPaymentRecord; receiptNumber: string; invoice: ParentInvoice }>> => {
+    const res = await axiosClient.post<
+      ApiResponse<{ payment: ParentPaymentRecord; receiptNumber: string; invoice: ParentInvoice }>
+    >('/parent/fees/verify-payment', payload);
+    return res.data;
+  },
+
+  getParentPayments: async (
+    params?: { studentId?: string; academicYear?: string }
+  ): Promise<ApiResponse<ParentPaymentHistoryResponse>> => {
+    const res = await axiosClient.get<ApiResponse<ParentPaymentHistoryResponse>>(
+      '/parent/fees/payments',
+      { params }
+    );
     return res.data;
   },
 };

@@ -183,4 +183,117 @@ export class ParentController {
       next(error);
     }
   };
+
+  getFeeInvoices = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      if (!req.user || !req.user.sub) {
+        throw new UnauthorizedError('Authenticated parent session required.', 'UNAUTHORIZED');
+      }
+
+      const { studentId, academicYear, status } = req.query;
+      const result = await this.parentService.getParentFeeInvoices(req.user.sub, {
+        studentId: studentId ? String(studentId) : undefined,
+        academicYear: academicYear ? String(academicYear) : undefined,
+        status: status ? String(status) : undefined,
+      });
+
+      return res
+        .status(HttpStatusCode.OK)
+        .json(ApiResponse.success(result, ParentMessages.FEE_INVOICES_FETCHED));
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  getFeeInvoiceById = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      if (!req.user || !req.user.sub) {
+        throw new UnauthorizedError('Authenticated parent session required.', 'UNAUTHORIZED');
+      }
+
+      const { id } = req.params;
+      const result = await this.parentService.getParentFeeInvoiceDetails(req.user.sub, id);
+
+      return res
+        .status(HttpStatusCode.OK)
+        .json(ApiResponse.success(result, ParentMessages.FEE_INVOICE_DETAIL_FETCHED));
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  getPaymentConfig = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const config = this.parentService.getPaymentConfig();
+      return res
+        .status(HttpStatusCode.OK)
+        .json(ApiResponse.success(config, ParentMessages.PAYMENT_CONFIG_FETCHED));
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  createPaymentOrder = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      if (!req.user || !req.user.sub) {
+        throw new UnauthorizedError('Authenticated parent session required.', 'UNAUTHORIZED');
+      }
+
+      const result = await this.parentService.createOnlinePaymentOrder(req.user.sub, req.body);
+      return res
+        .status(HttpStatusCode.CREATED)
+        .json(ApiResponse.success(result, ParentMessages.PAYMENT_ORDER_CREATED));
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  verifyPayment = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      if (!req.user || !req.user.sub) {
+        throw new UnauthorizedError('Authenticated parent session required.', 'UNAUTHORIZED');
+      }
+
+      const result = await this.parentService.verifyOnlinePayment(req.user.sub, req.body);
+      return res
+        .status(HttpStatusCode.OK)
+        .json(ApiResponse.success(result, ParentMessages.PAYMENT_VERIFIED));
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  handlePaymentWebhook = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const signature = String(req.headers['x-razorpay-signature'] || '');
+      // Use raw body string or JSON stringified body
+      const rawBody = (req as any).rawBody || JSON.stringify(req.body);
+      const result = await this.parentService.handlePaymentWebhook(rawBody, signature, req.body);
+      return res
+        .status(HttpStatusCode.OK)
+        .json(ApiResponse.success(result, ParentMessages.PAYMENT_WEBHOOK_PROCESSED));
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  getParentPayments = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      if (!req.user || !req.user.sub) {
+        throw new UnauthorizedError('Authenticated parent session required.', 'UNAUTHORIZED');
+      }
+
+      const { studentId, academicYear } = req.query;
+      const result = await this.parentService.getParentPayments(req.user.sub, {
+        studentId: studentId ? String(studentId) : undefined,
+        academicYear: academicYear ? String(academicYear) : undefined,
+      });
+
+      return res
+        .status(HttpStatusCode.OK)
+        .json(ApiResponse.success(result, ParentMessages.PAYMENT_HISTORY_FETCHED));
+    } catch (error) {
+      next(error);
+    }
+  };
 }

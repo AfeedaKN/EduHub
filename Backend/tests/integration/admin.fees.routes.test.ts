@@ -74,7 +74,9 @@ describe('Admin Fees & Payments Management Integration Tests', () => {
       },
     });
     await StudentFeeAssignmentModel.deleteMany({ admissionNumber: 'FEE-STU-001' });
-    await FeeInvoiceModel.deleteMany({ admissionNumber: 'FEE-STU-001' });
+    await FeeInvoiceModel.deleteMany({
+      $or: [{ studentAdmissionNumber: 'FEE-STU-001' }, { admissionNumber: 'FEE-STU-001' }],
+    });
     await FeePaymentModel.deleteMany({ studentId: { $exists: true } });
     await StudentModel.deleteMany({ studentId: 'FEE-STU-001' });
 
@@ -130,7 +132,9 @@ describe('Admin Fees & Payments Management Integration Tests', () => {
       },
     });
     await StudentFeeAssignmentModel.deleteMany({ admissionNumber: 'FEE-STU-001' });
-    await FeeInvoiceModel.deleteMany({ admissionNumber: 'FEE-STU-001' });
+    await FeeInvoiceModel.deleteMany({
+      $or: [{ studentAdmissionNumber: 'FEE-STU-001' }, { admissionNumber: 'FEE-STU-001' }],
+    });
     await StudentModel.deleteMany({ studentId: 'FEE-STU-001' });
   });
 
@@ -475,6 +479,59 @@ describe('Admin Fees & Payments Management Integration Tests', () => {
       expect(res.body.data.name).toBe('Class 10 Standard Fee 2027-2028');
       expect(res.body.data.totalAmount).toBe(20000);
     });
+    it('should update fee structure className when no financial records exist', async () => {
+      const res = await request(app)
+        .put(`/api/v1/admin/fees/structures/${structureId}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          className: 'Class 10',
+          section: 'A',
+        });
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.className).toBe('Class 10');
+      expect(res.body.data.section).toBe('A');
+    });
+
+    it('should safely delete a fee structure when no assignments or invoices reference it', async () => {
+      // Create a temporary structure with 0 assignments
+      const createRes = await request(app)
+        .post('/api/v1/admin/fees/structures')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          name: 'Temporary Deletable Structure',
+          academicYear: '2026-2027',
+          className: 'Grade 9',
+          categories: [
+            { categoryId, categoryName: 'Tuition Fee Test', amount: 5000 },
+          ],
+          totalAmount: 5000,
+          paymentFrequency: 'ANNUAL',
+          installments: [
+            { installmentNumber: 1, name: 'Full Payment', amount: 5000, dueDate: '2026-07-31' },
+          ],
+        });
+
+      expect(createRes.status).toBe(201);
+      const tempId = createRes.body.data.id;
+
+      // Delete the structure
+      const deleteRes = await request(app)
+        .delete(`/api/v1/admin/fees/structures/${tempId}`)
+        .set('Authorization', `Bearer ${adminToken}`);
+
+      expect(deleteRes.status).toBe(200);
+      expect(deleteRes.body.success).toBe(true);
+      expect(deleteRes.body.data.success).toBe(true);
+
+      // Verify it is gone
+      const checkRes = await request(app)
+        .get(`/api/v1/admin/fees/structures/${tempId}`)
+        .set('Authorization', `Bearer ${adminToken}`);
+
+      expect(checkRes.status).toBe(404);
+    });
   });
 
   describe('5. Student Fee Assignment', () => {
@@ -727,6 +784,373 @@ describe('Admin Fees & Payments Management Integration Tests', () => {
       expect(res.body.success).toBe(true);
       expect(res.body.data).toHaveProperty('reportType', 'COLLECTION_SUMMARY');
       expect(Array.isArray(res.body.data.rows)).toBe(true);
+    });
+  });
+
+  describe('10. Invoice Payments & Assignment Cancellation', () => {
+    it('should retrieve payment transactions for a specific invoice', async () => {
+      const res = await request(app)
+        .get(`/api/v1/admin/fees/invoices/${invoiceId}/payments`)
+        .set('Authorization', `Bearer ${adminToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(Array.isArray(res.body.data)).toBe(true);
+    });
+
+    it('should prevent cancelling assignment if payments have been recorded', async () => {
+      // Record a new payment
+      const payRes = await request(app)
+        .post('/api/v1/admin/fees/payments/collect')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          invoiceId,
+          amount: 2000,
+          paymentMethod: 'CASH',
+        });
+      expect(payRes.status).toBe(201);
+      const newPaymentId = payRes.body.data.id;
+
+      // Attempt to cancel assignment
+      const cancelRes = await request(app)
+        .put(`/api/v1/admin/fees/assignments/${assignmentId}/cancel`)
+        .set('Authorization', `Bearer ${adminToken}`);
+
+      expect(cancelRes.status).toBe(400);
+
+      // Clean up payment so we can test cancellation next
+      await request(app)
+        .post(`/api/v1/admin/fees/payments/${newPaymentId}/reverse`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ reason: 'Test reset' });
+    });
+
+    it('should successfully cancel fee assignment when no payments exist', async () => {
+      const cancelRes = await request(app)
+        .put(`/api/v1/admin/fees/assignments/${assignmentId}/cancel`)
+        .set('Authorization', `Bearer ${adminToken}`);
+
+      expect(cancelRes.status).toBe(200);
+      expect(cancelRes.body.success).toBe(true);
+      expect(cancelRes.body.data.status).toBe('CANCELLED');
+
+      // Verify invoice is cancelled
+      const invDoc = await FeeInvoiceModel.findById(invoiceId);
+      expect(invDoc?.status).toBe('CANCELLED');
+    });
+  });
+
+  describe('11. Parent Portal Fee Invoices & Access Isolation', () => {
+    let secondParentUserId: string;
+    let secondParentToken: string;
+    let unapprovedParentUserId: string;
+    let unapprovedParentToken: string;
+
+    let testChild1Id: string;
+    let testChild2Id: string;
+    let testAssignment1Id: string;
+    let testInvoice1Id: string;
+
+    beforeAll(async () => {
+      secondParentUserId = new mongoose.Types.ObjectId().toString();
+      secondParentToken = tokenService.generateAccessToken({
+        sub: secondParentUserId,
+        email: 'other.parent@eduhub.school',
+        role: UserRole.PARENT,
+        fullName: 'Unrelated Parent',
+      });
+
+      await UserModel.create({
+        _id: new mongoose.Types.ObjectId(secondParentUserId),
+        email: 'other.parent@eduhub.school',
+        phone: '+91 98765 00003',
+        passwordHash: 'dummyhash',
+        role: UserRole.PARENT,
+        fullName: 'Unrelated Parent',
+        status: 'ACTIVE',
+      });
+
+      // Third parent with no enrolled children (pending registration only)
+      unapprovedParentUserId = new mongoose.Types.ObjectId().toString();
+      unapprovedParentToken = tokenService.generateAccessToken({
+        sub: unapprovedParentUserId,
+        email: 'unapproved.parent@eduhub.school',
+        role: UserRole.PARENT,
+        fullName: 'Unapproved Parent',
+      });
+
+      await UserModel.create({
+        _id: new mongoose.Types.ObjectId(unapprovedParentUserId),
+        email: 'unapproved.parent@eduhub.school',
+        phone: '+91 98765 00004',
+        passwordHash: 'dummyhash',
+        role: UserRole.PARENT,
+        fullName: 'Unapproved Parent',
+        status: 'ACTIVE',
+      });
+
+      // Create pending registration request for unapproved parent
+      await mongoose.model('StudentRegistrationRequest').create({
+        parentId: new mongoose.Types.ObjectId(unapprovedParentUserId),
+        studentFullName: 'Aarav Sharma',
+        dateOfBirth: new Date('2018-05-10'),
+        gender: 'MALE',
+        requestedGrade: 'Grade 3',
+        academicYear: '2026-2027',
+        parentRelationship: 'FATHER',
+        status: 'PENDING',
+      });
+
+      // Set up Child 1 for primary parent: Active enrolled with fee assignment and invoice
+      const child1Doc = await StudentModel.create({
+        parentId: new mongoose.Types.ObjectId(parentUserId),
+        fullName: 'Ayan Test Child',
+        studentId: 'STU-TEST-001',
+        grade: 'Class 10',
+        section: 'A',
+        classTeacher: 'Teacher Test',
+        status: 'ACTIVE',
+        academicYear: '2026-2027',
+      });
+      testChild1Id = child1Doc._id.toString();
+
+      // Set up Child 2 for primary parent: Active enrolled WITHOUT fee assignment
+      const child2Doc = await StudentModel.create({
+        parentId: new mongoose.Types.ObjectId(parentUserId),
+        fullName: 'Zoya Test Child',
+        studentId: 'STU-TEST-002',
+        grade: 'Class 8',
+        section: 'B',
+        classTeacher: 'Teacher Two',
+        status: 'ACTIVE',
+        academicYear: '2026-2027',
+      });
+      testChild2Id = child2Doc._id.toString();
+
+      // Create assignment for Child 1
+      const asgnDoc = await StudentFeeAssignmentModel.create({
+        studentId: new mongoose.Types.ObjectId(testChild1Id),
+        admissionNumber: 'STU-TEST-001',
+        studentName: 'Ayan Test Child',
+        className: 'Class 10',
+        section: 'A',
+        academicYear: '2026-2027',
+        feeStructureId: new mongoose.Types.ObjectId(structureId),
+        feeStructureName: 'Class 10 Standard Fee 2026',
+        baseAmount: 10000,
+        concessionAmount: 1000,
+        netPayable: 9000,
+        installments: [
+          {
+            installmentNumber: 1,
+            name: 'Term 1 Tuition',
+            baseAmount: 5000,
+            concessionAmount: 500,
+            netAmount: 4500,
+            dueDate: '2026-08-31',
+            paidAmount: 0,
+            status: 'UNPAID',
+          },
+          {
+            installmentNumber: 2,
+            name: 'Term 2 Tuition',
+            baseAmount: 5000,
+            concessionAmount: 500,
+            netAmount: 4500,
+            dueDate: '2026-12-31',
+            paidAmount: 0,
+            status: 'UNPAID',
+          },
+        ],
+        status: 'ACTIVE',
+      });
+      testAssignment1Id = asgnDoc._id.toString();
+
+      // Create an invoice for Child 1
+      const invDoc = await FeeInvoiceModel.create({
+        invoiceNumber: 'INV-2026-TEST1',
+        studentId: new mongoose.Types.ObjectId(testChild1Id),
+        studentAdmissionNumber: 'STU-TEST-001',
+        studentName: 'Ayan Test Child',
+        parentId: new mongoose.Types.ObjectId(parentUserId),
+        parentName: 'Parent Fee Tester',
+        parentContact: '+91 98765 00002',
+        className: 'Class 10',
+        section: 'A',
+        academicYear: '2026-2027',
+        feeAssignmentId: new mongoose.Types.ObjectId(testAssignment1Id),
+        feeStructureId: new mongoose.Types.ObjectId(structureId),
+        installmentNumber: 1,
+        installmentName: 'Term 1 Tuition',
+        items: [
+          { categoryName: 'Tuition Fee', amount: 4500 },
+          { categoryName: 'Computer Lab Fee', amount: 500 },
+        ],
+        subtotal: 5000,
+        concessionAmount: 500,
+        lateFeeAmount: 0,
+        totalPayable: 4500,
+        paidAmount: 0,
+        outstandingAmount: 4500,
+        issueDate: '2026-06-01',
+        dueDate: '2027-03-31',
+        status: 'UNPAID',
+      });
+      testInvoice1Id = invDoc._id.toString();
+    });
+
+    afterAll(async () => {
+      await UserModel.deleteMany({
+        email: { $in: ['other.parent@eduhub.school', 'unapproved.parent@eduhub.school'] },
+      });
+      await StudentModel.deleteMany({
+        studentId: { $in: ['STU-TEST-001', 'STU-TEST-002'] },
+      });
+      await mongoose.model('StudentRegistrationRequest').deleteMany({
+        parentId: new mongoose.Types.ObjectId(unapprovedParentUserId),
+      });
+      await StudentFeeAssignmentModel.deleteMany({
+        studentId: new mongoose.Types.ObjectId(testChild1Id),
+      });
+      await FeeInvoiceModel.deleteMany({
+        invoiceNumber: 'INV-2026-TEST1',
+      });
+      await FeePaymentModel.deleteMany({
+        invoiceId: new mongoose.Types.ObjectId(testInvoice1Id),
+      });
+    });
+
+    it('Scenario 1: Enrolled student with assigned fee structure and invoice', async () => {
+      const res = await request(app)
+        .get(`/api/v1/parent/fees/invoices?studentId=${testChild1Id}`)
+        .set('Authorization', `Bearer ${parentToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.hasEnrolledChildren).toBe(true);
+      expect(res.body.data.assignment).not.toBeNull();
+      expect(res.body.data.assignment.studentName).toBe('Ayan Test Child');
+      expect(res.body.data.assignment.feeStructureName).toBe('Class 10 Standard Fee 2026');
+      expect(res.body.data.invoices.length).toBeGreaterThan(0);
+      expect(res.body.data.invoices[0].invoiceNumber).toBe('INV-2026-TEST1');
+      expect(res.body.data.summary.totalFees).toBeGreaterThan(0);
+    });
+
+    it('Scenario 2: Enrolled student without an assigned fee structure', async () => {
+      const res = await request(app)
+        .get(`/api/v1/parent/fees/invoices?studentId=${testChild2Id}`)
+        .set('Authorization', `Bearer ${parentToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.hasEnrolledChildren).toBe(true);
+      expect(res.body.data.assignment).toBeNull();
+      expect(res.body.data.invoices).toHaveLength(0);
+      expect(res.body.data.summary.totalFees).toBe(0);
+      expect(res.body.data.summary.outstandingBalance).toBe(0);
+    });
+
+    it('Scenario 3: Parent with multiple children (selector support)', async () => {
+      const res = await request(app)
+        .get('/api/v1/parent/fees/invoices')
+        .set('Authorization', `Bearer ${parentToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.hasEnrolledChildren).toBe(true);
+      // Both test children are in the returned children list
+      expect(res.body.data.children.length).toBeGreaterThanOrEqual(2);
+      expect(res.body.data.children.some((c: any) => c.studentId === 'STU-TEST-001')).toBe(true);
+      expect(res.body.data.children.some((c: any) => c.studentId === 'STU-TEST-002')).toBe(true);
+    });
+
+    it('Scenario 4: Unauthorized parent attempting to access another parent’s student fees', async () => {
+      // Attempting to filter by another parent's child ID
+      const queryRes = await request(app)
+        .get(`/api/v1/parent/fees/invoices?studentId=${testChild1Id}`)
+        .set('Authorization', `Bearer ${secondParentToken}`);
+
+      expect(queryRes.status).toBe(403);
+
+      // Attempting to directly fetch another parent's invoice details
+      const detailRes = await request(app)
+        .get(`/api/v1/parent/fees/invoices/${testInvoice1Id}`)
+        .set('Authorization', `Bearer ${secondParentToken}`);
+
+      expect(detailRes.status).toBe(403);
+    });
+
+    it('Scenario 5: Unpaid and partially paid invoice verification', async () => {
+      // Verify initial UNPAID state
+      const initialRes = await request(app)
+        .get(`/api/v1/parent/fees/invoices/${testInvoice1Id}`)
+        .set('Authorization', `Bearer ${parentToken}`);
+
+      expect(initialRes.status).toBe(200);
+      expect(initialRes.body.data.status).toBe('UNPAID');
+      expect(initialRes.body.data.paidAmount).toBe(0);
+      expect(initialRes.body.data.outstandingAmount).toBe(4500);
+      expect(initialRes.body.data.items.length).toBe(2);
+
+      // Record a partial payment of 2000 against this invoice via admin
+      const payRes = await request(app)
+        .post('/api/v1/admin/fees/payments/collect')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          invoiceId: testInvoice1Id,
+          amount: 2000,
+          paymentMethod: 'UPI',
+          transactionReference: 'UPI-PARENT-TEST-01',
+          remarks: 'Partial payment for Term 1',
+        });
+
+      expect(payRes.status).toBe(201);
+
+      // Re-fetch invoice as parent to verify PARTIAL status and payment history
+      const partialRes = await request(app)
+        .get(`/api/v1/parent/fees/invoices/${testInvoice1Id}`)
+        .set('Authorization', `Bearer ${parentToken}`);
+
+      expect(partialRes.status).toBe(200);
+      expect(partialRes.body.data.status).toBe('PARTIAL');
+      expect(partialRes.body.data.paidAmount).toBe(2000);
+      expect(partialRes.body.data.outstandingAmount).toBe(2500);
+      expect(partialRes.body.data.payments).toHaveLength(1);
+      expect(partialRes.body.data.payments[0].receiptNumber).toMatch(/^REC-/);
+      expect(partialRes.body.data.payments[0].amount).toBe(2000);
+      expect(partialRes.body.data.payments[0].status).toBe('SUCCESS');
+    });
+
+    it('Scenario 6: Parent with no officially enrolled children (admission pending)', async () => {
+      const res = await request(app)
+        .get('/api/v1/parent/fees/invoices')
+        .set('Authorization', `Bearer ${unapprovedParentToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.hasEnrolledChildren).toBe(false);
+      expect(res.body.data.registrationRequestsCount).toBe(1);
+      expect(res.body.data.invoices).toHaveLength(0);
+    });
+
+    it('Scenario 7: Guarded structure deletion should reject deletion when active assignments/invoices exist', async () => {
+      const deleteRes = await request(app)
+        .delete(`/api/v1/admin/fees/structures/${structureId}`)
+        .set('Authorization', `Bearer ${adminToken}`);
+
+      expect(deleteRes.status).toBe(400);
+      const errorMsg = deleteRes.body.error?.message || deleteRes.body.message;
+      expect(errorMsg).toMatch(/active financial records reference it/i);
+      expect(errorMsg).toMatch(/deactivate or archive this fee structure instead/i);
+
+      // Verify that deactivating the structure succeeds
+      const deactRes = await request(app)
+        .put(`/api/v1/admin/fees/structures/${structureId}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ status: 'INACTIVE' });
+
+      expect(deactRes.status).toBe(200);
+      expect(deactRes.body.data.status).toBe('INACTIVE');
     });
   });
 });

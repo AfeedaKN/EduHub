@@ -179,7 +179,9 @@ export const AdminFeesPage: React.FC = () => {
           {activeTab === 'INVOICES' && (
             <FeeInvoicesTab academicYear={selectedAcademicYear} />
           )}
-          {activeTab === 'COLLECTION' && <FeeCollectionTab />}
+          {activeTab === 'COLLECTION' && (
+            <FeeCollectionTab academicYear={selectedAcademicYear} />
+          )}
           {activeTab === 'TRANSACTIONS' && (
             <FeeTransactionsTab academicYear={selectedAcademicYear} />
           )}
